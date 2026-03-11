@@ -1,0 +1,317 @@
+{
+  "info": {
+    "name": "PoloDeck API",
+    "description": "PoloDeck water polo scoreboard API. Import the PoloDeck-Local environment and select it so hostname/port and gameId are shared. Set hostname (and port if needed) in the environment; baseUrl is built from them. After creating a game, set gameId in the environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "gameId", "value": "" },
+    { "key": "exclusionId", "value": "" },
+    { "key": "playerId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Games",
+      "item": [
+        {
+          "name": "Create Game",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"homeTeamName\": \"Home Team\",\n  \"awayTeamName\": \"Away Team\",\n  \"totalPeriods\": 4,\n  \"gameClockDurationMs\": 480000,\n  \"shotClockDurationMs\": 30000\n}"
+            },
+            "url": "{{baseUrl}}/api/games"
+          }
+        },
+        {
+          "name": "List Games",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/games"
+          }
+        },
+        {
+          "name": "Get Game by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Score",
+      "item": [
+        {
+          "name": "Home Increment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/score/home/increment"
+          }
+        },
+        {
+          "name": "Home Decrement",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/score/home/decrement"
+          }
+        },
+        {
+          "name": "Away Increment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/score/away/increment"
+          }
+        },
+        {
+          "name": "Away Decrement",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/score/away/decrement"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Game Clock",
+      "item": [
+        {
+          "name": "Start",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/game-clock/start"
+          }
+        },
+        {
+          "name": "Stop",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/game-clock/stop"
+          }
+        },
+        {
+          "name": "Set",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remainingMs\": 120000\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/game-clock/set"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shot Clock",
+      "item": [
+        {
+          "name": "Start",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/shot-clock/start"
+          }
+        },
+        {
+          "name": "Stop",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/shot-clock/stop"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/shot-clock/reset"
+          }
+        },
+        {
+          "name": "Set",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remainingMs\": 30000\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/shot-clock/set"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Period",
+      "item": [
+        {
+          "name": "Advance Period",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/period/advance"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roster",
+      "item": [
+        {
+          "name": "Add Home Player",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"capNumber\": 7,\n  \"playerName\": \"Player Name\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/roster/home/player"
+          }
+        },
+        {
+          "name": "Add Away Player",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"capNumber\": 7,\n  \"playerName\": \"Player Name\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/roster/away/player"
+          }
+        },
+        {
+          "name": "Get Roster",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/roster"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exclusions",
+      "item": [
+        {
+          "name": "Create Exclusion",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"durationMs\": 20000\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/exclusions"
+          }
+        },
+        {
+          "name": "Get Active Exclusions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/exclusions/active"
+          }
+        },
+        {
+          "name": "Clear Exclusion",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/exclusions/{{exclusionId}}/clear"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Timeouts",
+      "item": [
+        {
+          "name": "Home Full Timeout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/timeouts/home/full"
+          }
+        },
+        {
+          "name": "Home Short Timeout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/timeouts/home/short"
+          }
+        },
+        {
+          "name": "Away Full Timeout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/timeouts/away/full"
+          }
+        },
+        {
+          "name": "Away Short Timeout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/timeouts/away/short"
+          }
+        },
+        {
+          "name": "Get Timeouts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/games/{{gameId}}/timeouts"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Horn",
+      "item": [
+        {
+          "name": "Trigger Horn",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"manual\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}/horn/trigger"
+          }
+        }
+      ]
+    }
+  ]
+}

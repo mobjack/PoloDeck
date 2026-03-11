@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GameStatus {
+  PENDING
+  IN_PROGRESS
+  FINAL
+}
+
+enum TeamSide {
+  HOME
+  AWAY
+}
+
+enum ExclusionStatus {
+  ACTIVE
+  ROLLED
+}
+
+enum GameEventType {
+  GAME_CREATED
+  GOAL_HOME
+  GOAL_AWAY
+  GAME_CLOCK_STARTED
+  GAME_CLOCK_STOPPED
+  GAME_CLOCK_SET
+  SHOT_CLOCK_STARTED
+  SHOT_CLOCK_STOPPED
+  SHOT_CLOCK_RESET
+  SHOT_CLOCK_SET
+  PERIOD_ADVANCED
+  EXCLUSION_STARTED
+  EXCLUSION_CLEARED
+  TIMEOUT_USED
+  HORN_TRIGGERED
+}
+
+model Game {
+  id             String       @id @default(cuid())
+  homeTeamName   String
+  awayTeamName   String
+  currentPeriod  Int          @default(1)
+  totalPeriods   Int
+  status         GameStatus   @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  score          Score?
+  gameClock      GameClock?
+  shotClock      ShotClock?
+  events         GameEvent[]
+  players        Player[]
+  exclusions     PlayerExclusion[]
+  timeoutStates  TeamTimeoutState[]
+}
+
+model Score {
+  id        String @id @default(cuid())
+  gameId    String @unique
+  homeScore Int    @default(0)
+  awayScore Int    @default(0)
+
+  game      Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model GameClock {
+  id            String   @id @default(cuid())
+  gameId        String   @unique
+  durationMs    Int
+  remainingMs   Int
+  running       Boolean  @default(false)
+  lastStartedAt DateTime?
+
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model ShotClock {
+  id            String   @id @default(cuid())
+  gameId        String   @unique
+  durationMs    Int
+  remainingMs   Int
+  running       Boolean  @default(false)
+  lastStartedAt DateTime?
+
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+model GameEvent {
+  id        String        @id @default(cuid())
+  gameId    String
+  eventType GameEventType
+  payload   Json
+  source    String
+  createdAt DateTime      @default(now())
+
+  game      Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, createdAt])
+}
+
+model Player {
+  id         String    @id @default(cuid())
+  gameId     String
+  teamSide   TeamSide
+  capNumber  Int
+  playerName String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  game       Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  exclusions PlayerExclusion[]
+
+  @@index([gameId, teamSide])
+}
+
+model PlayerExclusion {
+  id          String          @id @default(cuid())
+  gameId      String
+  playerId    String
+  teamSide    TeamSide
+  durationMs  Int
+  remainingMs Int
+  running     Boolean         @default(true)
+  status      ExclusionStatus @default(ACTIVE)
+  endedAt     DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  game        Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player      Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, status])
+}
+
+model TeamTimeoutState {
+  id                     String   @id @default(cuid())
+  gameId                 String
+  teamSide               TeamSide
+  fullTimeoutsRemaining  Int
+  shortTimeoutsRemaining Int
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  game                   Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, teamSide])
+}
+

@@ -1,0 +1,31 @@
+name: deckServer
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: polodeck-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-polodeck}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-polodeck}
+      POSTGRES_DB: ${POSTGRES_DB:-polodeck}
+    ports:
+      - "5432:5432"
+    volumes:
+      - polodeck-postgres-data:/var/lib/postgresql/data
+
+  polodeck-app:
+    build: .
+    container_name: polodeck-app
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-polodeck}:${POSTGRES_PASSWORD:-polodeck}@postgres:5432/${POSTGRES_DB:-polodeck}?schema=public
+    ports:
+      - "127.0.0.1:3000:3000"
+    command: ["node", "dist/server.js"]
+
+volumes:
+  polodeck-postgres-data:
+

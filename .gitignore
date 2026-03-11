@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and secrets (do not commit)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs and runtime
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Prisma
+# Keep schema and migrations; ignore generated client in repo (generated on install)
+# server/node_modules/.prisma is inside node_modules, so already ignored
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Test and coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Optional: local overrides
+*.local
