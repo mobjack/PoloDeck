@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { TeamSide } from ".prisma/client";
+import { env } from "../config/env";
 import {
   addPlayerBodySchema,
   createExclusionBodySchema,
@@ -28,6 +29,48 @@ export async function registerGameRoutes(app: FastifyInstance) {
   app.get("/games/:id", async (request) => {
     const params = gameIdParamSchema.parse(request.params);
     return service.getGameAggregate(params.id);
+  });
+
+  // Global devices & capabilities (one server -> one game, many devices)
+  app.post("/devices/check-in", async (request) => {
+    const body = request.body as {
+      clientId?: string;
+      type?: string;
+      name?: string;
+    };
+
+    if (!body?.clientId || !body?.type) {
+      throw new Error("clientId and type are required");
+    }
+
+    const normalizedType = body.type.toUpperCase();
+    const allowedTypes = ["SCOREBOARD", "SHOT_CLOCK", "OTHER"] as const;
+
+    if (!allowedTypes.includes(normalizedType as any)) {
+      throw new Error("Invalid device type");
+    }
+
+    const device = await service.checkInDevice({
+      clientId: body.clientId,
+      type: normalizedType as (typeof allowedTypes)[number],
+      name: body.name,
+    });
+
+    return {
+      device,
+      config: {
+        heartbeatIntervalMs: env.DEVICE_HEARTBEAT_INTERVAL_MS,
+        staleAfterMs: env.DEVICE_STALE_AFTER_MS,
+      },
+    };
+  });
+
+  app.get("/devices", async () => {
+    return service.listAllDevices();
+  });
+
+  app.get("/capabilities", async () => {
+    return service.getGlobalDeviceCapabilities();
   });
 
   // Score commands

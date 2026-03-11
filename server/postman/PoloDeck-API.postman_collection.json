@@ -58,6 +58,39 @@
       ]
     },
     {
+      "name": "Devices & Capabilities",
+      "item": [
+        {
+          "name": "Device Check-in",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"sb-001\",\n  \"type\": \"SCOREBOARD\",\n  \"name\": \"Main scoreboard\"\n}"
+            },
+            "url": "{{baseUrl}}/api/devices/check-in"
+          }
+        },
+        {
+          "name": "List Devices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/devices"
+          }
+        },
+        {
+          "name": "Get Capabilities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/capabilities"
+          }
+        }
+      ]
+    },
+    {
       "name": "Score",
       "item": [
         {

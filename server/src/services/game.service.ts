@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import {
-  GameEventType,
-  TeamSide,
-  type Prisma,
-} from ".prisma/client";
+import { GameEventType, TeamSide, type Prisma } from ".prisma/client";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
+import {
+  buildDeviceCapabilities,
+  type DeviceCapabilities,
+  type DeviceSummary,
+} from "./deviceCapabilities";
+import { env } from "../config/env";
 
 export class GameService {
   constructor(private app: FastifyInstance) {}
@@ -48,6 +50,64 @@ export class GameService {
         payload,
         source,
       },
+    });
+  }
+
+  async checkInDevice(input: {
+    clientId: string;
+    type: "SCOREBOARD" | "SHOT_CLOCK" | "OTHER";
+    name?: string;
+  }) {
+    const now = new Date();
+
+    const existing = await this.prisma.device.findUnique({
+      where: { clientId: input.clientId },
+    });
+
+    if (existing) {
+      const updated = await this.prisma.device.update({
+        where: { id: existing.id },
+        data: {
+          type: input.type,
+          name: input.name,
+          lastCheckInAt: now,
+        },
+      });
+      return updated;
+    }
+
+    const created = await this.prisma.device.create({
+      data: {
+        clientId: input.clientId,
+        type: input.type,
+        name: input.name,
+        lastCheckInAt: now,
+      },
+    });
+
+    return created;
+  }
+
+  async listAllDevices(): Promise<DeviceSummary[]> {
+    const devices = await this.prisma.device.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+
+    return devices.map((d: any) => ({
+      id: d.id,
+      clientId: d.clientId,
+      type: d.type,
+      name: d.name,
+      lastCheckInAt: d.lastCheckInAt.toISOString(),
+    }));
+  }
+
+  async getGlobalDeviceCapabilities(): Promise<DeviceCapabilities> {
+    const devices = await this.listAllDevices();
+    return buildDeviceCapabilities({
+      now: new Date(),
+      devices,
+      staleAfterMs: env.DEVICE_STALE_AFTER_MS,
     });
   }
 
