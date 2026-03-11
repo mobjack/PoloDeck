@@ -6,7 +6,7 @@ export type GameMode =
 export interface DeviceSummary {
   id: string;
   clientId: string;
-  type: "SCOREBOARD" | "SHOT_CLOCK" | "OTHER";
+  type: "SCOREBOARD" | "SHOT_CLOCK" | "TIMER" | "HORN" | "OTHER";
   name?: string | null;
   lastCheckInAt: string;
 }
