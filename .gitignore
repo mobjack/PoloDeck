@@ -44,3 +44,4 @@ coverage/
 
 # Optional: local overrides
 *.local
+prompt.md
