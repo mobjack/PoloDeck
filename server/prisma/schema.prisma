@@ -23,6 +23,12 @@ enum ExclusionStatus {
   ROLLED
 }
 
+enum DeviceType {
+  SCOREBOARD
+  SHOT_CLOCK
+  OTHER
+}
+
 enum GameEventType {
   GAME_CREATED
   GOAL_HOME
@@ -151,4 +157,15 @@ model TeamTimeoutState {
 
   @@unique([gameId, teamSide])
 }
+
+model Device {
+  id            String     @id @default(cuid())
+  clientId      String     @unique
+  type          DeviceType
+  name          String?
+  lastCheckInAt DateTime
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
 
