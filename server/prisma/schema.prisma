@@ -47,16 +47,37 @@ enum GameEventType {
   HORN_TRIGGERED
 }
 
+model GameDay {
+  id                          String   @id @default(cuid())
+  date                        DateTime @db.Date
+  location                    String
+  defaultQuarterDurationMs     Int
+  defaultBreakBetweenQuartersMs Int
+  defaultHalftimeDurationMs   Int
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  games                       Game[]
+}
+
 model Game {
   id             String       @id @default(cuid())
+  gameDayId      String?
+  scheduledAt    DateTime?
   homeTeamName   String
   awayTeamName   String
+  level         String?       // Varsity, JV, 14U, etc.
+  gender        String?       // Boys, Girls, Co-ed
+  gameType      String?       // League, Tournament, Scrimmage, Practice
+  label         String?       // short label e.g. "Girls Varsity 7pm"
+  orderInDay    Int?         // for display order on game day
   currentPeriod  Int          @default(1)
   totalPeriods   Int
   status         GameStatus   @default(PENDING)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  gameDay       GameDay?     @relation(fields: [gameDayId], references: [id], onDelete: SetNull)
   score          Score?
   gameClock      GameClock?
   shotClock      ShotClock?
@@ -114,7 +135,7 @@ model Player {
   id         String    @id @default(cuid())
   gameId     String
   teamSide   TeamSide
-  capNumber  Int
+  capNumber  String    // e.g. "1", "2", "A", "B", "1A"
   playerName String
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt

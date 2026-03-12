@@ -5,21 +5,54 @@ import {
   addPlayerBodySchema,
   createExclusionBodySchema,
   createGameBodySchema,
+  createGameDayBodySchema,
   exclusionIdParamSchema,
+  gameDayIdParamSchema,
   gameIdParamSchema,
   setClockBodySchema,
   triggerHornBodySchema,
+  updateGameBodySchema,
+  updateGameDayBodySchema,
 } from "../schemas/game.schemas";
 import { GameService } from "../services/game.service";
 
 export async function registerGameRoutes(app: FastifyInstance) {
   const service = new GameService(app);
 
+  // Game days
+  app.post("/game-days", async (request, reply) => {
+    const body = createGameDayBodySchema.parse(request.body);
+    const gameDay = await service.createGameDay(body);
+    reply.code(201);
+    return gameDay;
+  });
+
+  app.get("/game-days", async () => {
+    return service.listGameDays();
+  });
+
+  app.get("/game-days/:gameDayId", async (request) => {
+    const params = gameDayIdParamSchema.parse(request.params);
+    return service.getGameDay(params.gameDayId);
+  });
+
+  app.patch("/game-days/:gameDayId", async (request) => {
+    const params = gameDayIdParamSchema.parse(request.params);
+    const body = updateGameDayBodySchema.parse(request.body);
+    return service.updateGameDay(params.gameDayId, body);
+  });
+
   app.post("/games", async (request, reply) => {
     const body = createGameBodySchema.parse(request.body);
     const aggregate = await service.createGame(body);
     reply.code(201);
     return aggregate;
+  });
+
+  app.patch("/games/:id", async (request) => {
+    const params = gameIdParamSchema.parse(request.params);
+    const body = updateGameBodySchema.parse(request.body);
+    return service.updateGame(params.id, body);
   });
 
   app.get("/games", async () => {

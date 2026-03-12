@@ -111,45 +111,164 @@ export class GameService {
     });
   }
 
+  // --- Game day ---
+  async createGameDay(input: {
+    date: string;
+    location: string;
+    defaultQuarterDurationMs: number;
+    defaultBreakBetweenQuartersMs: number;
+    defaultHalftimeDurationMs: number;
+  }) {
+    const gameDay = await this.prisma.gameDay.create({
+      data: {
+        date: new Date(input.date),
+        location: input.location,
+        defaultQuarterDurationMs: input.defaultQuarterDurationMs,
+        defaultBreakBetweenQuartersMs: input.defaultBreakBetweenQuartersMs,
+        defaultHalftimeDurationMs: input.defaultHalftimeDurationMs,
+      },
+    });
+    return gameDay;
+  }
+
+  async listGameDays() {
+    const list = await this.prisma.gameDay.findMany({
+      orderBy: { date: "desc" },
+      include: {
+        games: {
+          orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    });
+    type GameDayWithGames = (typeof list)[0];
+    type GameRow = GameDayWithGames["games"][0];
+    return list.map((gd: GameDayWithGames) => ({
+      ...gd,
+      date: gd.date.toISOString().slice(0, 10),
+      games: gd.games.map((g: GameRow) => ({
+        ...g,
+        scheduledAt: g.scheduledAt?.toISOString() ?? null,
+        createdAt: g.createdAt.toISOString(),
+        updatedAt: g.updatedAt.toISOString(),
+      })),
+    }));
+  }
+
+  async getGameDay(gameDayId: string) {
+    const gameDay = await this.prisma.gameDay.findUnique({
+      where: { id: gameDayId },
+      include: {
+        games: {
+          orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    });
+    if (!gameDay) throw this.notFound("Game day not found");
+    type GameRow = (typeof gameDay.games)[number];
+    return {
+      ...gameDay,
+      date: gameDay.date.toISOString().slice(0, 10),
+      games: gameDay.games.map((g: GameRow) => ({
+        ...g,
+        scheduledAt: g.scheduledAt?.toISOString() ?? null,
+        createdAt: g.createdAt.toISOString(),
+        updatedAt: g.updatedAt.toISOString(),
+      })),
+    };
+  }
+
+  async updateGameDay(
+    gameDayId: string,
+    input: {
+      date?: string;
+      location?: string;
+      defaultQuarterDurationMs?: number;
+      defaultBreakBetweenQuartersMs?: number;
+      defaultHalftimeDurationMs?: number;
+    }
+  ) {
+    const existing = await this.prisma.gameDay.findUnique({ where: { id: gameDayId } });
+    if (!existing) throw this.notFound("Game day not found");
+    const data: { date?: Date; location?: string; defaultQuarterDurationMs?: number; defaultBreakBetweenQuartersMs?: number; defaultHalftimeDurationMs?: number } = {};
+    if (input.date != null) data.date = new Date(input.date);
+    if (input.location != null) data.location = input.location;
+    if (input.defaultQuarterDurationMs != null) data.defaultQuarterDurationMs = input.defaultQuarterDurationMs;
+    if (input.defaultBreakBetweenQuartersMs != null) data.defaultBreakBetweenQuartersMs = input.defaultBreakBetweenQuartersMs;
+    if (input.defaultHalftimeDurationMs != null) data.defaultHalftimeDurationMs = input.defaultHalftimeDurationMs;
+    const gameDay = await this.prisma.gameDay.update({
+      where: { id: gameDayId },
+      data,
+    });
+    return gameDay;
+  }
+
   async createGame(input: {
+    gameDayId?: string;
+    scheduledAt?: string;
     homeTeamName: string;
     awayTeamName: string;
-    totalPeriods: number;
-    gameClockDurationMs: number;
-    shotClockDurationMs: number;
+    level?: string;
+    gender?: string;
+    gameType?: string;
+    label?: string;
+    totalPeriods?: number;
+    gameClockDurationMs?: number;
+    shotClockDurationMs?: number;
   }) {
+    let totalPeriods = input.totalPeriods ?? 4;
+    let gameClockDurationMs = input.gameClockDurationMs;
+    let shotClockDurationMs = input.shotClockDurationMs;
+
+    if (input.gameDayId) {
+      const gameDay = await this.prisma.gameDay.findUnique({
+        where: { id: input.gameDayId },
+      });
+      if (gameDay) {
+        if (gameClockDurationMs == null) gameClockDurationMs = gameDay.defaultQuarterDurationMs;
+        if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000; // default 30s shot clock
+      }
+    }
+    if (gameClockDurationMs == null) gameClockDurationMs = 8 * 60 * 1000; // 8 min default
+    if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000;
+
+    const maxOrder = input.gameDayId
+      ? await this.prisma.game
+          .aggregate({
+            where: { gameDayId: input.gameDayId },
+            _max: { orderInDay: true },
+          })
+          .then((r: { _max: { orderInDay: number | null } }) => (r._max.orderInDay ?? -1) + 1)
+      : 0;
+
     const game = await this.prisma.game.create({
       data: {
+        gameDayId: input.gameDayId ?? null,
+        scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
         homeTeamName: input.homeTeamName,
         awayTeamName: input.awayTeamName,
-        totalPeriods: input.totalPeriods,
-        score: {
-          create: {},
-        },
+        level: input.level ?? null,
+        gender: input.gender ?? null,
+        gameType: input.gameType ?? null,
+        label: input.label ?? null,
+        orderInDay: input.gameDayId ? maxOrder : null,
+        totalPeriods,
+        score: { create: {} },
         gameClock: {
           create: {
-            durationMs: input.gameClockDurationMs,
-            remainingMs: input.gameClockDurationMs,
+            durationMs: gameClockDurationMs,
+            remainingMs: gameClockDurationMs,
           },
         },
         shotClock: {
           create: {
-            durationMs: input.shotClockDurationMs,
-            remainingMs: input.shotClockDurationMs,
+            durationMs: shotClockDurationMs,
+            remainingMs: shotClockDurationMs,
           },
         },
         timeoutStates: {
           create: [
-            {
-              teamSide: TeamSide.HOME,
-              fullTimeoutsRemaining: 2,
-              shortTimeoutsRemaining: 1,
-            },
-            {
-              teamSide: TeamSide.AWAY,
-              fullTimeoutsRemaining: 2,
-              shortTimeoutsRemaining: 1,
-            },
+            { teamSide: TeamSide.HOME, fullTimeoutsRemaining: 2, shortTimeoutsRemaining: 1 },
+            { teamSide: TeamSide.AWAY, fullTimeoutsRemaining: 2, shortTimeoutsRemaining: 1 },
           ],
         },
       },
@@ -167,6 +286,46 @@ export class GameService {
     );
 
     return this.emitState(game.id);
+  }
+
+  async updateGame(
+    gameId: string,
+    input: {
+      scheduledAt?: string | null;
+      homeTeamName?: string;
+      awayTeamName?: string;
+      level?: string | null;
+      gender?: string | null;
+      gameType?: string | null;
+      label?: string | null;
+      orderInDay?: number | null;
+    }
+  ) {
+    const existing = await this.prisma.game.findUnique({ where: { id: gameId } });
+    if (!existing) throw this.notFound("Game not found");
+    const data: {
+      scheduledAt?: Date | null;
+      homeTeamName?: string;
+      awayTeamName?: string;
+      level?: string | null;
+      gender?: string | null;
+      gameType?: string | null;
+      label?: string | null;
+      orderInDay?: number | null;
+    } = {};
+    if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+    if (input.homeTeamName != null) data.homeTeamName = input.homeTeamName;
+    if (input.awayTeamName != null) data.awayTeamName = input.awayTeamName;
+    if (input.level !== undefined) data.level = input.level;
+    if (input.gender !== undefined) data.gender = input.gender;
+    if (input.gameType !== undefined) data.gameType = input.gameType;
+    if (input.label !== undefined) data.label = input.label;
+    if (input.orderInDay !== undefined) data.orderInDay = input.orderInDay;
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data,
+    });
+    return this.emitState(gameId);
   }
 
   async getGameAggregate(gameId: string) {
@@ -472,7 +631,7 @@ export class GameService {
     return this.emitState(gameId);
   }
 
-  async addPlayer(gameId: string, teamSide: TeamSide, body: { capNumber: number; playerName: string }) {
+  async addPlayer(gameId: string, teamSide: TeamSide, body: { capNumber: string; playerName: string }) {
     const game = await this.prisma.game.findUnique({ where: { id: gameId } });
     if (!game) {
       throw this.notFound("Game not found");

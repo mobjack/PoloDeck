@@ -1,16 +1,62 @@
 {
   "info": {
     "name": "PoloDeck API",
-    "description": "PoloDeck water polo scoreboard API. Import the PoloDeck-Local environment and select it so hostname/port and gameId are shared. Set hostname (and port if needed) in the environment; baseUrl is built from them. After creating a game, set gameId in the environment.",
+    "description": "PoloDeck water polo scoreboard API. Use collection variables: baseUrl (default http://localhost:3000), gameDayId, gameId, exclusionId, playerId. After creating a game day, set gameDayId; after creating a game, set gameId.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "gameDayId", "value": "" },
     { "key": "gameId", "value": "" },
     { "key": "exclusionId", "value": "" },
     { "key": "playerId", "value": "" }
   ],
   "item": [
+    {
+      "name": "Game Days",
+      "item": [
+        {
+          "name": "Create Game Day",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2025-03-15\",\n  \"location\": \"Main Pool\",\n  \"defaultQuarterDurationMs\": 480000,\n  \"defaultBreakBetweenQuartersMs\": 30000,\n  \"defaultHalftimeDurationMs\": 180000\n}"
+            },
+            "url": "{{baseUrl}}/api/game-days"
+          }
+        },
+        {
+          "name": "List Game Days",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/game-days"
+          }
+        },
+        {
+          "name": "Get Game Day by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/game-days/{{gameDayId}}"
+          }
+        },
+        {
+          "name": "Update Game Day",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2025-03-15\",\n  \"location\": \"Main Pool\",\n  \"defaultQuarterDurationMs\": 480000,\n  \"defaultBreakBetweenQuartersMs\": 30000,\n  \"defaultHalftimeDurationMs\": 180000\n}"
+            },
+            "url": "{{baseUrl}}/api/game-days/{{gameDayId}}"
+          }
+        }
+      ]
+    },
     {
       "name": "Health",
       "item": [
@@ -34,9 +80,21 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"homeTeamName\": \"Home Team\",\n  \"awayTeamName\": \"Away Team\",\n  \"totalPeriods\": 4,\n  \"gameClockDurationMs\": 480000,\n  \"shotClockDurationMs\": 30000\n}"
+              "raw": "{\n  \"gameDayId\": \"{{gameDayId}}\",\n  \"homeTeamName\": \"Home Team\",\n  \"awayTeamName\": \"Away Team\",\n  \"level\": \"Varsity\",\n  \"gender\": \"Boys\",\n  \"gameType\": \"League\",\n  \"label\": \"Game 1\",\n  \"totalPeriods\": 4,\n  \"gameClockDurationMs\": 480000,\n  \"shotClockDurationMs\": 30000\n}"
             },
             "url": "{{baseUrl}}/api/games"
+          }
+        },
+        {
+          "name": "Update Game",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"homeTeamName\": \"Home Team\",\n  \"awayTeamName\": \"Away Team\",\n  \"level\": \"Varsity\",\n  \"gender\": \"Girls\",\n  \"gameType\": \"Scrimmage\",\n  \"label\": \"Girls Varsity 7pm\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/{{gameId}}"
           }
         },
         {
@@ -224,7 +282,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"capNumber\": 7,\n  \"playerName\": \"Player Name\"\n}"
+              "raw": "{\n  \"capNumber\": \"7\",\n  \"playerName\": \"Player Name\"\n}"
             },
             "url": "{{baseUrl}}/api/games/{{gameId}}/roster/home/player"
           }
@@ -236,7 +294,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"capNumber\": 7,\n  \"playerName\": \"Player Name\"\n}"
+              "raw": "{\n  \"capNumber\": \"7\",\n  \"playerName\": \"Player Name\"\n}"
             },
             "url": "{{baseUrl}}/api/games/{{gameId}}/roster/away/player"
           }
