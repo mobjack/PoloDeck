@@ -236,22 +236,33 @@ export function GameSheet() {
               </tbody>
             </table>
 
-            <h4 className="game-sheet-fouls-heading">Personal fouls</h4>
+            <h4 className="game-sheet-fouls-heading">Personal fouls (3 per player)</h4>
             <table className="table game-sheet-fouls-table">
               <thead>
                 <tr>
                   <th>Cap#</th>
-                  <th>Q1</th>
-                  <th>Q2</th>
-                  <th>Q3</th>
-                  <th>Q4</th>
-                  <th>OT</th>
+                  <th>Name</th>
+                  <th>1</th>
+                  <th>2</th>
+                  <th>3</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colSpan={6}>Fouls by quarter will show here.</td>
-                </tr>
+                {homePlayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>No roster yet.</td>
+                  </tr>
+                ) : (
+                  homePlayers.map((p) => (
+                    <tr key={`foul-${p.id}`}>
+                      <td>{p.capNumber}</td>
+                      <td>{p.playerName}</td>
+                      <td className="foul-slot">—</td>
+                      <td className="foul-slot">—</td>
+                      <td className="foul-slot">—</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </section>
@@ -296,22 +307,33 @@ export function GameSheet() {
               </tbody>
             </table>
 
-            <h4 className="game-sheet-fouls-heading">Personal fouls</h4>
+            <h4 className="game-sheet-fouls-heading">Personal fouls (3 per player)</h4>
             <table className="table game-sheet-fouls-table">
               <thead>
                 <tr>
                   <th>Cap#</th>
-                  <th>Q1</th>
-                  <th>Q2</th>
-                  <th>Q3</th>
-                  <th>Q4</th>
-                  <th>OT</th>
+                  <th>Name</th>
+                  <th>1</th>
+                  <th>2</th>
+                  <th>3</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colSpan={6}>Fouls by quarter will show here.</td>
-                </tr>
+                {awayPlayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>No roster yet.</td>
+                  </tr>
+                ) : (
+                  awayPlayers.map((p) => (
+                    <tr key={`foul-${p.id}`}>
+                      <td>{p.capNumber}</td>
+                      <td>{p.playerName}</td>
+                      <td className="foul-slot">—</td>
+                      <td className="foul-slot">—</td>
+                      <td className="foul-slot">—</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </section>

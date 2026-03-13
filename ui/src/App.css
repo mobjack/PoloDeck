@@ -19,6 +19,8 @@
 
 .game-sheet-page {
   max-width: 1200px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
 }
 
 .game-sheet-header h2 {
@@ -39,6 +41,10 @@
 .game-sheet-col {
   flex: 1;
   min-width: 0;
+}
+
+.game-sheet-col:last-child {
+  margin-left: 4rem;
 }
 
 .scoreboard-card {
@@ -132,6 +138,11 @@
 .game-sheet-roster-table,
 .game-sheet-fouls-table {
   font-size: 0.8rem;
+}
+
+.game-sheet-fouls-table .foul-slot {
+  min-width: 1.5rem;
+  text-align: center;
 }
 
 .game-sheet-roster-column h3 {

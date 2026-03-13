@@ -66,6 +66,13 @@ export function GameSheet() {
   const homeTimeouts = aggregate.timeoutStates.find((t) => t.teamSide === "HOME");
   const awayTimeouts = aggregate.timeoutStates.find((t) => t.teamSide === "AWAY");
 
+  const homePlayers = (aggregate.players ?? [])
+    .filter((p) => p.teamSide === "HOME" && p.playerName.trim().length > 0)
+    .sort((a, b) => a.capNumber.localeCompare(b.capNumber));
+  const awayPlayers = (aggregate.players ?? [])
+    .filter((p) => p.teamSide === "AWAY" && p.playerName.trim().length > 0)
+    .sort((a, b) => a.capNumber.localeCompare(b.capNumber));
+
   const formatMsToClock = (ms: number | null | undefined) => {
     if (ms == null) return "—";
     const totalSeconds = Math.floor(ms / 1000);
@@ -208,9 +215,24 @@ export function GameSheet() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colSpan={8}>Goals by quarter will show here.</td>
-                </tr>
+                {homePlayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8}>No roster yet.</td>
+                  </tr>
+                ) : (
+                  homePlayers.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.capNumber}</td>
+                      <td>{p.playerName}</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
 
@@ -253,9 +275,24 @@ export function GameSheet() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colSpan={8}>Goals by quarter will show here.</td>
-                </tr>
+                {awayPlayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8}>No roster yet.</td>
+                  </tr>
+                ) : (
+                  awayPlayers.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.capNumber}</td>
+                      <td>{p.playerName}</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
 
