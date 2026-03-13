@@ -9,6 +9,10 @@
   text-align: left;
 }
 
+.roster-page {
+  max-width: 1200px;
+}
+
 .page-header {
   display: flex;
   flex-wrap: wrap;
@@ -185,4 +189,224 @@
 
 .games-section .btn.primary {
   margin-top: 0.5rem;
+}
+
+.roster-panel-subtitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.roster-heading-location {
+  margin: 0 0 0.4rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.roster-location-tag {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-left: 0.35rem;
+}
+
+.roster-heading-matchup {
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.roster-home-label {
+  font-weight: 700;
+  color: #9bbcff;
+}
+
+.roster-away-label {
+  font-weight: 700;
+  color: #ffb29b;
+}
+
+.roster-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.roster-import label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
+.roster-import select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-color-scheme: light) {
+  .roster-import select {
+    border-color: #ccc;
+    background: #fff;
+  }
+}
+
+.roster-table-wrapper {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+
+.roster-table {
+  min-width: 1000px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.roster-table th,
+.roster-table td {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: left;
+}
+
+.roster-cap-heading {
+  width: 4rem;
+  text-align: center;
+}
+
+.roster-home-heading {
+  width: 1fr;
+}
+
+.roster-away-heading {
+  width: 1fr;
+}
+
+.roster-table td:nth-child(1) {
+  width: 4rem;
+  text-align: center;
+}
+
+.roster-table td:nth-child(2),
+.roster-table td:nth-child(4) {
+  width: 1fr;
+}
+
+.roster-table td:nth-child(3) {
+  width: 4rem;
+  text-align: center;
+  padding-left: 1rem;
+  border-left-width: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  .roster-table th,
+  .roster-table td {
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+}
+
+.roster-table th {
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+  .roster-table th {
+    background: rgba(0, 0, 0, 0.06);
+  }
+}
+
+.roster-table input[type="text"] {
+  width: 25rem;
+  max-width: 25;
+  box-sizing: border-box;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.9rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .roster-table input[type="text"] {
+    border-color: #ccc;
+    background: #fff;
+  }
+}
+
+.btn-compact {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.modal {
+  max-width: 480px;
+  width: 100%;
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
+  background: #121212;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+  .modal {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.modal-section {
+  margin-top: 0.75rem;
+}
+
+.modal-section-title {
+  margin: 0.25rem 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.modal-text {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.modal-radio,
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.modal-warning {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.modal-actions {
+  justify-content: flex-end;
 }

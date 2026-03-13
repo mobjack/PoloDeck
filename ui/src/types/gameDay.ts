@@ -19,11 +19,13 @@ export interface GameOnDay {
   level: string | null;
   gender: string | null;
   gameType: string | null;
-  label: string | null;
   orderInDay: number | null;
   currentPeriod: number;
   totalPeriods: number;
   status: string;
+  quarterDurationMs: number;
+  breakBetweenQuartersDurationMs: number;
+  halftimeDurationMs: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,7 +54,9 @@ export interface CreateGameInput {
   level?: string;
   gender?: string;
   gameType?: string;
-  label?: string;
+  quarterDurationMs?: number;
+  breakBetweenQuartersDurationMs?: number;
+  halftimeDurationMs?: number;
 }
 
 export interface UpdateGameInput {
@@ -62,6 +66,8 @@ export interface UpdateGameInput {
   level?: string | null;
   gender?: string | null;
   gameType?: string | null;
-  label?: string | null;
   orderInDay?: number | null;
+  quarterDurationMs?: number;
+  breakBetweenQuartersDurationMs?: number;
+  halftimeDurationMs?: number;
 }

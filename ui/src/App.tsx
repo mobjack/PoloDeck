@@ -5,6 +5,7 @@ import { NewGameDay } from "./pages/NewGameDay";
 import { EditGameDay } from "./pages/EditGameDay";
 import { AddGame } from "./pages/AddGame";
 import { EditGame } from "./pages/EditGame";
+import { GameRoster } from "./pages/GameRoster";
 import "./App.css";
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
           <Route path="/game-days/:id/edit" element={<EditGameDay />} />
           <Route path="/game-days/:id/games/new" element={<AddGame />} />
           <Route path="/game-days/:id/games/:gameId/edit" element={<EditGame />} />
+          <Route path="/game-days/:id/games/:gameId/roster" element={<GameRoster />} />
         </Routes>
       </div>
     </BrowserRouter>

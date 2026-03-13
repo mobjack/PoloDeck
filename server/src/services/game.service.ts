@@ -210,14 +210,19 @@ export class GameService {
     level?: string;
     gender?: string;
     gameType?: string;
-    label?: string;
     totalPeriods?: number;
     gameClockDurationMs?: number;
     shotClockDurationMs?: number;
+    quarterDurationMs?: number;
+    breakBetweenQuartersDurationMs?: number;
+    halftimeDurationMs?: number;
   }) {
     let totalPeriods = input.totalPeriods ?? 4;
-    let gameClockDurationMs = input.gameClockDurationMs;
+    let gameClockDurationMs = input.gameClockDurationMs ?? input.quarterDurationMs;
     let shotClockDurationMs = input.shotClockDurationMs;
+    let quarterDurationMs = input.quarterDurationMs;
+    let breakBetweenQuartersDurationMs = input.breakBetweenQuartersDurationMs;
+    let halftimeDurationMs = input.halftimeDurationMs;
 
     if (input.gameDayId) {
       const gameDay = await this.prisma.gameDay.findUnique({
@@ -225,10 +230,16 @@ export class GameService {
       });
       if (gameDay) {
         if (gameClockDurationMs == null) gameClockDurationMs = gameDay.defaultQuarterDurationMs;
-        if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000; // default 30s shot clock
+        if (quarterDurationMs == null) quarterDurationMs = gameDay.defaultQuarterDurationMs;
+        if (breakBetweenQuartersDurationMs == null) breakBetweenQuartersDurationMs = gameDay.defaultBreakBetweenQuartersMs;
+        if (halftimeDurationMs == null) halftimeDurationMs = gameDay.defaultHalftimeDurationMs;
+        if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000;
       }
     }
-    if (gameClockDurationMs == null) gameClockDurationMs = 8 * 60 * 1000; // 8 min default
+    if (gameClockDurationMs == null) gameClockDurationMs = 8 * 60 * 1000;
+    if (quarterDurationMs == null) quarterDurationMs = 8 * 60 * 1000;
+    if (breakBetweenQuartersDurationMs == null) breakBetweenQuartersDurationMs = 2 * 60 * 1000;
+    if (halftimeDurationMs == null) halftimeDurationMs = 5 * 60 * 1000;
     if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000;
 
     const maxOrder = input.gameDayId
@@ -249,9 +260,11 @@ export class GameService {
         level: input.level ?? null,
         gender: input.gender ?? null,
         gameType: input.gameType ?? null,
-        label: input.label ?? null,
         orderInDay: input.gameDayId ? maxOrder : null,
         totalPeriods,
+        quarterDurationMs,
+        breakBetweenQuartersDurationMs,
+        halftimeDurationMs,
         score: { create: {} },
         gameClock: {
           create: {
@@ -297,8 +310,10 @@ export class GameService {
       level?: string | null;
       gender?: string | null;
       gameType?: string | null;
-      label?: string | null;
       orderInDay?: number | null;
+      quarterDurationMs?: number;
+      breakBetweenQuartersDurationMs?: number;
+      halftimeDurationMs?: number;
     }
   ) {
     const existing = await this.prisma.game.findUnique({ where: { id: gameId } });
@@ -310,8 +325,10 @@ export class GameService {
       level?: string | null;
       gender?: string | null;
       gameType?: string | null;
-      label?: string | null;
       orderInDay?: number | null;
+      quarterDurationMs?: number;
+      breakBetweenQuartersDurationMs?: number;
+      halftimeDurationMs?: number;
     } = {};
     if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
     if (input.homeTeamName != null) data.homeTeamName = input.homeTeamName;
@@ -319,8 +336,10 @@ export class GameService {
     if (input.level !== undefined) data.level = input.level;
     if (input.gender !== undefined) data.gender = input.gender;
     if (input.gameType !== undefined) data.gameType = input.gameType;
-    if (input.label !== undefined) data.label = input.label;
     if (input.orderInDay !== undefined) data.orderInDay = input.orderInDay;
+    if (input.quarterDurationMs !== undefined) data.quarterDurationMs = input.quarterDurationMs;
+    if (input.breakBetweenQuartersDurationMs !== undefined) data.breakBetweenQuartersDurationMs = input.breakBetweenQuartersDurationMs;
+    if (input.halftimeDurationMs !== undefined) data.halftimeDurationMs = input.halftimeDurationMs;
     await this.prisma.game.update({
       where: { id: gameId },
       data,
@@ -774,6 +793,47 @@ export class GameService {
     );
 
     this.io.to(`game:${gameId}`).emit("game:hornTriggered", { gameId, reason });
+
+    return this.emitState(gameId);
+  }
+
+  async replaceRoster(
+    gameId: string,
+    body: {
+      home?: { capNumber: string; playerName: string }[];
+      away?: { capNumber: string; playerName: string }[];
+    }
+  ) {
+    const game = await this.prisma.game.findUnique({ where: { id: gameId } });
+    if (!game) {
+      throw this.notFound("Game not found");
+    }
+
+    await this.prisma.player.deleteMany({
+      where: { gameId },
+    });
+
+    const rows: Prisma.PlayerCreateManyInput[] = [];
+    for (const player of body.home ?? []) {
+      rows.push({
+        gameId,
+        teamSide: TeamSide.HOME,
+        capNumber: player.capNumber,
+        playerName: player.playerName,
+      });
+    }
+    for (const player of body.away ?? []) {
+      rows.push({
+        gameId,
+        teamSide: TeamSide.AWAY,
+        capNumber: player.capNumber,
+        playerName: player.playerName,
+      });
+    }
+
+    if (rows.length > 0) {
+      await this.prisma.player.createMany({ data: rows });
+    }
 
     return this.emitState(gameId);
   }

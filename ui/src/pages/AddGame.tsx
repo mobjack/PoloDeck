@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { CreateGameInput } from "../types/gameDay";
@@ -6,6 +6,9 @@ import type { CreateGameInput } from "../types/gameDay";
 const LEVELS = ["Varsity", "JV", "14U", "16U", "18U", ""];
 const GENDERS = ["Boys", "Girls", "Co-ed", ""];
 const GAME_TYPES = ["League", "Tournament", "Scrimmage", "Practice", ""];
+const DEFAULT_QUARTER_MS = 8 * 60 * 1000;
+const DEFAULT_BREAK_MS = 2 * 60 * 1000;
+const DEFAULT_HALFTIME_MS = 5 * 60 * 1000;
 
 export function AddGame() {
   const { id: gameDayId } = useParams<{ id: string }>();
@@ -18,8 +21,25 @@ export function AddGame() {
     level: "",
     gender: "",
     gameType: "",
-    label: "",
+    quarterDurationMs: DEFAULT_QUARTER_MS,
+    breakBetweenQuartersDurationMs: DEFAULT_BREAK_MS,
+    halftimeDurationMs: DEFAULT_HALFTIME_MS,
   });
+
+  useEffect(() => {
+    if (!gameDayId) return;
+    api.gameDays
+      .get(gameDayId)
+      .then((gd) => {
+        setForm((f) => ({
+          ...f,
+          quarterDurationMs: gd.defaultQuarterDurationMs,
+          breakBetweenQuartersDurationMs: gd.defaultBreakBetweenQuartersMs,
+          halftimeDurationMs: gd.defaultHalftimeDurationMs,
+        }));
+      })
+      .catch(() => {});
+  }, [gameDayId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +50,9 @@ export function AddGame() {
       level: form.level || undefined,
       gender: form.gender || undefined,
       gameType: form.gameType || undefined,
-      label: form.label || undefined,
+      quarterDurationMs: form.quarterDurationMs,
+      breakBetweenQuartersDurationMs: form.breakBetweenQuartersDurationMs,
+      halftimeDurationMs: form.halftimeDurationMs,
     };
     api.games
       .create(body)
@@ -98,14 +120,45 @@ export function AddGame() {
             ))}
           </select>
         </label>
-        <label>
-          Label (e.g. Girls Varsity 7pm)
-          <input
-            type="text"
-            value={form.label}
-            onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-          />
-        </label>
+        <fieldset>
+          <legend>Timing</legend>
+          <label>
+            Quarter length (minutes)
+            <input
+              type="number"
+              min={1}
+              value={form.quarterDurationMs != null ? form.quarterDurationMs / 60000 : ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, quarterDurationMs: Number(e.target.value) * 60000 }))
+              }
+            />
+          </label>
+          <label>
+            Break between quarters (minutes)
+            <input
+              type="number"
+              min={0}
+              value={form.breakBetweenQuartersDurationMs != null ? form.breakBetweenQuartersDurationMs / 60000 : ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  breakBetweenQuartersDurationMs: Number(e.target.value) * 60000,
+                }))
+              }
+            />
+          </label>
+          <label>
+            Halftime (minutes)
+            <input
+              type="number"
+              min={0}
+              value={form.halftimeDurationMs != null ? form.halftimeDurationMs / 60000 : ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, halftimeDurationMs: Number(e.target.value) * 60000 }))
+              }
+            />
+          </label>
+        </fieldset>
         <div className="form-actions">
           <button type="submit" className="btn primary">
             Add game

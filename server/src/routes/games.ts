@@ -13,6 +13,7 @@ import {
   triggerHornBodySchema,
   updateGameBodySchema,
   updateGameDayBodySchema,
+  replaceRosterBodySchema,
 } from "../schemas/game.schemas";
 import { GameService } from "../services/game.service";
 
@@ -189,6 +190,12 @@ export async function registerGameRoutes(app: FastifyInstance) {
     const params = gameIdParamSchema.parse(request.params);
     const game = await service.getGameAggregate(params.id);
     return game.players;
+  });
+
+  app.post("/games/:id/roster/replace", async (request) => {
+    const params = gameIdParamSchema.parse(request.params);
+    const body = replaceRosterBodySchema.parse(request.body);
+    return service.replaceRoster(params.id, body);
   });
 
   // Exclusions
