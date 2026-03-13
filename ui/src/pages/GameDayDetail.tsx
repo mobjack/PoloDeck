@@ -46,13 +46,14 @@ export function GameDayDetail() {
               <th>Type</th>
               <th>Gender</th>
               <th>Roster</th>
+              <th>Game sheet</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {gameDay.games.length === 0 ? (
               <tr>
-                <td colSpan={8}>No games. Add one below.</td>
+                <td colSpan={9}>No games. Add one below.</td>
               </tr>
             ) : (
               gameDay.games.map((g) => (
@@ -97,6 +98,14 @@ function GameRow({
           className="btn secondary btn-compact"
         >
           Roster
+        </Link>
+      </td>
+      <td>
+        <Link
+          to={`/game-days/${gameDayId}/games/${game.id}/sheet`}
+          className="btn secondary btn-compact"
+        >
+          Game sheet
         </Link>
       </td>
       <td>

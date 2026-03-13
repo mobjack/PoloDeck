@@ -30,6 +30,52 @@ export interface DeviceCapabilities {
   mode: string;
 }
 
+export interface GameAggregate {
+  id: string;
+  gameDayId: string | null;
+  scheduledAt: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  level: string | null;
+  gender: string | null;
+  gameType: string | null;
+  currentPeriod: number;
+  totalPeriods: number;
+  score: {
+    homeScore: number;
+    awayScore: number;
+  } | null;
+  gameClock: {
+    durationMs: number;
+    remainingMs: number;
+    running: boolean;
+  } | null;
+  shotClock: {
+    durationMs: number;
+    remainingMs: number;
+    running: boolean;
+  } | null;
+  timeoutStates: {
+    teamSide: "HOME" | "AWAY";
+    fullTimeoutsRemaining: number;
+    shortTimeoutsRemaining: number;
+  }[];
+  players: {
+    id: string;
+    gameId: string;
+    teamSide: "HOME" | "AWAY";
+    capNumber: string;
+    playerName: string;
+  }[];
+  events: {
+    id: string;
+    gameId: string;
+    eventType: string;
+    payload: any;
+    createdAt: string;
+  }[];
+}
+
 export const api = {
   capabilities: () =>
     request<DeviceCapabilities>("/capabilities"),
@@ -58,6 +104,8 @@ export const api = {
       body: import("../types/gameDay").UpdateGameInput
     ) =>
       request<unknown>(`/games/${id}`, { method: "PATCH", json: body }),
+    getAggregate: (id: string) =>
+      request<GameAggregate>(`/games/${id}`),
     getRoster: (
       id: string
     ) =>

@@ -17,6 +17,207 @@
   max-width: 1200px;
 }
 
+.game-sheet-page {
+  max-width: 1200px;
+}
+
+.game-sheet-header h2 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.game-sheet-scoreboard {
+  margin-bottom: 1.5rem;
+}
+
+.game-sheet-main {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.game-sheet-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.scoreboard-card {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .scoreboard-card {
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+}
+
+.scoreboard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.scoreboard-team-label {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.scoreboard-team-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.scoreboard-caps {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.scoreboard-body {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.scoreboard-column {
+  flex: 1;
+}
+
+.scoreboard-column:last-child {
+  text-align: right;
+}
+
+.scoreboard-score {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.scoreboard-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.game-sheet-rosters {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.roster-column {
+  flex: 1;
+  min-width: 0;
+}
+
+.roster-table-static {
+  margin-bottom: 0;
+}
+
+.game-sheet-progress {
+  margin-top: 1.5rem;
+}
+
+.game-sheet-page .table {
+  font-size: 0.9rem;
+}
+
+.game-sheet-roster-table,
+.game-sheet-fouls-table {
+  font-size: 0.8rem;
+}
+
+.game-sheet-roster-column h3 {
+  margin-top: 0;
+  margin-bottom: 0.4rem;
+}
+
+.game-sheet-fouls-heading {
+  margin-top: 0.75rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.goals-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.goals-column h4 {
+  margin-bottom: 0.25rem;
+}
+
+.goals-table th,
+.goals-table td {
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.goals-table th:nth-child(2),
+.goals-table td:nth-child(2) {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goals-table th:nth-child(n + 3),
+.goals-table td:nth-child(n + 3) {
+  text-align: center;
+}
+
+.game-sheet-progress-table-wrapper {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.game-sheet-input {
+  margin-top: 1.5rem;
+}
+
+.game-sheet-input input[type="text"] {
+  width: 100%;
+}
+
+.input-help {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.parsed-preview {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.scoring-input-form .scoring-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.scoring-input-form .scoring-label {
+  flex: 0 0 auto;
+}
+
+.scoring-input-form .scoring-apply {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.scoring-input-form .scoring-label input[type="text"] {
+  width: 12rem;
+}
+
+
 .welcome-line {
   margin: 0.5rem 0 0;
   font-size: 1rem;
