@@ -78,7 +78,7 @@ export async function registerGameRoutes(app: FastifyInstance) {
     }
 
     const normalizedType = body.type.toUpperCase();
-    const allowedTypes = ["SCOREBOARD", "SHOT_CLOCK", "OTHER"] as const;
+    const allowedTypes = ["SCOREBOARD", "SHOT_CLOCK", "TIMER"] as const;
 
     if (!allowedTypes.includes(normalizedType as any)) {
       throw new Error("Invalid device type");

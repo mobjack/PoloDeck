@@ -6,18 +6,20 @@ export type GameMode =
 export interface DeviceSummary {
   id: string;
   clientId: string;
-  type: "SCOREBOARD" | "SHOT_CLOCK" | "TIMER" | "HORN" | "OTHER";
+  type: "SCOREBOARD" | "SHOT_CLOCK" | "TIMER";
   name?: string | null;
   lastCheckInAt: string;
 }
 
 export interface DeviceCapabilities {
   hasScoreboard: boolean;
+  hasTimer: boolean;
   hasShotClock: boolean;
+  shotClockCount: number;
   mode: GameMode;
   scoreboards: DeviceSummary[];
+  timers: DeviceSummary[];
   shotClocks: DeviceSummary[];
-  others: DeviceSummary[];
 }
 
 export function buildDeviceCapabilities(input: {
@@ -32,10 +34,11 @@ export function buildDeviceCapabilities(input: {
   });
 
   const scoreboards = freshDevices.filter((d) => d.type === "SCOREBOARD");
+  const timers = freshDevices.filter((d) => d.type === "TIMER");
   const shotClocks = freshDevices.filter((d) => d.type === "SHOT_CLOCK");
-  const others = freshDevices.filter((d) => d.type === "OTHER");
 
   const hasScoreboard = scoreboards.length > 0;
+  const hasTimer = timers.length > 0;
   const hasShotClock = shotClocks.length > 0;
 
   let mode: GameMode = "manual_only";
@@ -47,11 +50,13 @@ export function buildDeviceCapabilities(input: {
 
   return {
     hasScoreboard,
+    hasTimer,
     hasShotClock,
+    shotClockCount: shotClocks.length,
     mode,
     scoreboards,
+    timers,
     shotClocks,
-    others,
   };
 }
 

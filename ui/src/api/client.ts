@@ -22,7 +22,17 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+export interface DeviceCapabilities {
+  hasScoreboard: boolean;
+  hasTimer: boolean;
+  hasShotClock: boolean;
+  shotClockCount: number;
+  mode: string;
+}
+
 export const api = {
+  capabilities: () =>
+    request<DeviceCapabilities>("/capabilities"),
   gameDays: {
     list: () => request<import("../types/gameDay").GameDay[]>("/game-days"),
     get: (id: string) =>
