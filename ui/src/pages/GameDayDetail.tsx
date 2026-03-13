@@ -3,12 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GameDay, GameOnDay } from "../types/gameDay";
 
-function formatMs(ms: number): string {
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return s > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${m} min`;
-}
-
 export function GameDayDetail() {
   const { id } = useParams<{ id: string }>();
   const [gameDay, setGameDay] = useState<GameDay | null>(null);
@@ -19,7 +13,9 @@ export function GameDayDetail() {
     if (!id) return;
     api.gameDays
       .get(id)
-      .then(setGameDay)
+      .then((gd) => {
+        setGameDay(gd);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [id]);
@@ -33,19 +29,10 @@ export function GameDayDetail() {
       <header className="page-header">
         <Link to="/">← Game Days</Link>
         <h1>{gameDay.date} — {gameDay.location}</h1>
-      </header>
-
-      <section className="timing-defaults">
-        <h2>Timing defaults</h2>
-        <ul>
-          <li>Quarter: {formatMs(gameDay.defaultQuarterDurationMs)}</li>
-          <li>Between quarters: {formatMs(gameDay.defaultBreakBetweenQuartersMs)}</li>
-          <li>Halftime: {formatMs(gameDay.defaultHalftimeDurationMs)}</li>
-        </ul>
         <Link to={`/game-days/${gameDay.id}/edit`} className="btn secondary">
           Edit day
         </Link>
-      </section>
+      </header>
 
       <section className="games-section">
         <h2>Games</h2>
@@ -57,14 +44,15 @@ export function GameDayDetail() {
               <th>Away (light)</th>
               <th>Level</th>
               <th>Type</th>
-              <th>Label</th>
+              <th>Gender</th>
+              <th>Roster</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {gameDay.games.length === 0 ? (
               <tr>
-                <td colSpan={7}>No games. Add one below.</td>
+                <td colSpan={8}>No games. Add one below.</td>
               </tr>
             ) : (
               gameDay.games.map((g) => (
@@ -81,7 +69,13 @@ export function GameDayDetail() {
   );
 }
 
-function GameRow({ game, gameDayId }: { game: GameOnDay; gameDayId: string }) {
+function GameRow({
+  game,
+  gameDayId,
+}: {
+  game: GameOnDay;
+  gameDayId: string;
+}) {
   const time = game.scheduledAt
     ? new Date(game.scheduledAt).toLocaleTimeString("en-US", {
         hour: "numeric",
@@ -96,7 +90,15 @@ function GameRow({ game, gameDayId }: { game: GameOnDay; gameDayId: string }) {
       <td>{game.awayTeamName}</td>
       <td>{game.level ?? "—"}</td>
       <td>{game.gameType ?? "—"}</td>
-      <td>{game.label ?? "—"}</td>
+      <td>{game.gender ?? "—"}</td>
+      <td>
+        <Link
+          to={`/game-days/${gameDayId}/games/${game.id}/roster`}
+          className="btn secondary btn-compact"
+        >
+          Roster
+        </Link>
+      </td>
       <td>
         <Link to={`/game-days/${gameDayId}/games/${game.id}/edit`}>Edit</Link>
       </td>

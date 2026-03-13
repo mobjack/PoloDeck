@@ -6,6 +6,13 @@ import type { UpdateGameInput } from "../types/gameDay";
 const LEVELS = ["Varsity", "JV", "14U", "16U", "18U", ""];
 const GENDERS = ["Boys", "Girls", "Co-ed", ""];
 const GAME_TYPES = ["League", "Tournament", "Scrimmage", "Practice", ""];
+const MS_PER_MIN = 60 * 1000;
+function msToMinutes(ms: number): number {
+  return Math.round(ms / MS_PER_MIN);
+}
+function minutesToMs(m: number): number {
+  return m * MS_PER_MIN;
+}
 
 export function EditGame() {
   const { id: gameDayId, gameId } = useParams<{ id: string; gameId: string }>();
@@ -26,7 +33,9 @@ export function EditGame() {
             level: game.level,
             gender: game.gender,
             gameType: game.gameType,
-            label: game.label,
+            quarterDurationMs: game.quarterDurationMs,
+            breakBetweenQuartersDurationMs: game.breakBetweenQuartersDurationMs,
+            halftimeDurationMs: game.halftimeDurationMs,
           });
         }
       })
@@ -42,7 +51,9 @@ export function EditGame() {
       level: form.level || null,
       gender: form.gender || null,
       gameType: form.gameType || null,
-      label: form.label || null,
+      quarterDurationMs: form.quarterDurationMs,
+      breakBetweenQuartersDurationMs: form.breakBetweenQuartersDurationMs,
+      halftimeDurationMs: form.halftimeDurationMs,
     };
     api.games
       .update(gameId, body)
@@ -110,14 +121,45 @@ export function EditGame() {
             ))}
           </select>
         </label>
-        <label>
-          Label
-          <input
-            type="text"
-            value={form.label ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, label: e.target.value || null }))}
-          />
-        </label>
+        <fieldset>
+          <legend>Timing</legend>
+          <label>
+            Quarter length (minutes)
+            <input
+              type="number"
+              min={1}
+              value={form.quarterDurationMs != null ? msToMinutes(form.quarterDurationMs) : ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, quarterDurationMs: minutesToMs(Number(e.target.value)) }))
+              }
+            />
+          </label>
+          <label>
+            Break between quarters (minutes)
+            <input
+              type="number"
+              min={0}
+              value={form.breakBetweenQuartersDurationMs != null ? msToMinutes(form.breakBetweenQuartersDurationMs) : ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  breakBetweenQuartersDurationMs: minutesToMs(Number(e.target.value)),
+                }))
+              }
+            />
+          </label>
+          <label>
+            Halftime (minutes)
+            <input
+              type="number"
+              min={0}
+              value={form.halftimeDurationMs != null ? msToMinutes(form.halftimeDurationMs) : ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, halftimeDurationMs: minutesToMs(Number(e.target.value)) }))
+              }
+            />
+          </label>
+        </fieldset>
         <div className="form-actions">
           <button type="submit" className="btn primary">
             Save

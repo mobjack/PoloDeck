@@ -20,9 +20,6 @@ export function EditGameDay() {
         setForm({
           date: gd.date,
           location: gd.location,
-          defaultQuarterDurationMs: gd.defaultQuarterDurationMs,
-          defaultBreakBetweenQuartersMs: gd.defaultBreakBetweenQuartersMs,
-          defaultHalftimeDurationMs: gd.defaultHalftimeDurationMs,
         });
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -38,9 +35,6 @@ export function EditGameDay() {
       .then(() => navigate(`/game-days/${id}`))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
-
-  const setMinutes = (key: keyof UpdateGameDayInput, minutes: number) =>
-    setForm((f) => ({ ...f, [key]: minutes * 60 * 1000 }));
 
   if (loading) return <p>Loading…</p>;
   if (error && !gameDay) return <p className="error">Error: {error}</p>;
@@ -73,36 +67,6 @@ export function EditGameDay() {
             required
           />
         </label>
-        <fieldset>
-          <legend>Timing defaults</legend>
-          <label>
-            Quarter length (minutes)
-            <input
-              type="number"
-              min={1}
-              value={form.defaultQuarterDurationMs != null ? form.defaultQuarterDurationMs / 60000 : ""}
-              onChange={(e) => setMinutes("defaultQuarterDurationMs", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Break between quarters (minutes)
-            <input
-              type="number"
-              min={0}
-              value={form.defaultBreakBetweenQuartersMs != null ? form.defaultBreakBetweenQuartersMs / 60000 : ""}
-              onChange={(e) => setMinutes("defaultBreakBetweenQuartersMs", Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Halftime (minutes)
-            <input
-              type="number"
-              min={0}
-              value={form.defaultHalftimeDurationMs != null ? form.defaultHalftimeDurationMs / 60000 : ""}
-              onChange={(e) => setMinutes("defaultHalftimeDurationMs", Number(e.target.value))}
-            />
-          </label>
-        </fieldset>
         <div className="form-actions">
           <button type="submit" className="btn primary">
             Save

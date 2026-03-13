@@ -2,9 +2,9 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
 async function request<T>(
   path: string,
-  options: RequestInit & { method?: string; body?: unknown } = {}
+  options: (Omit<RequestInit, "body"> & { method?: string; json?: unknown }) = {}
 ): Promise<T> {
-  const { method = "GET", body, ...rest } = options;
+  const { method = "GET", json, ...rest } = options;
   const res = await fetch(`${API_BASE}${path}`, {
     ...rest,
     method,
@@ -12,7 +12,7 @@ async function request<T>(
       "Content-Type": "application/json",
       ...rest.headers,
     },
-    body: body != null ? JSON.stringify(body) : undefined,
+    body: json != null ? JSON.stringify(json) : undefined,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -28,23 +28,48 @@ export const api = {
     get: (id: string) =>
       request<import("../types/gameDay").GameDay>(`/game-days/${id}`),
     create: (body: import("../types/gameDay").CreateGameDayInput) =>
-      request<{ id: string }>("/game-days", { method: "POST", body }),
+      request<{ id: string }>("/game-days", { method: "POST", json: body }),
     update: (
       id: string,
       body: import("../types/gameDay").UpdateGameDayInput
     ) =>
       request<import("../types/gameDay").GameDay>(`/game-days/${id}`, {
         method: "PATCH",
-        body,
+        json: body,
       }),
   },
   games: {
+    list: () =>
+      request<any[]>("/games"),
     create: (body: import("../types/gameDay").CreateGameInput) =>
-      request<unknown>("/games", { method: "POST", body }),
+      request<unknown>("/games", { method: "POST", json: body }),
     update: (
       id: string,
       body: import("../types/gameDay").UpdateGameInput
     ) =>
-      request<unknown>(`/games/${id}`, { method: "PATCH", body }),
+      request<unknown>(`/games/${id}`, { method: "PATCH", json: body }),
+    getRoster: (
+      id: string
+    ) =>
+      request<
+        {
+          id: string;
+          gameId: string;
+          teamSide: "HOME" | "AWAY";
+          capNumber: string;
+          playerName: string;
+        }[]
+      >(`/games/${id}/roster`),
+    replaceRoster: (
+      id: string,
+      body: {
+        home?: { capNumber: string; playerName: string }[];
+        away?: { capNumber: string; playerName: string }[];
+      }
+    ) =>
+      request<unknown>(`/games/${id}/roster/replace`, {
+        method: "POST",
+        json: body,
+      }),
   },
 };

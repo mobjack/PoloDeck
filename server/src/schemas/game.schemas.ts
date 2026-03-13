@@ -23,10 +23,12 @@ export const createGameBodySchema = z.object({
   level: z.string().optional(),
   gender: z.string().optional(),
   gameType: z.string().optional(),
-  label: z.string().optional(),
   totalPeriods: z.number().int().positive().optional(),
   gameClockDurationMs: z.number().int().positive().optional(),
   shotClockDurationMs: z.number().int().positive().optional(),
+  quarterDurationMs: z.number().int().positive().optional(),
+  breakBetweenQuartersDurationMs: z.number().int().nonnegative().optional(),
+  halftimeDurationMs: z.number().int().nonnegative().optional(),
 });
 
 export const updateGameBodySchema = z.object({
@@ -36,8 +38,10 @@ export const updateGameBodySchema = z.object({
   level: z.string().optional().nullable(),
   gender: z.string().optional().nullable(),
   gameType: z.string().optional().nullable(),
-  label: z.string().optional().nullable(),
   orderInDay: z.number().int().optional().nullable(),
+  quarterDurationMs: z.number().int().positive().optional(),
+  breakBetweenQuartersDurationMs: z.number().int().nonnegative().optional(),
+  halftimeDurationMs: z.number().int().nonnegative().optional(),
 });
 
 export const gameIdParamSchema = z.object({
@@ -55,6 +59,11 @@ export const setClockBodySchema = z.object({
 export const addPlayerBodySchema = z.object({
   capNumber: z.string().min(1), // e.g. "1", "A", "1A"
   playerName: z.string().min(1),
+});
+
+export const replaceRosterBodySchema = z.object({
+  home: z.array(addPlayerBodySchema).optional(),
+  away: z.array(addPlayerBodySchema).optional(),
 });
 
 export const createExclusionBodySchema = z.object({
@@ -77,4 +86,5 @@ export type SetClockBody = z.infer<typeof setClockBodySchema>;
 export type AddPlayerBody = z.infer<typeof addPlayerBodySchema>;
 export type CreateExclusionBody = z.infer<typeof createExclusionBodySchema>;
 export type TriggerHornBody = z.infer<typeof triggerHornBodySchema>;
+export type ReplaceRosterBody = z.infer<typeof replaceRosterBodySchema>;
 

@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN     "breakBetweenQuartersDurationMs" INTEGER NOT NULL DEFAULT 120000,
+ADD COLUMN     "halftimeDurationMs" INTEGER NOT NULL DEFAULT 300000,
+ADD COLUMN     "quarterDurationMs" INTEGER NOT NULL DEFAULT 480000;

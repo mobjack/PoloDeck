@@ -69,11 +69,13 @@ model Game {
   level         String?       // Varsity, JV, 14U, etc.
   gender        String?       // Boys, Girls, Co-ed
   gameType      String?       // League, Tournament, Scrimmage, Practice
-  label         String?       // short label e.g. "Girls Varsity 7pm"
   orderInDay    Int?         // for display order on game day
   currentPeriod  Int          @default(1)
   totalPeriods   Int
   status         GameStatus   @default(PENDING)
+  quarterDurationMs             Int       @default(480000)   // 8 min per quarter
+  breakBetweenQuartersDurationMs Int       @default(120000)  // 2 min
+  halftimeDurationMs            Int       @default(300000)   // 5 min
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
