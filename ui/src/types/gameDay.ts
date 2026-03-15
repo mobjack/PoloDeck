@@ -70,4 +70,5 @@ export interface UpdateGameInput {
   quarterDurationMs?: number;
   breakBetweenQuartersDurationMs?: number;
   halftimeDurationMs?: number;
+  status?: "PENDING" | "IN_PROGRESS" | "FINAL";
 }

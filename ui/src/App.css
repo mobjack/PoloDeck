@@ -453,8 +453,56 @@
   }
 }
 
+.game-sheet-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.game-sheet-modal {
+  background: var(--page-bg, #1a1a1a);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.game-sheet-modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.game-sheet-modal p {
+  margin: 0 0 1.25rem;
+  opacity: 0.9;
+}
+
+.game-sheet-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-modal {
+    background: var(--page-bg, #fff);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+}
+
 .game-sheet-input input[type="text"] {
   width: 100%;
+}
+
+.game-sheet-input input[type="text"]:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .input-help {

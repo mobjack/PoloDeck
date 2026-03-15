@@ -50,6 +50,7 @@ export interface GameAggregate {
   gameType: string | null;
   currentPeriod: number;
   totalPeriods: number;
+  status: "PENDING" | "IN_PROGRESS" | "FINAL";
   score: {
     homeScore: number;
     awayScore: number;
@@ -112,7 +113,7 @@ export const api = {
       id: string,
       body: import("../types/gameDay").UpdateGameInput
     ) =>
-      request<unknown>(`/games/${id}`, { method: "PATCH", json: body }),
+      request<GameAggregate>(`/games/${id}`, { method: "PATCH", json: body }),
     getAggregate: (id: string) =>
       request<GameAggregate>(`/games/${id}`),
     getRoster: (
@@ -145,6 +146,7 @@ export const api = {
         timeSeconds?: number;
         side?: "HOME" | "AWAY";
         capNumber?: string;
+        overtime?: boolean;
       }
     ) =>
       request<GameAggregate>(`/games/${id}/score-command`, {

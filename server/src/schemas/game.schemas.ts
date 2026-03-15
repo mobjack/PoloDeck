@@ -42,6 +42,7 @@ export const updateGameBodySchema = z.object({
   quarterDurationMs: z.number().int().positive().optional(),
   breakBetweenQuartersDurationMs: z.number().int().nonnegative().optional(),
   halftimeDurationMs: z.number().int().nonnegative().optional(),
+  status: z.enum(["PENDING", "IN_PROGRESS", "FINAL"]).optional(),
 });
 
 export const gameIdParamSchema = z.object({
@@ -88,6 +89,7 @@ export const scoreCommandBodySchema = z.object({
   timeSeconds: z.number().int().nonnegative().optional(),
   side: z.enum(["HOME", "AWAY"]).optional(),
   capNumber: z.string().min(1).optional(),
+  overtime: z.boolean().optional(),
 });
 
 export type CreateGameDayBody = z.infer<typeof createGameDayBodySchema>;
