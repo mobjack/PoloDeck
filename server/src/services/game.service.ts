@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { GameEventType, TeamSide, type Prisma } from ".prisma/client";
+import { DeviceType, GameEventType, TeamSide, type Prisma } from ".prisma/client";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
 import {
   buildDeviceCapabilities,
@@ -55,7 +55,7 @@ export class GameService {
 
   async checkInDevice(input: {
     clientId: string;
-    type: "SCOREBOARD" | "SHOT_CLOCK" | "OTHER";
+    type: DeviceType;
     name?: string;
   }) {
     const now = new Date();
@@ -377,7 +377,8 @@ export class GameService {
     gameId: string,
     side: TeamSide,
     delta: 1 | -1,
-    capNumber?: string
+    capNumber?: string,
+    timeSeconds?: number
   ) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
@@ -411,8 +412,10 @@ export class GameService {
       capNumber?: string;
       homeScore: number;
       awayScore: number;
+      timeSeconds?: number;
     } = { side, delta, homeScore, awayScore };
     if (capNumber != null) payload.capNumber = capNumber;
+    if (timeSeconds != null) payload.timeSeconds = timeSeconds;
 
     await this.createEvent(gameId, eventType, payload, "operator");
 
@@ -474,7 +477,7 @@ export class GameService {
     return this.emitState(gameId);
   }
 
-  async setGameClock(gameId: string, remainingMs: number) {
+  async setGameClock(gameId: string, remainingMs: number, options?: { skipEvent?: boolean }) {
     const clock = await this.prisma.gameClock.findUnique({
       where: { gameId },
     });
@@ -500,12 +503,14 @@ export class GameService {
       },
     });
 
-    await this.createEvent(
-      gameId,
-      GameEventType.GAME_CLOCK_SET,
-      { remainingMs: newState.remainingMs },
-      "operator"
-    );
+    if (!options?.skipEvent) {
+      await this.createEvent(
+        gameId,
+        GameEventType.GAME_CLOCK_SET,
+        { remainingMs: newState.remainingMs },
+        "operator"
+      );
+    }
     return this.emitState(gameId);
   }
 
@@ -686,13 +691,22 @@ export class GameService {
     return this.emitState(gameId);
   }
 
-  async createExclusion(gameId: string, body: { playerId: string; durationMs?: number }) {
+  async createExclusion(
+    gameId: string,
+    body: { playerId: string; durationMs?: number; timeSeconds?: number; isPenalty?: boolean }
+  ) {
     const player = await this.prisma.player.findUnique({
       where: { id: body.playerId },
     });
     if (!player || player.gameId !== gameId) {
       throw this.notFound("Player not found for game");
     }
+
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      select: { currentPeriod: true },
+    });
+    const currentPeriod = game?.currentPeriod ?? 1;
 
     const durationMs = body.durationMs ?? 20_000;
 
@@ -707,16 +721,20 @@ export class GameService {
       },
     });
 
+    const exclusionPayload: Record<string, unknown> = {
+      exclusionId: exclusion.id,
+      playerId: player.id,
+      teamSide: player.teamSide,
+      capNumber: player.capNumber,
+      durationMs,
+      period: currentPeriod,
+      isPenalty: body.isPenalty === true,
+    };
+    if (body.timeSeconds != null) exclusionPayload.timeSeconds = body.timeSeconds;
     await this.createEvent(
       gameId,
       GameEventType.EXCLUSION_STARTED,
-      {
-        exclusionId: exclusion.id,
-        playerId: player.id,
-        teamSide: player.teamSide,
-        capNumber: player.capNumber,
-        durationMs,
-      },
+      exclusionPayload as Prisma.InputJsonValue,
       "operator"
     );
 
@@ -757,7 +775,7 @@ export class GameService {
     return this.emitState(gameId);
   }
 
-  async useTimeout(gameId: string, teamSide: TeamSide, type: "full" | "short") {
+  async useTimeout(gameId: string, teamSide: TeamSide, type: "full" | "short", timeSeconds?: number) {
     const timeoutState = await this.prisma.teamTimeoutState.findUnique({
       where: {
         gameId_teamSide: {
@@ -786,10 +804,12 @@ export class GameService {
       },
     });
 
+    const timeoutPayload: Record<string, unknown> = { teamSide, type };
+    if (timeSeconds != null) timeoutPayload.timeSeconds = timeSeconds;
     await this.createEvent(
       gameId,
       GameEventType.TIMEOUT_USED,
-      { teamSide, type },
+      timeoutPayload as Prisma.InputJsonValue,
       "operator"
     );
 
@@ -827,8 +847,14 @@ export class GameService {
           include: { gameClock: true },
         });
         if (!game?.gameClock) throw this.notFound("Game not found");
+        if (game.currentPeriod === 1 && game.scheduledAt == null) {
+          await this.prisma.game.update({
+            where: { id: gameId },
+            data: { scheduledAt: new Date() },
+          });
+        }
         const quarterMs = game.quarterDurationMs ?? game.gameClock.durationMs;
-        await this.setGameClock(gameId, quarterMs);
+        await this.setGameClock(gameId, quarterMs, { skipEvent: true });
         return this.startGameClock(gameId);
       }
       case "END_QUARTER": {
@@ -839,26 +865,37 @@ export class GameService {
         if (side == null || body.capNumber == null) {
           throw this.badRequest("GOAL requires side and capNumber");
         }
-        return this.adjustScore(gameId, side, 1, body.capNumber);
+        if (body.timeSeconds != null) {
+          await this.setGameClock(gameId, body.timeSeconds * 1000, { skipEvent: true });
+        }
+        return this.adjustScore(gameId, side, 1, body.capNumber, body.timeSeconds);
       }
       case "EXCLUSION":
       case "PENALTY": {
         if (side == null || body.capNumber == null) {
           throw this.badRequest("Exclusion/penalty requires side and capNumber");
         }
+        if (body.timeSeconds != null) {
+          await this.setGameClock(gameId, body.timeSeconds * 1000, { skipEvent: true });
+        }
         const player = await this.prisma.player.findFirst({
           where: { gameId, teamSide: side, capNumber: body.capNumber },
         });
         if (!player) throw this.notFound("Player not found for this game and cap number");
-        return this.createExclusion(gameId, { playerId: player.id });
+        const isPenalty = body.type === "PENALTY";
+        return this.createExclusion(gameId, {
+          playerId: player.id,
+          timeSeconds: body.timeSeconds,
+          isPenalty,
+        });
       }
       case "TIMEOUT": {
         if (side == null) throw this.badRequest("TIMEOUT requires side");
-        return this.useTimeout(gameId, side, "full");
+        return this.useTimeout(gameId, side, "full", body.timeSeconds);
       }
       case "TIMEOUT_30": {
         if (side == null) throw this.badRequest("TIMEOUT_30 requires side");
-        return this.useTimeout(gameId, side, "short");
+        return this.useTimeout(gameId, side, "short", body.timeSeconds);
       }
       default:
         throw this.badRequest(`Unknown score command type: ${(body as { type: string }).type}`);

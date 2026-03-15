@@ -78,10 +78,9 @@ function GameRow({
   gameDayId: string;
 }) {
   const time = game.scheduledAt
-    ? new Date(game.scheduledAt).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
+    ? new Date(game.scheduledAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "medium",
       })
     : "—";
   return (
