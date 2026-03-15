@@ -75,6 +75,21 @@ export const triggerHornBodySchema = z.object({
   reason: z.string().optional(),
 });
 
+export const scoreCommandBodySchema = z.object({
+  type: z.enum([
+    "START_QUARTER",
+    "END_QUARTER",
+    "GOAL",
+    "EXCLUSION",
+    "PENALTY",
+    "TIMEOUT",
+    "TIMEOUT_30",
+  ]),
+  timeSeconds: z.number().int().nonnegative().optional(),
+  side: z.enum(["HOME", "AWAY"]).optional(),
+  capNumber: z.string().min(1).optional(),
+});
+
 export type CreateGameDayBody = z.infer<typeof createGameDayBodySchema>;
 export type UpdateGameDayBody = z.infer<typeof updateGameDayBodySchema>;
 export type GameDayIdParams = z.infer<typeof gameDayIdParamSchema>;
@@ -87,4 +102,5 @@ export type AddPlayerBody = z.infer<typeof addPlayerBodySchema>;
 export type CreateExclusionBody = z.infer<typeof createExclusionBodySchema>;
 export type TriggerHornBody = z.infer<typeof triggerHornBodySchema>;
 export type ReplaceRosterBody = z.infer<typeof replaceRosterBodySchema>;
+export type ScoreCommandBody = z.infer<typeof scoreCommandBodySchema>;
 

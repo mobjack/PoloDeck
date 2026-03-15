@@ -14,6 +14,7 @@ import {
   updateGameBodySchema,
   updateGameDayBodySchema,
   replaceRosterBodySchema,
+  scoreCommandBodySchema,
 } from "../schemas/game.schemas";
 import { GameService } from "../services/game.service";
 
@@ -126,6 +127,12 @@ export async function registerGameRoutes(app: FastifyInstance) {
   app.post("/games/:id/score/away/decrement", async (request) => {
     const params = gameIdParamSchema.parse(request.params);
     return service.adjustScore(params.id, TeamSide.AWAY, -1 as const);
+  });
+
+  app.post("/games/:id/score-command", async (request) => {
+    const params = gameIdParamSchema.parse(request.params);
+    const body = scoreCommandBodySchema.parse(request.body);
+    return service.applyScoreCommand(params.id, body);
   });
 
   // Game clock

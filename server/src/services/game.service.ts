@@ -373,7 +373,12 @@ export class GameService {
     return game;
   }
 
-  async adjustScore(gameId: string, side: TeamSide, delta: 1 | -1) {
+  async adjustScore(
+    gameId: string,
+    side: TeamSide,
+    delta: 1 | -1,
+    capNumber?: string
+  ) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
       include: { score: true },
@@ -398,12 +403,18 @@ export class GameService {
         ? GameEventType.GOAL_HOME
         : GameEventType.GOAL_AWAY;
 
-    await this.createEvent(
-      gameId,
-      eventType,
-      { side, delta },
-      "operator"
-    );
+    const homeScore = side === TeamSide.HOME ? next : game.score.homeScore;
+    const awayScore = side === TeamSide.AWAY ? next : game.score.awayScore;
+    const payload: {
+      side: TeamSide;
+      delta: number;
+      capNumber?: string;
+      homeScore: number;
+      awayScore: number;
+    } = { side, delta, homeScore, awayScore };
+    if (capNumber != null) payload.capNumber = capNumber;
+
+    await this.createEvent(gameId, eventType, payload, "operator");
 
     return this.emitState(gameId);
   }
@@ -703,6 +714,7 @@ export class GameService {
         exclusionId: exclusion.id,
         playerId: player.id,
         teamSide: player.teamSide,
+        capNumber: player.capNumber,
         durationMs,
       },
       "operator"
@@ -795,6 +807,62 @@ export class GameService {
     this.io.to(`game:${gameId}`).emit("game:hornTriggered", { gameId, reason });
 
     return this.emitState(gameId);
+  }
+
+  async applyScoreCommand(
+    gameId: string,
+    body: {
+      type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
+      timeSeconds?: number;
+      side?: "HOME" | "AWAY";
+      capNumber?: string;
+    }
+  ) {
+    const side = body.side != null ? (body.side as TeamSide) : undefined;
+
+    switch (body.type) {
+      case "START_QUARTER": {
+        const game = await this.prisma.game.findUnique({
+          where: { id: gameId },
+          include: { gameClock: true },
+        });
+        if (!game?.gameClock) throw this.notFound("Game not found");
+        const quarterMs = game.quarterDurationMs ?? game.gameClock.durationMs;
+        await this.setGameClock(gameId, quarterMs);
+        return this.startGameClock(gameId);
+      }
+      case "END_QUARTER": {
+        await this.stopGameClock(gameId);
+        return this.advancePeriod(gameId);
+      }
+      case "GOAL": {
+        if (side == null || body.capNumber == null) {
+          throw this.badRequest("GOAL requires side and capNumber");
+        }
+        return this.adjustScore(gameId, side, 1, body.capNumber);
+      }
+      case "EXCLUSION":
+      case "PENALTY": {
+        if (side == null || body.capNumber == null) {
+          throw this.badRequest("Exclusion/penalty requires side and capNumber");
+        }
+        const player = await this.prisma.player.findFirst({
+          where: { gameId, teamSide: side, capNumber: body.capNumber },
+        });
+        if (!player) throw this.notFound("Player not found for this game and cap number");
+        return this.createExclusion(gameId, { playerId: player.id });
+      }
+      case "TIMEOUT": {
+        if (side == null) throw this.badRequest("TIMEOUT requires side");
+        return this.useTimeout(gameId, side, "full");
+      }
+      case "TIMEOUT_30": {
+        if (side == null) throw this.badRequest("TIMEOUT_30 requires side");
+        return this.useTimeout(gameId, side, "short");
+      }
+      default:
+        throw this.badRequest(`Unknown score command type: ${(body as { type: string }).type}`);
+    }
   }
 
   async replaceRoster(
