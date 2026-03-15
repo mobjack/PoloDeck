@@ -264,6 +264,17 @@ export function GameRoster() {
         </button>
       </div>
 
+      <div className="roster-table-top-actions">
+        <button
+          type="button"
+          className="btn primary"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+
       <div className="roster-table-wrapper">
         <table className="roster-table">
           <thead>
@@ -279,12 +290,13 @@ export function GameRoster() {
             </tr>
           </thead>
           <tbody>
-            {CAP_NUMBERS.map((cap) => (
+            {CAP_NUMBERS.map((cap, index) => (
               <tr key={cap}>
                 <td>{cap}</td>
                 <td>
                   <input
                     type="text"
+                    tabIndex={index + 1}
                     value={homeNames[cap] ?? ""}
                     onChange={(e) =>
                       setHomeNames((prev) => ({ ...prev, [cap]: e.target.value }))
@@ -295,6 +307,7 @@ export function GameRoster() {
                 <td>
                   <input
                     type="text"
+                    tabIndex={CAP_NUMBERS.length + index + 1}
                     value={awayNames[cap] ?? ""}
                     onChange={(e) =>
                       setAwayNames((prev) => ({ ...prev, [cap]: e.target.value }))

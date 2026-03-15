@@ -591,6 +591,12 @@
   }
 }
 
+.roster-table-top-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
 .roster-table-wrapper {
   margin-top: 0.75rem;
   overflow-x: auto;
@@ -640,10 +646,19 @@
   border-left-width: 0;
 }
 
+/* Alternating row shading for easier scanning */
+.roster-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 @media (prefers-color-scheme: light) {
   .roster-table th,
   .roster-table td {
     border-color: rgba(0, 0, 0, 0.12);
+  }
+
+  .roster-table tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.04);
   }
 }
 
