@@ -24,6 +24,16 @@ export function GameSheet() {
   const [input, setInput] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
   const [lastParsed, setLastParsed] = useState<ParsedInput | null>(null);
+  const [commandHelpOpen, setCommandHelpOpen] = useState(false);
+
+  useEffect(() => {
+    if (!commandHelpOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCommandHelpOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [commandHelpOpen]);
 
   useEffect(() => {
     if (!gameDayId || !gameId) return;
@@ -352,7 +362,13 @@ export function GameSheet() {
               {inputError && <p className="error">{inputError}</p>}
               <div className="scoring-row">
                 <label className="scoring-label">
-                  Scoring command
+                  <button
+                    type="button"
+                    className="scoring-command-link"
+                    onClick={() => setCommandHelpOpen(true)}
+                  >
+                    Scoring command
+                  </button>
                   <input
                     type="text"
                     value={input}
@@ -371,6 +387,73 @@ export function GameSheet() {
               </p>
             )}
           </section>
+
+          {commandHelpOpen && (
+            <>
+              <div
+                className="scoring-command-help-overlay"
+                role="presentation"
+                onClick={() => setCommandHelpOpen(false)}
+              />
+              <aside
+                className="scoring-command-help-panel"
+                role="dialog"
+                aria-label="Scoring command reference"
+              >
+                <div className="scoring-command-help-header">
+                  <h2>Scoring command reference</h2>
+                  <button
+                    type="button"
+                    className="scoring-command-help-close"
+                    onClick={() => setCommandHelpOpen(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="scoring-command-help-body">
+                  <h3>Quarter</h3>
+                  <ul>
+                    <li><strong>sq</strong> — Start quarter</li>
+                    <li><strong>eq</strong> — End quarter</li>
+                  </ul>
+
+                  <h3>Time</h3>
+                  <p>Use a dot or colon: <strong>6.07</strong> or <strong>6:07</strong> = 6 min 7 sec. Optional at the start of goal/exclusion/penalty.</p>
+
+                  <h3>Team</h3>
+                  <ul>
+                    <li><strong>b</strong> or <strong>d</strong> — Dark (home)</li>
+                    <li><strong>w</strong> or <strong>l</strong> — Light (away)</li>
+                  </ul>
+
+                  <h3>Goal / Exclusion / Penalty</h3>
+                  <p>Either order works:</p>
+                  <ul>
+                    <li><strong>[time] team cap action</strong> — e.g. <code>6.07w13g</code> (Light cap 13 goal at 6:07)</li>
+                    <li><strong>[time] action cap team</strong> — e.g. <code>6.07g13w</code></li>
+                  </ul>
+                  <p>Actions: <strong>g</strong> = goal, <strong>e</strong> = exclusion, <strong>p</strong> = penalty. Cap number is required.</p>
+
+                  <h3>Timeout</h3>
+                  <ul>
+                    <li><strong>4.13tw</strong> or <strong>4.13tb</strong> — Full timeout at 4:13 for light (w) or dark (b)</li>
+                    <li><strong>4.13t3w</strong> — 30-second timeout</li>
+                  </ul>
+
+                  <h3>Examples</h3>
+                  <ul className="scoring-command-help-examples">
+                    <li><code>sq</code> — start quarter</li>
+                    <li><code>eq</code> — end quarter</li>
+                    <li><code>6:50w13g</code> — Light cap 13 goal at 6:50</li>
+                    <li><code>5.53b2e</code> — Dark cap 2 exclusion at 5:53</li>
+                    <li><code>g13w</code> — Light cap 13 goal (no time)</li>
+                    <li><code>4.13tw</code> — Light full timeout at 4:13</li>
+                  </ul>
+                </div>
+              </aside>
+            </>
+          )}
 
           <section className="game-sheet-progress">
             <h3>Game progress</h3>

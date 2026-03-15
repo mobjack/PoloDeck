@@ -307,6 +307,150 @@
 .game-sheet-input {
   margin-top: 1.5rem;
   font-size: 0.85rem;
+  text-align: left;
+}
+
+.scoring-command-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.scoring-command-link:hover {
+  opacity: 0.85;
+}
+
+.scoring-command-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.scoring-command-help-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 100vw);
+  max-width: 100%;
+  background: var(--page-bg, #1a1a1a);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scoring-command-help-slide-in 0.25s ease-out;
+}
+
+@keyframes scoring-command-help-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.scoring-command-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.scoring-command-help-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.scoring-command-help-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.scoring-command-help-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scoring-command-help-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.scoring-command-help-body h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.scoring-command-help-body h3:first-child {
+  margin-top: 0;
+}
+
+.scoring-command-help-body p {
+  margin: 0.35em 0;
+}
+
+.scoring-command-help-body ul {
+  margin: 0.35em 0;
+  padding-left: 1.25rem;
+}
+
+.scoring-command-help-body code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.35em;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.scoring-command-help-examples {
+  list-style: none;
+  padding-left: 0;
+}
+
+.scoring-command-help-examples li {
+  margin-bottom: 0.35rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .scoring-command-help-panel {
+    background: var(--page-bg, #fff);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+  .scoring-command-help-header {
+    border-bottom-color: rgba(0, 0, 0, 0.12);
+  }
+  .scoring-command-help-close {
+    border-color: rgba(0, 0, 0, 0.2);
+  }
+  .scoring-command-help-close:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+  .scoring-command-help-body code {
+    background: rgba(0, 0, 0, 0.08);
+  }
 }
 
 .game-sheet-input input[type="text"] {
@@ -324,14 +468,20 @@
   opacity: 0.9;
 }
 
+.scoring-input-form {
+  text-align: left;
+}
+
 .scoring-input-form .scoring-row {
   display: flex;
   align-items: flex-end;
+  justify-content: flex-start;
   gap: 0.75rem;
 }
 
 .scoring-input-form .scoring-label {
   flex: 0 0 auto;
+  text-align: left;
 }
 
 .scoring-input-form .scoring-apply {
