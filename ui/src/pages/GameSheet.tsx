@@ -101,25 +101,31 @@ export function GameSheet() {
   const foulsByPlayer = useMemo(() => {
     const raw = aggregate?.events;
     const eventList = Array.isArray(raw) ? [...raw] : [];
-    const events = eventList
-      .filter((e) => e.eventType === "EXCLUSION_STARTED")
-      .sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+    eventList.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
     type Side = "HOME" | "AWAY";
     const bySideCap: Record<Side, Record<string, string[]>> = {
       HOME: {},
       AWAY: {},
     };
-    for (const ev of events) {
+    let currentPeriod = 1;
+    for (const ev of eventList) {
       const p = ev.payload as Record<string, unknown> | undefined;
+      if (ev.eventType === "PERIOD_ADVANCED") {
+        const to = (p?.to as number) ?? 1;
+        currentPeriod = to;
+        continue;
+      }
+      if (ev.eventType !== "EXCLUSION_STARTED") continue;
       const side = (p?.teamSide as Side) ?? (p?.side as Side);
       const cap = p?.capNumber as string;
       if (!side || !cap) continue;
       if (!bySideCap[side][cap]) bySideCap[side][cap] = [];
-      if (bySideCap[side][cap].length < 3) {
-        bySideCap[side][cap].push("E");
-      }
+      if (bySideCap[side][cap].length >= 3) continue;
+      const period = (typeof p?.period === "number" ? p.period : currentPeriod) as number;
+      const letter = p?.isPenalty === true ? "P" : "E";
+      bySideCap[side][cap].push(`${letter}${period}`);
     }
     return bySideCap;
   }, [aggregate?.events]);
@@ -178,18 +184,24 @@ export function GameSheet() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const progressRows = (Array.isArray(aggregate.events) ? aggregate.events : []).map((ev) => {
+  const progressRows = (Array.isArray(aggregate.events) ? aggregate.events : [])
+    .filter((ev) => ev.eventType !== "GAME_CLOCK_STOPPED")
+    .map((ev) => {
     const p = ev.payload as Record<string, unknown> | undefined;
     const side = (p?.side ?? p?.teamSide) as string | undefined;
     const team = side === "HOME" ? "Dark" : side === "AWAY" ? "Light" : "—";
     const cap = (p?.capNumber as string) ?? "—";
-    const timeStr = ev.createdAt
-      ? new Date(ev.createdAt).toLocaleTimeString(undefined, {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      : "—";
+    const timeStr =
+      typeof p?.timeSeconds === "number"
+        ? `${Math.floor(p.timeSeconds / 60)}:${String(p.timeSeconds % 60).padStart(2, "0")}`
+        : ev.createdAt
+          ? new Date(ev.createdAt).toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            })
+          : "—";
     let remark = "—";
     let score = "—";
     switch (ev.eventType) {
@@ -201,7 +213,7 @@ export function GameSheet() {
         }
         break;
       case "EXCLUSION_STARTED":
-        remark = "Exclusion";
+        remark = p?.isPenalty === true ? "Penalty" : "Exclusion";
         break;
       case "EXCLUSION_CLEARED":
         remark = "Exclusion cleared";
@@ -213,10 +225,7 @@ export function GameSheet() {
         remark = `End Q${(p?.from as number) ?? "?"} → Q${(p?.to as number) ?? "?"}`;
         break;
       case "GAME_CLOCK_STARTED":
-        remark = "Clock started";
-        break;
-      case "GAME_CLOCK_STOPPED":
-        remark = "Clock stopped";
+        remark = "Quarter started";
         break;
       case "GAME_CLOCK_SET":
         remark = "Clock set";
@@ -230,7 +239,23 @@ export function GameSheet() {
       default:
         remark = ev.eventType.replace(/_/g, " ").toLowerCase();
     }
-    return { id: ev.id, time: timeStr, cap, team, remark, score };
+    const isQuarterStart = ev.eventType === "GAME_CLOCK_STARTED";
+    const isQuarterEnd = ev.eventType === "PERIOD_ADVANCED";
+    const foulCount =
+      ev.eventType === "EXCLUSION_STARTED" && side && cap
+        ? (foulsByPlayer[(side as TeamSide)]?.[cap]?.length ?? 0)
+        : undefined;
+    return {
+      id: ev.id,
+      time: timeStr,
+      cap,
+      team,
+      remark,
+      score,
+      isQuarterStart,
+      isQuarterEnd,
+      foulCount,
+    };
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -257,7 +282,14 @@ export function GameSheet() {
       ...(parsed.value.capNumber != null && { capNumber: parsed.value.capNumber }),
     };
     try {
-      const next = await api.games.applyScoreCommand(gameId, payload);
+      let next: GameAggregate;
+      const betweenQuarters = !aggregate.gameClock?.running;
+      if (betweenQuarters && parsed.value.type !== "START_QUARTER") {
+        await api.games.applyScoreCommand(gameId, { type: "START_QUARTER" });
+        next = await api.games.applyScoreCommand(gameId, payload);
+      } else {
+        next = await api.games.applyScoreCommand(gameId, payload);
+      }
       setAggregate(next);
       setInput("");
     } catch (err) {
@@ -307,7 +339,7 @@ export function GameSheet() {
               </div>
               <div className="scoreboard-footer">
                 <div>Period: Q{aggregate.currentPeriod}</div>
-                <div>Game clock: {formatMsToClock(aggregate.gameClock?.remainingMs)}</div>
+                <div>Game clock: {aggregate.gameClock?.running ? formatMsToClock(aggregate.gameClock.remainingMs) : "—"}</div>
               </div>
             </div>
           </section>
@@ -357,7 +389,17 @@ export function GameSheet() {
                     </tr>
                   ) : (
                     progressRows.map((row) => (
-                      <tr key={row.id}>
+                      <tr
+                        key={row.id}
+                        className={[
+                          row.isQuarterStart && "game-progress-row--quarter-start",
+                          row.isQuarterEnd && "game-progress-row--quarter-end",
+                          row.foulCount === 2 && "game-progress-row--fouls-2",
+                          row.foulCount === 3 && "game-progress-row--fouls-3",
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
+                      >
                         <td>{row.time}</td>
                         <td>{row.cap}</td>
                         <td>{row.team}</td>
@@ -397,8 +439,9 @@ export function GameSheet() {
                 ) : (
                   homePlayers.map((p) => {
                     const g = getGoalsForPlayer("HOME", p.capNumber);
+                    const isEjected = (foulsByPlayer.HOME?.[p.capNumber]?.length ?? 0) === 3;
                     return (
-                      <tr key={p.id}>
+                      <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
                         <td>{p.capNumber}</td>
                         <td>{p.playerName}</td>
                         <td>{g.q1}</td>
@@ -433,8 +476,17 @@ export function GameSheet() {
                 ) : (
                   homePlayers.map((p) => {
                     const [s1, s2, s3] = getFoulSlots("HOME", p.capNumber);
+                    const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
                     return (
-                      <tr key={`foul-${p.id}`}>
+                      <tr
+                        key={`foul-${p.id}`}
+                        className={[
+                          foulCount === 2 && "fouls-row--2",
+                          foulCount === 3 && "fouls-row--3",
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
+                      >
                         <td>{p.capNumber}</td>
                         <td>{p.playerName}</td>
                         <td className="foul-slot">{s1}</td>
@@ -474,8 +526,9 @@ export function GameSheet() {
                 ) : (
                   awayPlayers.map((p) => {
                     const g = getGoalsForPlayer("AWAY", p.capNumber);
+                    const isEjected = (foulsByPlayer.AWAY?.[p.capNumber]?.length ?? 0) === 3;
                     return (
-                      <tr key={p.id}>
+                      <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
                         <td>{p.capNumber}</td>
                         <td>{p.playerName}</td>
                         <td>{g.q1}</td>
@@ -510,8 +563,17 @@ export function GameSheet() {
                 ) : (
                   awayPlayers.map((p) => {
                     const [s1, s2, s3] = getFoulSlots("AWAY", p.capNumber);
+                    const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
                     return (
-                      <tr key={`foul-${p.id}`}>
+                      <tr
+                        key={`foul-${p.id}`}
+                        className={[
+                          foulCount === 2 && "fouls-row--2",
+                          foulCount === 3 && "fouls-row--3",
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
+                      >
                         <td>{p.capNumber}</td>
                         <td>{p.playerName}</td>
                         <td className="foul-slot">{s1}</td>

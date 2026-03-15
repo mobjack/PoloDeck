@@ -128,7 +128,23 @@
 }
 
 .game-sheet-progress {
-  margin-top: 1.5rem;
+  margin-top: 1rem;
+}
+
+.game-sheet-progress h3 {
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.game-sheet-progress-table-wrapper .table {
+  font-size: 0.75rem;
+}
+
+.game-sheet-progress-table-wrapper .table th,
+.game-sheet-progress-table-wrapper .table td {
+  padding: 0.25rem 0.4rem;
 }
 
 .game-sheet-page .table {
@@ -136,7 +152,6 @@
 }
 
 /* Match Game clock size (0.85rem) for scoring and roster/foul tables */
-.game-sheet-progress-table-wrapper .table,
 .game-sheet-roster-table,
 .game-sheet-fouls-table {
   font-size: 0.85rem;
@@ -196,8 +211,81 @@
 }
 
 .game-sheet-progress-table-wrapper {
-  max-height: 260px;
+  max-height: 200px;
   overflow-y: auto;
+}
+
+.game-sheet-progress-table-wrapper .table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #252525;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-table-wrapper .table thead th {
+    background: #e8e8e8;
+    border-bottom-color: rgba(0, 0, 0, 0.12);
+  }
+}
+
+.game-sheet-progress-table-wrapper .table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-table-wrapper .table tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--quarter-start {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--quarter-start {
+    background: rgba(76, 175, 80, 0.15);
+  }
+}
+
+.game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--quarter-end {
+  background: rgba(255, 235, 59, 0.25);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--quarter-end {
+    background: rgba(255, 235, 59, 0.35);
+  }
+}
+
+/* 2 personal fouls: bright yellow */
+.game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-2,
+.game-sheet-fouls-table tbody tr.fouls-row--2 {
+  background: rgba(255, 235, 0, 0.5);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-2,
+  .game-sheet-fouls-table tbody tr.fouls-row--2 {
+    background: rgba(255, 235, 0, 0.55);
+  }
+}
+
+/* 3 personal fouls / ejected: red */
+.game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-3,
+.game-sheet-fouls-table tbody tr.fouls-row--3,
+.game-sheet-roster-table tbody tr.roster-row--ejected {
+  background: rgba(244, 67, 54, 0.4);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-3,
+  .game-sheet-fouls-table tbody tr.fouls-row--3,
+  .game-sheet-roster-table tbody tr.roster-row--ejected {
+    background: rgba(244, 67, 54, 0.35);
+  }
 }
 
 .game-sheet-input {
