@@ -135,9 +135,20 @@
   font-size: 0.9rem;
 }
 
+/* Match Game clock size (0.85rem) for scoring and roster/foul tables */
+.game-sheet-progress-table-wrapper .table,
 .game-sheet-roster-table,
 .game-sheet-fouls-table {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* Keep long names on one line: smaller font in Name column */
+.game-sheet-roster-table th:nth-child(2),
+.game-sheet-roster-table td:nth-child(2),
+.game-sheet-fouls-table th:nth-child(2),
+.game-sheet-fouls-table td:nth-child(2) {
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .game-sheet-fouls-table .foul-slot {
@@ -191,6 +202,7 @@
 
 .game-sheet-input {
   margin-top: 1.5rem;
+  font-size: 0.85rem;
 }
 
 .game-sheet-input input[type="text"] {
