@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
 import { api, type GameAggregate } from "../api/client";
@@ -57,14 +57,81 @@ export function GameSheet() {
     };
   }, [gameDayId, gameId]);
 
+  const { goalsByPlayerAndPeriod, closedPeriods } = useMemo(() => {
+    const raw = aggregate?.events;
+    const events = Array.isArray(raw) ? [...raw] : [];
+    events.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    type Side = "HOME" | "AWAY";
+    const goals: Record<Side, Record<string, Record<number, number>>> = {
+      HOME: {},
+      AWAY: {},
+    };
+    const closedPeriods = new Set<number>();
+    let currentPeriod = 1;
+
+    for (const ev of events) {
+      const p = ev.payload as Record<string, unknown> | undefined;
+      if (ev.eventType === "PERIOD_ADVANCED") {
+        const from = (p?.from as number) ?? 0;
+        const to = (p?.to as number) ?? 1;
+        if (from >= 1) closedPeriods.add(from);
+        currentPeriod = to;
+        continue;
+      }
+      if (ev.eventType === "GOAL_HOME" && p?.capNumber) {
+        const cap = String(p.capNumber);
+        if (!goals.HOME[cap]) goals.HOME[cap] = {};
+        goals.HOME[cap][currentPeriod] = (goals.HOME[cap][currentPeriod] ?? 0) + 1;
+      }
+      if (ev.eventType === "GOAL_AWAY" && p?.capNumber) {
+        const cap = String(p.capNumber);
+        if (!goals.AWAY[cap]) goals.AWAY[cap] = {};
+        goals.AWAY[cap][currentPeriod] = (goals.AWAY[cap][currentPeriod] ?? 0) + 1;
+      }
+    }
+
+    return {
+      goalsByPlayerAndPeriod: goals,
+      closedPeriods,
+    };
+  }, [aggregate?.events]);
+
+  const foulsByPlayer = useMemo(() => {
+    const raw = aggregate?.events;
+    const eventList = Array.isArray(raw) ? [...raw] : [];
+    const events = eventList
+      .filter((e) => e.eventType === "EXCLUSION_STARTED")
+      .sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    type Side = "HOME" | "AWAY";
+    const bySideCap: Record<Side, Record<string, string[]>> = {
+      HOME: {},
+      AWAY: {},
+    };
+    for (const ev of events) {
+      const p = ev.payload as Record<string, unknown> | undefined;
+      const side = (p?.teamSide as Side) ?? (p?.side as Side);
+      const cap = p?.capNumber as string;
+      if (!side || !cap) continue;
+      if (!bySideCap[side][cap]) bySideCap[side][cap] = [];
+      if (bySideCap[side][cap].length < 3) {
+        bySideCap[side][cap].push("E");
+      }
+    }
+    return bySideCap;
+  }, [aggregate?.events]);
+
   if (loading) return <div className="page"><p>Loading…</p></div>;
   if (error) return <div className="page"><p className="error">Error: {error}</p></div>;
   if (!gameDay || !aggregate) return <div className="page"><p>Game not found.</p></div>;
 
   const homeScore = aggregate.score?.homeScore ?? 0;
   const awayScore = aggregate.score?.awayScore ?? 0;
-  const homeTimeouts = aggregate.timeoutStates.find((t) => t.teamSide === "HOME");
-  const awayTimeouts = aggregate.timeoutStates.find((t) => t.teamSide === "AWAY");
+  const homeTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "HOME");
+  const awayTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "AWAY");
 
   const homePlayers = (aggregate.players ?? [])
     .filter((p) => p.teamSide === "HOME" && p.playerName.trim().length > 0)
@@ -72,6 +139,36 @@ export function GameSheet() {
   const awayPlayers = (aggregate.players ?? [])
     .filter((p) => p.teamSide === "AWAY" && p.playerName.trim().length > 0)
     .sort((a, b) => a.capNumber.localeCompare(b.capNumber));
+
+  const getGoalsForPlayer = (
+    side: "HOME" | "AWAY",
+    capNumber: string
+  ): { q1: number | "—"; q2: number | "—"; q3: number | "—"; q4: number | "—"; ot: number; tot: number } => {
+    const byPeriod = goalsByPlayerAndPeriod[side]?.[capNumber];
+    if (!byPeriod) {
+      return { q1: "—", q2: "—", q3: "—", q4: "—", ot: 0, tot: 0 };
+    }
+    const q1 = closedPeriods.has(1) ? (byPeriod[1] ?? 0) : "—";
+    const q2 = closedPeriods.has(2) ? (byPeriod[2] ?? 0) : "—";
+    const q3 = closedPeriods.has(3) ? (byPeriod[3] ?? 0) : "—";
+    const q4 = closedPeriods.has(4) ? (byPeriod[4] ?? 0) : "—";
+    let ot = 0;
+    let tot = 0;
+    for (const [periodStr, count] of Object.entries(byPeriod)) {
+      const period = Number(periodStr);
+      if (!Number.isInteger(period) || count === undefined) continue;
+      if (closedPeriods.has(period)) {
+        tot += count;
+        if (period >= 5) ot += count;
+      }
+    }
+    return { q1, q2, q3, q4, ot, tot };
+  };
+
+  const getFoulSlots = (side: "HOME" | "AWAY", capNumber: string): [string, string, string] => {
+    const arr = foulsByPlayer[side]?.[capNumber] ?? [];
+    return [arr[0] ?? "—", arr[1] ?? "—", arr[2] ?? "—"];
+  };
 
   const formatMsToClock = (ms: number | null | undefined) => {
     if (ms == null) return "—";
@@ -81,7 +178,62 @@ export function GameSheet() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const progressRows = (Array.isArray(aggregate.events) ? aggregate.events : []).map((ev) => {
+    const p = ev.payload as Record<string, unknown> | undefined;
+    const side = (p?.side ?? p?.teamSide) as string | undefined;
+    const team = side === "HOME" ? "Dark" : side === "AWAY" ? "Light" : "—";
+    const cap = (p?.capNumber as string) ?? "—";
+    const timeStr = ev.createdAt
+      ? new Date(ev.createdAt).toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      : "—";
+    let remark = "—";
+    let score = "—";
+    switch (ev.eventType) {
+      case "GOAL_HOME":
+      case "GOAL_AWAY":
+        remark = "Goal";
+        if (typeof p?.homeScore === "number" && typeof p?.awayScore === "number") {
+          score = `${p.homeScore}-${p.awayScore}`;
+        }
+        break;
+      case "EXCLUSION_STARTED":
+        remark = "Exclusion";
+        break;
+      case "EXCLUSION_CLEARED":
+        remark = "Exclusion cleared";
+        break;
+      case "TIMEOUT_USED":
+        remark = (p?.type as string) === "short" ? "Timeout (30s)" : "Timeout (full)";
+        break;
+      case "PERIOD_ADVANCED":
+        remark = `End Q${(p?.from as number) ?? "?"} → Q${(p?.to as number) ?? "?"}`;
+        break;
+      case "GAME_CLOCK_STARTED":
+        remark = "Clock started";
+        break;
+      case "GAME_CLOCK_STOPPED":
+        remark = "Clock stopped";
+        break;
+      case "GAME_CLOCK_SET":
+        remark = "Clock set";
+        break;
+      case "HORN_TRIGGERED":
+        remark = "Horn";
+        break;
+      case "GAME_CREATED":
+        remark = "Game created";
+        break;
+      default:
+        remark = ev.eventType.replace(/_/g, " ").toLowerCase();
+    }
+    return { id: ev.id, time: timeStr, cap, team, remark, score };
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
@@ -97,8 +249,20 @@ export function GameSheet() {
     }
     setInputError(null);
     setLastParsed(parsed.value);
-    // TODO: send to server endpoint that applies this event
-    setInput("");
+    if (!gameId) return;
+    const payload = {
+      type: parsed.value.type,
+      ...(parsed.value.timeSeconds != null && { timeSeconds: parsed.value.timeSeconds }),
+      ...(parsed.value.side != null && { side: parsed.value.side }),
+      ...(parsed.value.capNumber != null && { capNumber: parsed.value.capNumber }),
+    };
+    try {
+      const next = await api.games.applyScoreCommand(gameId, payload);
+      setAggregate(next);
+      setInput("");
+    } catch (err) {
+      setInputError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (
@@ -187,10 +351,21 @@ export function GameSheet() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* TODO: render events from aggregate.events once wired */}
-                  <tr>
-                    <td colSpan={5}>No events yet.</td>
-                  </tr>
+                  {progressRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>No events yet.</td>
+                    </tr>
+                  ) : (
+                    progressRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.time}</td>
+                        <td>{row.cap}</td>
+                        <td>{row.team}</td>
+                        <td>{row.remark}</td>
+                        <td>{row.score}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -220,18 +395,21 @@ export function GameSheet() {
                     <td colSpan={8}>No roster yet.</td>
                   </tr>
                 ) : (
-                  homePlayers.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.capNumber}</td>
-                      <td>{p.playerName}</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                    </tr>
-                  ))
+                  homePlayers.map((p) => {
+                    const g = getGoalsForPlayer("HOME", p.capNumber);
+                    return (
+                      <tr key={p.id}>
+                        <td>{p.capNumber}</td>
+                        <td>{p.playerName}</td>
+                        <td>{g.q1}</td>
+                        <td>{g.q2}</td>
+                        <td>{g.q3}</td>
+                        <td>{g.q4}</td>
+                        <td>{g.ot}</td>
+                        <td>{g.tot}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -253,15 +431,18 @@ export function GameSheet() {
                     <td colSpan={5}>No roster yet.</td>
                   </tr>
                 ) : (
-                  homePlayers.map((p) => (
-                    <tr key={`foul-${p.id}`}>
-                      <td>{p.capNumber}</td>
-                      <td>{p.playerName}</td>
-                      <td className="foul-slot">—</td>
-                      <td className="foul-slot">—</td>
-                      <td className="foul-slot">—</td>
-                    </tr>
-                  ))
+                  homePlayers.map((p) => {
+                    const [s1, s2, s3] = getFoulSlots("HOME", p.capNumber);
+                    return (
+                      <tr key={`foul-${p.id}`}>
+                        <td>{p.capNumber}</td>
+                        <td>{p.playerName}</td>
+                        <td className="foul-slot">{s1}</td>
+                        <td className="foul-slot">{s2}</td>
+                        <td className="foul-slot">{s3}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -291,18 +472,21 @@ export function GameSheet() {
                     <td colSpan={8}>No roster yet.</td>
                   </tr>
                 ) : (
-                  awayPlayers.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.capNumber}</td>
-                      <td>{p.playerName}</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                      <td>-</td>
-                    </tr>
-                  ))
+                  awayPlayers.map((p) => {
+                    const g = getGoalsForPlayer("AWAY", p.capNumber);
+                    return (
+                      <tr key={p.id}>
+                        <td>{p.capNumber}</td>
+                        <td>{p.playerName}</td>
+                        <td>{g.q1}</td>
+                        <td>{g.q2}</td>
+                        <td>{g.q3}</td>
+                        <td>{g.q4}</td>
+                        <td>{g.ot}</td>
+                        <td>{g.tot}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -324,15 +508,18 @@ export function GameSheet() {
                     <td colSpan={5}>No roster yet.</td>
                   </tr>
                 ) : (
-                  awayPlayers.map((p) => (
-                    <tr key={`foul-${p.id}`}>
-                      <td>{p.capNumber}</td>
-                      <td>{p.playerName}</td>
-                      <td className="foul-slot">—</td>
-                      <td className="foul-slot">—</td>
-                      <td className="foul-slot">—</td>
-                    </tr>
-                  ))
+                  awayPlayers.map((p) => {
+                    const [s1, s2, s3] = getFoulSlots("AWAY", p.capNumber);
+                    return (
+                      <tr key={`foul-${p.id}`}>
+                        <td>{p.capNumber}</td>
+                        <td>{p.playerName}</td>
+                        <td className="foul-slot">{s1}</td>
+                        <td className="foul-slot">{s2}</td>
+                        <td className="foul-slot">{s3}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

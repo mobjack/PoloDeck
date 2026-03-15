@@ -129,5 +129,18 @@ export const api = {
         method: "POST",
         json: body,
       }),
+    applyScoreCommand: (
+      id: string,
+      body: {
+        type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
+        timeSeconds?: number;
+        side?: "HOME" | "AWAY";
+        capNumber?: string;
+      }
+    ) =>
+      request<GameAggregate>(`/games/${id}/score-command`, {
+        method: "POST",
+        json: body,
+      }),
   },
 };
