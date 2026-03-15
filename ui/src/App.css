@@ -21,6 +21,9 @@
   max-width: 1200px;
   padding-left: 0.75rem;
   padding-right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 .game-sheet-header h2 {
@@ -36,11 +39,19 @@
   display: flex;
   gap: 2rem;
   align-items: flex-start;
+  flex: 1;
+  min-height: 0;
 }
 
 .game-sheet-col {
   flex: 1;
   min-width: 0;
+}
+
+.game-sheet-main > .game-sheet-col:first-child {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .game-sheet-col:last-child {
@@ -129,6 +140,10 @@
 
 .game-sheet-progress {
   margin-top: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .game-sheet-progress h3 {
@@ -211,7 +226,8 @@
 }
 
 .game-sheet-progress-table-wrapper {
-  max-height: 200px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 

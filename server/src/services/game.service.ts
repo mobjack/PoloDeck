@@ -643,6 +643,7 @@ export class GameService {
   async advancePeriod(gameId: string) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
+      include: { score: true },
     });
     if (!game) {
       throw this.notFound("Game not found");
@@ -657,10 +658,18 @@ export class GameService {
       },
     });
 
+    const payload: Record<string, unknown> = {
+      from: game.currentPeriod,
+      to: nextPeriod,
+    };
+    if (game.score) {
+      payload.homeScore = game.score.homeScore;
+      payload.awayScore = game.score.awayScore;
+    }
     await this.createEvent(
       gameId,
       GameEventType.PERIOD_ADVANCED,
-      { from: game.currentPeriod, to: nextPeriod },
+      payload as Prisma.InputJsonValue,
       "operator"
     );
     return this.emitState(gameId);
@@ -864,6 +873,15 @@ export class GameService {
       case "GOAL": {
         if (side == null || body.capNumber == null) {
           throw this.badRequest("GOAL requires side and capNumber");
+        }
+        const goalPlayer = await this.prisma.player.findFirst({
+          where: { gameId, teamSide: side, capNumber: body.capNumber },
+        });
+        if (!goalPlayer) {
+          const teamName = side === TeamSide.HOME ? "Dark" : "Light";
+          throw this.badRequest(
+            `No player with cap number ${body.capNumber} on the ${teamName} team for this game.`
+          );
         }
         if (body.timeSeconds != null) {
           await this.setGameClock(gameId, body.timeSeconds * 1000, { skipEvent: true });

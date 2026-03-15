@@ -223,6 +223,9 @@ export function GameSheet() {
         break;
       case "PERIOD_ADVANCED":
         remark = `End Q${(p?.from as number) ?? "?"} → Q${(p?.to as number) ?? "?"}`;
+        if (typeof p?.homeScore === "number" && typeof p?.awayScore === "number") {
+          score = `${p.homeScore}-${p.awayScore}`;
+        }
         break;
       case "GAME_CLOCK_STARTED":
         remark = "Quarter started";
@@ -593,7 +596,9 @@ export function GameSheet() {
 }
 
 function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: false; error: string } {
-  const lower = raw.toLowerCase();
+  // Allow colon as time separator; normalize to dot for parsing
+  const normalized = raw.replace(/:/g, ".");
+  const lower = normalized.toLowerCase();
 
   if (lower === "sq") {
     return { ok: true, value: { raw, type: "START_QUARTER" } };
@@ -602,39 +607,59 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
     return { ok: true, value: { raw, type: "END_QUARTER" } };
   }
 
+  // b and d both mean dark; w and l both mean light
+  const darkChars = "bd";
+
   // Timeout with time and side: 4.13tw or 4.13tb (t or t3 before side)
-  const timeoutPattern = /^(\d+(\.\d{1,2})?)(t3?|t)(b|w)$/;
+  const timeoutPattern = /^(\d+(\.\d{1,2})?)(t3?|t)([bdwl])$/;
   const timeoutMatch = lower.match(timeoutPattern);
   if (timeoutMatch) {
     const timeSeconds = parseTimeToSeconds(timeoutMatch[1]);
     const action = timeoutMatch[3];
-    const side = timeoutMatch[4] === "b" ? "HOME" : "AWAY";
+    const sideChar = timeoutMatch[4];
+    const side: TeamSide = darkChars.includes(sideChar) ? "HOME" : "AWAY";
     const type = action === "t3" ? "TIMEOUT_30" : "TIMEOUT";
     return { ok: true, value: { raw, type, timeSeconds, side } };
   }
 
-  // General pattern: optional time, then side, optional cap, then action (g/e/p)
-  const pattern = /^(\d*(\.\d{1,2})?)?(b|w)(\d+)?(g|e|p)$/;
-  const match = lower.match(pattern);
-  if (!match) {
-    return {
-      ok: false,
-      error:
-        "Invalid command. Examples: sq, eq, 6.07w13g, 5.53b2e, .03w7p, 4.13tw or 4.13t3w.",
-    };
+  // Goal/exclusion/penalty: [time] then either (team)(cap)(action) or (action)(cap)(team)
+  const timePartRe = /^(\d*(\.\d{1,2})?)?/;
+  const timePartMatch = lower.match(timePartRe);
+  const timePart = timePartMatch ? timePartMatch[1] : undefined;
+  const rest = timePart != null ? lower.slice(timePart.length) : lower;
+
+  // Standard order: team then cap then action — (b|d|w|l)(\d+)(g|e|p)
+  const standardRe = /^([bdwl])(\d+)([gep])$/;
+  // Swapped order: action then cap then team — (g|e|p)(\d+)(b|d|w|l)
+  const swappedRe = /^([gep])(\d+)([bdwl])$/;
+
+  let sideChar: string;
+  let capPart: string;
+  let action: string;
+
+  const standardMatch = rest.match(standardRe);
+  if (standardMatch) {
+    sideChar = standardMatch[1];
+    capPart = standardMatch[2];
+    action = standardMatch[3];
+  } else {
+    const swappedMatch = rest.match(swappedRe);
+    if (swappedMatch) {
+      action = swappedMatch[1];
+      capPart = swappedMatch[2];
+      sideChar = swappedMatch[3];
+    } else {
+      return {
+        ok: false,
+        error:
+          "Invalid command. Examples: sq, eq, 6.07w13g, 5.53b2e, 6:07d3g, g13w, 4.13tw or 4.13t3w.",
+      };
+    }
   }
 
-  const timePart = match[1];
-  const sideChar = match[3];
-  const capPart = match[4];
-  const action = match[5];
-
-  const timeSeconds = timePart ? parseTimeToSeconds(timePart) : undefined;
-  const side: TeamSide = sideChar === "b" ? "HOME" : "AWAY";
-
-  if (!capPart && (action === "g" || action === "e" || action === "p")) {
-    return { ok: false, error: "Cap number is required for goals, exclusions, and penalties." };
-  }
+  const timeSeconds =
+    timePart != null && timePart.length > 0 ? parseTimeToSeconds(timePart) : undefined;
+  const side: TeamSide = darkChars.includes(sideChar) ? "HOME" : "AWAY";
 
   let type: ParsedInput["type"];
   if (action === "g") type = "GOAL";
@@ -655,17 +680,18 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
 }
 
 function parseTimeToSeconds(time: string): number {
-  // formats: "6.07", ".03", "6"
-  if (!time) return 0;
-  if (time.startsWith(".")) {
-    const seconds = Number(time.slice(1));
+  // formats: "6.07", "6:07", ".03", "6" — normalize colon to dot
+  const t = time.replace(":", ".");
+  if (!t) return 0;
+  if (t.startsWith(".")) {
+    const seconds = Number(t.slice(1));
     return isNaN(seconds) ? 0 : seconds;
   }
-  if (!time.includes(".")) {
-    const minutes = Number(time);
+  if (!t.includes(".")) {
+    const minutes = Number(t);
     return isNaN(minutes) ? 0 : minutes * 60;
   }
-  const [mStr, sStr] = time.split(".");
+  const [mStr, sStr] = t.split(".");
   const minutes = Number(mStr || "0");
   const seconds = Number(sStr || "0");
   if (isNaN(minutes) || isNaN(seconds)) return 0;
