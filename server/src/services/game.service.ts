@@ -53,6 +53,27 @@ export class GameService {
     });
   }
 
+  private async assertPlayerNotRolled(
+    gameId: string,
+    teamSide: TeamSide,
+    capNumber: string
+  ): Promise<void> {
+    const events = await this.prisma.gameEvent.findMany({
+      where: { gameId, eventType: GameEventType.EXCLUSION_STARTED },
+      select: { payload: true },
+    });
+    const count = events.filter((ev) => {
+      const p = ev.payload as Record<string, unknown> | null;
+      return p?.teamSide === teamSide && String(p?.capNumber) === String(capNumber);
+    }).length;
+    if (count >= 3) {
+      const teamName = teamSide === TeamSide.HOME ? "Dark" : "Light";
+      throw this.badRequest(
+        `Player ${capNumber} (${teamName}) has been rolled from the game, no updates possible.`
+      );
+    }
+  }
+
   async checkInDevice(input: {
     clientId: string;
     type: DeviceType;
@@ -883,6 +904,7 @@ export class GameService {
             `No player with cap number ${body.capNumber} on the ${teamName} team for this game.`
           );
         }
+        await this.assertPlayerNotRolled(gameId, side, body.capNumber);
         if (body.timeSeconds != null) {
           await this.setGameClock(gameId, body.timeSeconds * 1000, { skipEvent: true });
         }
@@ -900,6 +922,7 @@ export class GameService {
           where: { gameId, teamSide: side, capNumber: body.capNumber },
         });
         if (!player) throw this.notFound("Player not found for this game and cap number");
+        await this.assertPlayerNotRolled(gameId, side, body.capNumber);
         const isPenalty = body.type === "PENALTY";
         return this.createExclusion(gameId, {
           playerId: player.id,
