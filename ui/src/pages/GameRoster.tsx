@@ -61,6 +61,10 @@ export function GameRoster() {
   const [importApplyAway, setImportApplyAway] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
+  const [quickFillSide, setQuickFillSide] = useState<TeamSide | null>(null);
+  const [quickFillCount, setQuickFillCount] = useState<string>("12");
+  const [quickFillError, setQuickFillError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!gameDayId || !gameId) return;
     setLoading(true);
@@ -120,23 +124,43 @@ export function GameRoster() {
     return null;
   }, [allGameDays, importGameId]);
 
+  const buildRosterPayload = () => {
+    const home = CAP_NUMBERS.map((cap) => ({
+      capNumber: cap,
+      playerName: homeNames[cap]?.trim() ?? "",
+    })).filter((p) => p.playerName.length > 0);
+    const away = CAP_NUMBERS.map((cap) => ({
+      capNumber: cap,
+      playerName: awayNames[cap]?.trim() ?? "",
+    })).filter((p) => p.playerName.length > 0);
+    return { home, away };
+  };
+
   const handleSave = async () => {
     if (!gameId) return;
     setSaving(true);
     setError(null);
     try {
-      const home = CAP_NUMBERS.map((cap) => ({
-        capNumber: cap,
-        playerName: homeNames[cap]?.trim() ?? "",
-      })).filter((p) => p.playerName.length > 0);
-      const away = CAP_NUMBERS.map((cap) => ({
-        capNumber: cap,
-        playerName: awayNames[cap]?.trim() ?? "",
-      })).filter((p) => p.playerName.length > 0);
+      const { home, away } = buildRosterPayload();
       await api.games.replaceRoster(gameId, { home, away });
       if (gameDayId) {
         navigate(`/game-days/${gameDayId}`);
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAndGoToSheet = async () => {
+    if (!gameId || !gameDayId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { home, away } = buildRosterPayload();
+      await api.games.replaceRoster(gameId, { home, away });
+      navigate(`/game-days/${gameDayId}/games/${gameId}/sheet`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -206,6 +230,68 @@ export function GameRoster() {
     }
   };
 
+  const openQuickFillModal = (side: TeamSide) => {
+    setQuickFillSide(side);
+    setQuickFillCount("12");
+    setQuickFillError(null);
+  };
+
+  const applyQuickFillForSide = (side: TeamSide, count: number) => {
+    const names = side === "HOME" ? homeNames : awayNames;
+    const emptyCaps = CAP_NUMBERS.filter((cap) => (names[cap] ?? "").trim().length === 0);
+    if (emptyCaps.length === 0 || count <= 0) return;
+
+    const requested = Math.min(count, emptyCaps.length);
+
+    // Find max existing "Player N" index on this side
+    let maxIndex = 0;
+    for (const name of Object.values(names)) {
+      const match = /^Player\s+(\d+)$/.exec(name.trim());
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxIndex) {
+          maxIndex = num;
+        }
+      }
+    }
+
+    const updated: Record<string, string> = { ...names };
+    for (let i = 0; i < requested; i++) {
+      const cap = emptyCaps[i];
+      const index = maxIndex + i + 1;
+      updated[cap] = `Player ${index}`;
+    }
+
+    if (side === "HOME") {
+      setHomeNames(updated);
+    } else {
+      setAwayNames(updated);
+    }
+  };
+
+  const handleConfirmQuickFill = () => {
+    if (!quickFillSide) return;
+    const n = parseInt(quickFillCount, 10);
+    if (Number.isNaN(n) || n <= 0) {
+      setQuickFillError("Enter a positive number of caps.");
+      return;
+    }
+    applyQuickFillForSide(quickFillSide, n);
+    setQuickFillSide(null);
+  };
+
+  const clearSide = (side: TeamSide) => {
+    const empty: Record<string, string> = {};
+    for (const cap of CAP_NUMBERS) {
+      empty[cap] = "";
+    }
+    if (side === "HOME") {
+      setHomeNames(empty);
+    } else {
+      setAwayNames(empty);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -265,6 +351,16 @@ export function GameRoster() {
       </div>
 
       <div className="roster-table-top-actions">
+        {gameDayId && gameId && (
+          <button
+            type="button"
+            className="btn primary btn-compact game-sheet-button"
+            onClick={handleSaveAndGoToSheet}
+            disabled={saving}
+          >
+            Game sheet
+          </button>
+        )}
         <button
           type="button"
           className="btn primary"
@@ -282,10 +378,46 @@ export function GameRoster() {
               <th className="roster-cap-heading">Cap</th>
               <th className="roster-home-heading">
                 Home (dark) <span className="roster-home-label">{thisGame.homeTeamName}</span>
+                <button
+                  type="button"
+                  className="btn secondary btn-compact roster-quick-fill-button"
+                  onClick={() => openQuickFillModal("HOME")}
+                >
+                  Quick fill caps
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary btn-compact roster-quick-fill-button"
+                  onClick={() => {
+                    if (window.confirm("Clear all Home (dark) player names?")) {
+                      clearSide("HOME");
+                    }
+                  }}
+                >
+                  Clear
+                </button>
               </th>
               <th className="roster-cap-heading">Cap</th>
               <th className="roster-away-heading">
                 Away (light) <span className="roster-away-label">{thisGame.awayTeamName}</span>
+                <button
+                  type="button"
+                  className="btn secondary btn-compact roster-quick-fill-button"
+                  onClick={() => openQuickFillModal("AWAY")}
+                >
+                  Quick fill caps
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary btn-compact roster-quick-fill-button"
+                  onClick={() => {
+                    if (window.confirm("Clear all Away (light) player names?")) {
+                      clearSide("AWAY");
+                    }
+                  }}
+                >
+                  Clear
+                </button>
               </th>
             </tr>
           </thead>
@@ -421,6 +553,56 @@ export function GameRoster() {
                 onClick={handleConfirmImport}
               >
                 Import roster
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {quickFillSide && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>Quick fill caps</h3>
+            <p className="modal-text">
+              Fill empty caps for{" "}
+              {quickFillSide === "HOME"
+                ? `Home (dark): ${thisGame.homeTeamName}`
+                : `Away (light): ${thisGame.awayTeamName}`}
+              .
+            </p>
+
+            <div className="modal-section">
+              <p className="modal-section-title">How many caps to fill?</p>
+              <input
+                type="number"
+                min={1}
+                max={CAP_NUMBERS.length}
+                value={quickFillCount}
+                onChange={(e) => setQuickFillCount(e.target.value)}
+              />
+            </div>
+
+            {quickFillError && <p className="error">{quickFillError}</p>}
+
+            <p className="modal-warning">
+              This will only fill currently empty caps with placeholder names like{" "}
+              <strong>Player 1</strong>, <strong>Player 2</strong>, etc. You can edit them at any
+              time.
+            </p>
+
+            <div className="form-actions modal-actions">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setQuickFillSide(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={handleConfirmQuickFill}
+              >
+                Quick fill
               </button>
             </div>
           </div>

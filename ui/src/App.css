@@ -794,6 +794,25 @@
   }
 }
 
+.btn.primary.game-sheet-button {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.btn.primary.game-sheet-button:hover {
+  background: #1b5e20;
+}
+
+@media (prefers-color-scheme: light) {
+  .btn.primary.game-sheet-button {
+    background: #43a047;
+  }
+
+  .btn.primary.game-sheet-button:hover {
+    background: #2e7d32;
+  }
+}
+
 .error {
   color: #e57373;
   margin: 0 0 0.5rem;
@@ -897,6 +916,7 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 0.5rem;
+  gap: 0.5rem;
 }
 
 .roster-table-wrapper {
@@ -929,6 +949,15 @@
 
 .roster-away-heading {
   width: 1fr;
+}
+
+.roster-home-heading,
+.roster-away-heading {
+  white-space: nowrap;
+}
+
+.roster-quick-fill-button {
+  margin-left: 0.5rem;
 }
 
 .roster-table td:nth-child(1) {
