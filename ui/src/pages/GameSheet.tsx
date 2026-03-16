@@ -150,6 +150,9 @@ export function GameSheet() {
 
   const homeScore = aggregate.score?.homeScore ?? 0;
   const awayScore = aggregate.score?.awayScore ?? 0;
+  const isGameOver =
+    aggregate.status === "FINAL" ||
+    (aggregate.currentPeriod >= aggregate.totalPeriods && !aggregate.gameClock?.running);
   const homeTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "HOME");
   const awayTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "AWAY");
 
@@ -292,7 +295,7 @@ export function GameSheet() {
     setInputError(null);
     setLastParsed(parsed.value);
     if (!gameId) return;
-    if (aggregate.status === "FINAL") return;
+    if (isGameOver) return;
 
     const isEqInQ4 =
       parsed.value.type === "END_QUARTER" &&
@@ -393,7 +396,7 @@ export function GameSheet() {
                     type="button"
                     className="scoring-command-link"
                     onClick={() => setCommandHelpOpen(true)}
-                    disabled={aggregate.status === "FINAL"}
+                    disabled={isGameOver}
                   >
                     Scoring command
                   </button>
@@ -402,11 +405,11 @@ export function GameSheet() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="e.g. 6.07w13g"
-                    disabled={aggregate.status === "FINAL"}
+                    disabled={isGameOver}
                     aria-label="Scoring command"
                   />
                 </label>
-                {aggregate.status === "FINAL" ? (
+                {isGameOver ? (
                   <button
                     type="button"
                     className="btn primary btn-compact scoring-apply"

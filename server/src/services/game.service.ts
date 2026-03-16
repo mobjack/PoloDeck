@@ -158,6 +158,7 @@ export class GameService {
       include: {
         games: {
           orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+          include: { score: true },
         },
       },
     });
@@ -181,6 +182,7 @@ export class GameService {
       include: {
         games: {
           orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+          include: { score: true },
         },
       },
     });
