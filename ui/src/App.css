@@ -37,7 +37,7 @@
 
 .game-sheet-main {
   display: flex;
-  gap: 2rem;
+  gap: 3rem;
   align-items: flex-start;
   flex: 1;
   min-height: 0;
@@ -48,14 +48,22 @@
   min-width: 0;
 }
 
+/* Roster columns (home & away) don't shrink below content so cards never overlap */
+.game-sheet-main > .game-sheet-col:nth-child(2),
+.game-sheet-main > .game-sheet-col:nth-child(3) {
+  min-width: min-content;
+}
+
 .game-sheet-main > .game-sheet-col:first-child {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 320px;
+  flex: 1 1 320px;
 }
 
 .game-sheet-col:last-child {
-  margin-left: 4rem;
+  margin-left: 0;
 }
 
 .scoreboard-card {
@@ -98,6 +106,10 @@
   justify-content: space-between;
   gap: 2rem;
   margin-bottom: 0.75rem;
+}
+
+.scoreboard-timeouts-value {
+  white-space: nowrap;
 }
 
 .scoreboard-column {
@@ -186,9 +198,62 @@
   text-align: center;
 }
 
+/* Subtle row background on game sheet rosters/fouls to aid horizontal tracking.
+   Only apply to odd rows so the existing even-row shading remains. */
+.game-sheet-roster-table tbody tr:nth-child(odd),
+.game-sheet-fouls-table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-roster-table tbody tr:nth-child(odd),
+  .game-sheet-fouls-table tbody tr:nth-child(odd) {
+    background: rgba(0, 0, 0, 0.02);
+  }
+}
+
 .game-sheet-roster-column h3 {
   margin-top: 0;
   margin-bottom: 0.4rem;
+}
+
+.game-sheet-roster-column {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.game-sheet-roster-card {
+  padding: 0.9rem 1rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.game-sheet-roster-column-home .game-sheet-roster-card {
+  background: rgba(51, 102, 255, 0.18);
+  margin-right: 0.5rem;
+}
+
+.game-sheet-roster-column-away {
+  justify-content: flex-end;
+}
+
+.game-sheet-roster-column-away .game-sheet-roster-card {
+  background: rgba(255, 153, 102, 0.18);
+  margin-left: 0.5rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-roster-card {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .game-sheet-roster-column-home .game-sheet-roster-card {
+    background: rgba(51, 102, 255, 0.08);
+  }
+  .game-sheet-roster-column-away .game-sheet-roster-card {
+    background: rgba(255, 153, 102, 0.08);
+  }
 }
 
 .game-sheet-fouls-heading {
@@ -794,6 +859,25 @@
   }
 }
 
+.btn.primary.game-sheet-button {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.btn.primary.game-sheet-button:hover {
+  background: #1b5e20;
+}
+
+@media (prefers-color-scheme: light) {
+  .btn.primary.game-sheet-button {
+    background: #43a047;
+  }
+
+  .btn.primary.game-sheet-button:hover {
+    background: #2e7d32;
+  }
+}
+
 .error {
   color: #e57373;
   margin: 0 0 0.5rem;
@@ -897,6 +981,7 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 0.5rem;
+  gap: 0.5rem;
 }
 
 .roster-table-wrapper {
@@ -929,6 +1014,15 @@
 
 .roster-away-heading {
   width: 1fr;
+}
+
+.roster-home-heading,
+.roster-away-heading {
+  white-space: nowrap;
+}
+
+.roster-quick-fill-button {
+  margin-left: 0.5rem;
 }
 
 .roster-table td:nth-child(1) {
