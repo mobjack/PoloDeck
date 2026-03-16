@@ -6,6 +6,46 @@ import type { GameDay } from "../types/gameDay";
 
 type TeamSide = "HOME" | "AWAY";
 
+const CAP_ORDER: string[] = [
+  "1",
+  "1A",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "16",
+  "17",
+  "18",
+  "19",
+  "20",
+  "21",
+  "22",
+  "23",
+  "24",
+  "25",
+];
+
+function capSortKey(cap: string): number {
+  const idx = CAP_ORDER.indexOf(cap);
+  if (idx !== -1) return idx;
+  // Fallback: try numeric, then string order at the end
+  const numeric = Number(cap.replace(/\D+/g, ""));
+  if (!Number.isNaN(numeric)) {
+    return CAP_ORDER.length + numeric;
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
 interface ParsedInput {
   raw: string;
   type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
@@ -158,10 +198,12 @@ export function GameSheet() {
 
   const homePlayers = (aggregate.players ?? [])
     .filter((p) => p.teamSide === "HOME" && p.playerName.trim().length > 0)
-    .sort((a, b) => a.capNumber.localeCompare(b.capNumber));
+    .sort((a, b) => capSortKey(a.capNumber) - capSortKey(b.capNumber));
   const awayPlayers = (aggregate.players ?? [])
     .filter((p) => p.teamSide === "AWAY" && p.playerName.trim().length > 0)
-    .sort((a, b) => a.capNumber.localeCompare(b.capNumber));
+    .sort((a, b) => capSortKey(a.capNumber) - capSortKey(b.capNumber));
+
+  const maxRosterRows = Math.max(homePlayers.length, awayPlayers.length);
 
   const getGoalsForPlayer = (
     side: "HOME" | "AWAY",
@@ -367,16 +409,20 @@ export function GameSheet() {
               <div className="scoreboard-body">
                 <div className="scoreboard-column">
                   <div>Score: <span className="scoreboard-score">{homeScore}</span></div>
-                  <div>
-                    Timeouts: F: {homeTimeouts?.fullTimeoutsRemaining ?? 0}  30s:{" "}
-                    {homeTimeouts?.shortTimeoutsRemaining ?? 0}
+                  <div className="scoreboard-timeouts">
+                    <div>Timeouts:</div>
+                    <div className="scoreboard-timeouts-value">
+                      F: {homeTimeouts?.fullTimeoutsRemaining ?? 0}  30s: {homeTimeouts?.shortTimeoutsRemaining ?? 0}
+                    </div>
                   </div>
                 </div>
                 <div className="scoreboard-column">
                   <div>Score: <span className="scoreboard-score">{awayScore}</span></div>
-                  <div>
-                    Timeouts: F: {awayTimeouts?.fullTimeoutsRemaining ?? 0}  30s:{" "}
-                    {awayTimeouts?.shortTimeoutsRemaining ?? 0}
+                  <div className="scoreboard-timeouts">
+                    <div>Timeouts:</div>
+                    <div className="scoreboard-timeouts-value">
+                      F: {awayTimeouts?.fullTimeoutsRemaining ?? 0}  30s: {awayTimeouts?.shortTimeoutsRemaining ?? 0}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -624,8 +670,9 @@ export function GameSheet() {
 
         {/* Column 2: home roster + goals + fouls */}
         <div className="game-sheet-col">
-          <section className="game-sheet-roster-column">
-            <h3>Home (dark)</h3>
+          <section className="game-sheet-roster-column game-sheet-roster-column-home">
+            <div className="game-sheet-roster-card">
+            <h3>Home - {aggregate.homeTeamName} (dark)</h3>
             <table className="table game-sheet-roster-table">
               <thead>
                 <tr>
@@ -640,12 +687,27 @@ export function GameSheet() {
                 </tr>
               </thead>
               <tbody>
-                {homePlayers.length === 0 ? (
+                {maxRosterRows === 0 ? (
                   <tr>
                     <td colSpan={8}>No roster yet.</td>
                   </tr>
                 ) : (
-                  homePlayers.map((p) => {
+                  Array.from({ length: maxRosterRows }, (_, index) => {
+                    const p = homePlayers[index];
+                    if (!p) {
+                      return (
+                        <tr key={`home-empty-${index}`}>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                        </tr>
+                      );
+                    }
                     const g = getGoalsForPlayer("HOME", p.capNumber);
                     const isEjected = (foulsByPlayer.HOME?.[p.capNumber]?.length ?? 0) === 3;
                     return (
@@ -677,12 +739,24 @@ export function GameSheet() {
                 </tr>
               </thead>
               <tbody>
-                {homePlayers.length === 0 ? (
+                {maxRosterRows === 0 ? (
                   <tr>
                     <td colSpan={5}>No roster yet.</td>
                   </tr>
                 ) : (
-                  homePlayers.map((p) => {
+                  Array.from({ length: maxRosterRows }, (_, index) => {
+                    const p = homePlayers[index];
+                    if (!p) {
+                      return (
+                        <tr key={`home-foul-empty-${index}`}>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td className="foul-slot">&nbsp;</td>
+                          <td className="foul-slot">&nbsp;</td>
+                          <td className="foul-slot">&nbsp;</td>
+                        </tr>
+                      );
+                    }
                     const [s1, s2, s3] = getFoulSlots("HOME", p.capNumber);
                     const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
                     return (
@@ -706,13 +780,15 @@ export function GameSheet() {
                 )}
               </tbody>
             </table>
+            </div>
           </section>
         </div>
 
         {/* Column 3: away roster + goals + fouls */}
         <div className="game-sheet-col">
-          <section className="game-sheet-roster-column">
-            <h3>Away (light)</h3>
+          <section className="game-sheet-roster-column game-sheet-roster-column-away">
+            <div className="game-sheet-roster-card">
+            <h3>Away - {aggregate.awayTeamName} (light)</h3>
             <table className="table game-sheet-roster-table">
               <thead>
                 <tr>
@@ -727,12 +803,27 @@ export function GameSheet() {
                 </tr>
               </thead>
               <tbody>
-                {awayPlayers.length === 0 ? (
+                {maxRosterRows === 0 ? (
                   <tr>
                     <td colSpan={8}>No roster yet.</td>
                   </tr>
                 ) : (
-                  awayPlayers.map((p) => {
+                  Array.from({ length: maxRosterRows }, (_, index) => {
+                    const p = awayPlayers[index];
+                    if (!p) {
+                      return (
+                        <tr key={`away-empty-${index}`}>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                        </tr>
+                      );
+                    }
                     const g = getGoalsForPlayer("AWAY", p.capNumber);
                     const isEjected = (foulsByPlayer.AWAY?.[p.capNumber]?.length ?? 0) === 3;
                     return (
@@ -764,12 +855,24 @@ export function GameSheet() {
                 </tr>
               </thead>
               <tbody>
-                {awayPlayers.length === 0 ? (
+                {maxRosterRows === 0 ? (
                   <tr>
                     <td colSpan={5}>No roster yet.</td>
                   </tr>
                 ) : (
-                  awayPlayers.map((p) => {
+                  Array.from({ length: maxRosterRows }, (_, index) => {
+                    const p = awayPlayers[index];
+                    if (!p) {
+                      return (
+                        <tr key={`away-foul-empty-${index}`}>
+                          <td>&nbsp;</td>
+                          <td>&nbsp;</td>
+                          <td className="foul-slot">&nbsp;</td>
+                          <td className="foul-slot">&nbsp;</td>
+                          <td className="foul-slot">&nbsp;</td>
+                        </tr>
+                      );
+                    }
                     const [s1, s2, s3] = getFoulSlots("AWAY", p.capNumber);
                     const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
                     return (
@@ -793,6 +896,7 @@ export function GameSheet() {
                 )}
               </tbody>
             </table>
+            </div>
           </section>
         </div>
       </div>
