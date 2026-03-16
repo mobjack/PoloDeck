@@ -23,6 +23,10 @@ export interface GameOnDay {
   currentPeriod: number;
   totalPeriods: number;
   status: string;
+  score: {
+    homeScore: number;
+    awayScore: number;
+  } | null;
   quarterDurationMs: number;
   breakBetweenQuartersDurationMs: number;
   halftimeDurationMs: number;
@@ -70,4 +74,5 @@ export interface UpdateGameInput {
   quarterDurationMs?: number;
   breakBetweenQuartersDurationMs?: number;
   halftimeDurationMs?: number;
+  status?: "PENDING" | "IN_PROGRESS" | "FINAL";
 }

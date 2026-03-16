@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { DeviceType, GameEventType, TeamSide, type Prisma } from ".prisma/client";
+import { DeviceType, GameEventType, GameStatus, TeamSide, type Prisma } from ".prisma/client";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
 import {
   buildDeviceCapabilities,
@@ -158,6 +158,7 @@ export class GameService {
       include: {
         games: {
           orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+          include: { score: true },
         },
       },
     });
@@ -181,6 +182,7 @@ export class GameService {
       include: {
         games: {
           orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+          include: { score: true },
         },
       },
     });
@@ -335,6 +337,7 @@ export class GameService {
       quarterDurationMs?: number;
       breakBetweenQuartersDurationMs?: number;
       halftimeDurationMs?: number;
+      status?: GameStatus;
     }
   ) {
     const existing = await this.prisma.game.findUnique({ where: { id: gameId } });
@@ -350,6 +353,7 @@ export class GameService {
       quarterDurationMs?: number;
       breakBetweenQuartersDurationMs?: number;
       halftimeDurationMs?: number;
+      status?: GameStatus;
     } = {};
     if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
     if (input.homeTeamName != null) data.homeTeamName = input.homeTeamName;
@@ -361,6 +365,7 @@ export class GameService {
     if (input.quarterDurationMs !== undefined) data.quarterDurationMs = input.quarterDurationMs;
     if (input.breakBetweenQuartersDurationMs !== undefined) data.breakBetweenQuartersDurationMs = input.breakBetweenQuartersDurationMs;
     if (input.halftimeDurationMs !== undefined) data.halftimeDurationMs = input.halftimeDurationMs;
+    if (input.status !== undefined) data.status = input.status;
     await this.prisma.game.update({
       where: { id: gameId },
       data,
@@ -672,17 +677,46 @@ export class GameService {
 
     const nextPeriod = Math.min(game.totalPeriods, game.currentPeriod + 1);
 
+    const data: { currentPeriod: number; status?: GameStatus } = { currentPeriod: nextPeriod };
+    if (game.totalPeriods === 4 && nextPeriod === 4) {
+      data.status = GameStatus.FINAL;
+    }
     await this.prisma.game.update({
       where: { id: gameId },
-      data: {
-        currentPeriod: nextPeriod,
-      },
+      data,
     });
 
     const payload: Record<string, unknown> = {
       from: game.currentPeriod,
       to: nextPeriod,
     };
+    if (game.score) {
+      payload.homeScore = game.score.homeScore;
+      payload.awayScore = game.score.awayScore;
+    }
+    await this.createEvent(
+      gameId,
+      GameEventType.PERIOD_ADVANCED,
+      payload as Prisma.InputJsonValue,
+      "operator"
+    );
+    return this.emitState(gameId);
+  }
+
+  async startOvertime(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { score: true },
+    });
+    if (!game) throw this.notFound("Game not found");
+    if (game.currentPeriod !== 4 || game.totalPeriods !== 4) {
+      throw this.badRequest("Overtime can only be started from the end of the 4th quarter.");
+    }
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: { currentPeriod: 5, totalPeriods: 5 },
+    });
+    const payload: Record<string, unknown> = { from: 4, to: 5 };
     if (game.score) {
       payload.homeScore = game.score.homeScore;
       payload.awayScore = game.score.awayScore;
@@ -866,6 +900,7 @@ export class GameService {
       timeSeconds?: number;
       side?: "HOME" | "AWAY";
       capNumber?: string;
+      overtime?: boolean;
     }
   ) {
     const side = body.side != null ? (body.side as TeamSide) : undefined;
@@ -889,6 +924,9 @@ export class GameService {
       }
       case "END_QUARTER": {
         await this.stopGameClock(gameId);
+        if (body.overtime === true) {
+          return this.startOvertime(gameId);
+        }
         return this.advancePeriod(gameId);
       }
       case "GOAL": {

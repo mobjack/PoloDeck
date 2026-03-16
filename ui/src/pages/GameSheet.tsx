@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
 import { api, type GameAggregate } from "../api/client";
 import type { GameDay } from "../types/gameDay";
@@ -25,6 +25,10 @@ export function GameSheet() {
   const [inputError, setInputError] = useState<string | null>(null);
   const [lastParsed, setLastParsed] = useState<ParsedInput | null>(null);
   const [commandHelpOpen, setCommandHelpOpen] = useState(false);
+  const [eqOvertimeModalOpen, setEqOvertimeModalOpen] = useState(false);
+  const [eqEditEntriesModalOpen, setEqEditEntriesModalOpen] = useState(false);
+  const pendingEditModalAfterEnd = useRef(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!commandHelpOpen) return;
@@ -146,6 +150,9 @@ export function GameSheet() {
 
   const homeScore = aggregate.score?.homeScore ?? 0;
   const awayScore = aggregate.score?.awayScore ?? 0;
+  const isGameOver =
+    aggregate.status === "FINAL" ||
+    (aggregate.currentPeriod >= aggregate.totalPeriods && !aggregate.gameClock?.running);
   const homeTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "HOME");
   const awayTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "AWAY");
 
@@ -288,6 +295,24 @@ export function GameSheet() {
     setInputError(null);
     setLastParsed(parsed.value);
     if (!gameId) return;
+    if (isGameOver) return;
+
+    const isEqInQ4 =
+      parsed.value.type === "END_QUARTER" &&
+      aggregate.currentPeriod === 4 &&
+      aggregate.totalPeriods === 4;
+    const homeScore = aggregate.score?.homeScore ?? 0;
+    const awayScore = aggregate.score?.awayScore ?? 0;
+    const isTied = homeScore === awayScore;
+
+    if (isEqInQ4 && isTied) {
+      setEqOvertimeModalOpen(true);
+      return;
+    }
+    if (isEqInQ4 && !isTied) {
+      pendingEditModalAfterEnd.current = true;
+    }
+
     const payload = {
       type: parsed.value.type,
       ...(parsed.value.timeSeconds != null && { timeSeconds: parsed.value.timeSeconds }),
@@ -305,8 +330,13 @@ export function GameSheet() {
       }
       setAggregate(next);
       setInput("");
+      if (pendingEditModalAfterEnd.current) {
+        pendingEditModalAfterEnd.current = false;
+        setEqEditEntriesModalOpen(true);
+      }
     } catch (err) {
       setInputError(err instanceof Error ? err.message : String(err));
+      if (pendingEditModalAfterEnd.current) pendingEditModalAfterEnd.current = false;
     }
   };
 
@@ -366,6 +396,7 @@ export function GameSheet() {
                     type="button"
                     className="scoring-command-link"
                     onClick={() => setCommandHelpOpen(true)}
+                    disabled={isGameOver}
                   >
                     Scoring command
                   </button>
@@ -374,11 +405,34 @@ export function GameSheet() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="e.g. 6.07w13g"
+                    disabled={isGameOver}
+                    aria-label="Scoring command"
                   />
                 </label>
-                <button type="submit" className="btn primary btn-compact scoring-apply">
-                  Apply
-                </button>
+                {isGameOver ? (
+                  <button
+                    type="button"
+                    className="btn primary btn-compact scoring-apply"
+                    onClick={async () => {
+                      if (!gameId) return;
+                      try {
+                        const next = await api.games.update(gameId, {
+                          status: "IN_PROGRESS",
+                        });
+                        setAggregate(next);
+                        setInputError(null);
+                      } catch (err) {
+                        setInputError(err instanceof Error ? err.message : String(err));
+                      }
+                    }}
+                  >
+                    Reopen
+                  </button>
+                ) : (
+                  <button type="submit" className="btn primary btn-compact scoring-apply">
+                    Apply
+                  </button>
+                )}
               </div>
             </form>
             {lastParsed && (
@@ -453,6 +507,74 @@ export function GameSheet() {
                 </div>
               </aside>
             </>
+          )}
+
+          {eqOvertimeModalOpen && (
+            <div className="game-sheet-modal-overlay" role="dialog" aria-labelledby="eq-overtime-title">
+              <div className="game-sheet-modal">
+                <h2 id="eq-overtime-title">Score is tied</h2>
+                <p>Go to overtime?</p>
+                <div className="game-sheet-modal-actions">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={async () => {
+                      if (!gameId) return;
+                      try {
+                        const next = await api.games.applyScoreCommand(gameId, {
+                          type: "END_QUARTER",
+                          overtime: true,
+                        });
+                        setAggregate(next);
+                        setInput("");
+                        setEqOvertimeModalOpen(false);
+                      } catch (err) {
+                        setInputError(err instanceof Error ? err.message : String(err));
+                      }
+                    }}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setEqOvertimeModalOpen(false)}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {eqEditEntriesModalOpen && (
+            <div className="game-sheet-modal-overlay" role="dialog" aria-labelledby="eq-edit-title">
+              <div className="game-sheet-modal">
+                <h2 id="eq-edit-title">Game over</h2>
+                <p>Would you like to edit any entries?</p>
+                <div className="game-sheet-modal-actions">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() => {
+                      setEqEditEntriesModalOpen(false);
+                      if (gameDayId && gameId) {
+                        navigate(`/game-days/${gameDayId}/games/${gameId}/edit`);
+                      }
+                    }}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setEqEditEntriesModalOpen(false)}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           <section className="game-sheet-progress">

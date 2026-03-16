@@ -42,6 +42,7 @@ export function GameDayDetail() {
               <th>Time</th>
               <th>Home (dark)</th>
               <th>Away (light)</th>
+              <th>Score</th>
               <th>Level</th>
               <th>Type</th>
               <th>Gender</th>
@@ -53,7 +54,7 @@ export function GameDayDetail() {
           <tbody>
             {gameDay.games.length === 0 ? (
               <tr>
-                <td colSpan={9}>No games. Add one below.</td>
+              <td colSpan={10}>No games. Add one below.</td>
               </tr>
             ) : (
               gameDay.games.map((g) => (
@@ -83,11 +84,14 @@ function GameRow({
         timeStyle: "medium",
       })
     : "—";
+  const score =
+    game.score != null ? `${game.score.homeScore}-${game.score.awayScore}` : "—";
   return (
     <tr>
       <td>{time}</td>
       <td>{game.homeTeamName}</td>
       <td>{game.awayTeamName}</td>
+      <td>{score}</td>
       <td>{game.level ?? "—"}</td>
       <td>{game.gameType ?? "—"}</td>
       <td>{game.gender ?? "—"}</td>
