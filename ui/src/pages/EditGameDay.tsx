@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, isDatabaseUnavailableError } from "../api/client";
 import type { GameDay, UpdateGameDayInput } from "../types/gameDay";
+import {
+  ApiErrorDisplay,
+  DatabaseUnavailable,
+  formatApiErrorMessage,
+} from "../components/DatabaseUnavailable";
 
 export function EditGameDay() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [gameDay, setGameDay] = useState<GameDay | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [form, setForm] = useState<UpdateGameDayInput>({});
 
   useEffect(() => {
@@ -22,7 +27,7 @@ export function EditGameDay() {
           location: gd.location,
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => setError(e))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -33,12 +38,16 @@ export function EditGameDay() {
     api.gameDays
       .update(id, form)
       .then(() => navigate(`/game-days/${id}`))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(e));
   };
 
   if (loading) return <p>Loading…</p>;
-  if (error && !gameDay) return <p className="error">Error: {error}</p>;
+  if (error && !gameDay) return <ApiErrorDisplay error={error} />;
   if (!gameDay) return <p>Game day not found.</p>;
+
+  if (isDatabaseUnavailableError(error)) {
+    return <DatabaseUnavailable />;
+  }
 
   return (
     <div className="page">
@@ -48,7 +57,7 @@ export function EditGameDay() {
       </header>
 
       <form onSubmit={handleSubmit} className="form">
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{formatApiErrorMessage(error)}</p>}
         <label>
           Date
           <input

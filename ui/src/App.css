@@ -13,6 +13,193 @@
   max-width: 1100px;
 }
 
+/* Database offline / connection error (full page) */
+.database-unavailable-page {
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+  text-align: center;
+}
+
+.database-unavailable-card {
+  padding: 2rem 1.75rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    165deg,
+    rgba(30, 58, 95, 0.45) 0%,
+    rgba(18, 24, 38, 0.92) 50%,
+    rgba(40, 28, 60, 0.35) 100%
+  );
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: light) {
+  .database-unavailable-card {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: linear-gradient(
+      165deg,
+      rgba(200, 220, 255, 0.5) 0%,
+      #fff 45%,
+      rgba(255, 230, 210, 0.4) 100%
+    );
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.database-unavailable-icon {
+  position: relative;
+  display: inline-block;
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 0.75rem;
+}
+
+.database-unavailable-wave {
+  display: block;
+  font-size: 1.25rem;
+  letter-spacing: 0.15em;
+  opacity: 0.65;
+  margin-bottom: 0.15rem;
+}
+
+.database-unavailable-pool {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.25));
+}
+
+.database-unavailable-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.database-unavailable-lead {
+  margin: 0 0 1.25rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  opacity: 0.92;
+}
+
+.database-unavailable-checklist {
+  text-align: left;
+  margin: 0 0 1.5rem;
+  padding-left: 1.2rem;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.database-unavailable-checklist li {
+  margin-bottom: 0.5rem;
+}
+
+.database-unavailable-checklist code {
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  .database-unavailable-checklist code {
+    background: rgba(0, 0, 0, 0.06);
+  }
+}
+
+.database-unavailable-actions {
+  margin-bottom: 1rem;
+}
+
+.database-unavailable-footnote {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+/* Structured API / connectivity error (generic branch) */
+.api-error-page {
+  max-width: 720px;
+}
+
+.api-error-h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #e57373;
+}
+
+@media (prefers-color-scheme: light) {
+  .api-error-h2 {
+    color: #c62828;
+  }
+}
+
+.api-error-h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.api-error-code-panel {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: light) {
+  .api-error-code-panel {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.api-error-code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .api-error-code-toolbar {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+.api-error-code-label {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.api-error-copy-btn {
+  flex-shrink: 0;
+}
+
+.api-error-code-block {
+  margin: 0;
+  padding: 1rem 1rem 1.1rem;
+  max-height: min(50vh, 420px);
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.api-error-code-block code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
 .roster-page {
   max-width: 1200px;
 }

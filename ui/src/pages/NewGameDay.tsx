@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { api, isDatabaseUnavailableError } from "../api/client";
+import {
+  DatabaseUnavailable,
+  formatApiErrorMessage,
+} from "../components/DatabaseUnavailable";
 import type { CreateGameDayInput } from "../types/gameDay";
 
 const DEFAULT_QUARTER_MS = 8 * 60 * 1000;
@@ -9,7 +13,7 @@ const DEFAULT_HALFTIME_MS = 3 * 60 * 1000;
 
 export function NewGameDay() {
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [form, setForm] = useState<CreateGameDayInput>({
     date: new Date().toISOString().slice(0, 10),
     location: "",
@@ -24,11 +28,15 @@ export function NewGameDay() {
     api.gameDays
       .create(form)
       .then((r) => navigate(`/game-days/${r.id}`))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(e));
   };
 
   const setMinutes = (key: keyof CreateGameDayInput, minutes: number) =>
     setForm((f) => ({ ...f, [key]: minutes * 60 * 1000 }));
+
+  if (isDatabaseUnavailableError(error)) {
+    return <DatabaseUnavailable />;
+  }
 
   return (
     <div className="page">
@@ -38,7 +46,7 @@ export function NewGameDay() {
       </header>
 
       <form onSubmit={handleSubmit} className="form">
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{formatApiErrorMessage(error)}</p>}
         <label>
           Date
           <input
