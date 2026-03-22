@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { api, isDatabaseUnavailableError } from "../api/client";
+import {
+  DatabaseUnavailable,
+  formatApiErrorMessage,
+} from "../components/DatabaseUnavailable";
 import type { GameDay, GameOnDay } from "../types/gameDay";
 
 type TeamSide = "HOME" | "AWAY";
@@ -48,7 +52,7 @@ export function GameRoster() {
   const [gameDay, setGameDay] = useState<GameDay | null>(null);
   const [allGameDays, setAllGameDays] = useState<GameDay[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   const [homeNames, setHomeNames] = useState<Record<string, string>>({});
   const [awayNames, setAwayNames] = useState<Record<string, string>>({});
@@ -89,7 +93,7 @@ export function GameRoster() {
         setHomeNames(home);
         setAwayNames(away);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => setError(e))
       .finally(() => setLoading(false));
   }, [gameDayId, gameId]);
 
@@ -147,7 +151,7 @@ export function GameRoster() {
         navigate(`/game-days/${gameDayId}`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -162,7 +166,7 @@ export function GameRoster() {
       await api.games.replaceRoster(gameId, { home, away });
       navigate(`/game-days/${gameDayId}/games/${gameId}/sheet`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -300,10 +304,18 @@ export function GameRoster() {
     );
   }
 
+  if (error && isDatabaseUnavailableError(error)) {
+    return <DatabaseUnavailable />;
+  }
+
   if (error || !gameDay || !thisGame) {
     return (
       <div className="page">
-        {error ? <p className="error">Error: {error}</p> : <p>Game not found.</p>}
+        {error ? (
+          <p className="error">Error: {formatApiErrorMessage(error)}</p>
+        ) : (
+          <p>Game not found.</p>
+        )}
         <button type="button" className="btn secondary" onClick={handleCancel}>
           Back
         </button>
@@ -452,7 +464,7 @@ export function GameRoster() {
         </table>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{formatApiErrorMessage(error)}</p>}
 
       <div className="form-actions">
         <button

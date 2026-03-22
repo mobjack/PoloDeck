@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, isDatabaseUnavailableError } from "../api/client";
+import {
+  DatabaseUnavailable,
+  formatApiErrorMessage,
+} from "../components/DatabaseUnavailable";
 import type { CreateGameInput } from "../types/gameDay";
 
 const LEVELS = ["Varsity", "JV", "14U", "16U", "18U", ""];
@@ -13,7 +17,7 @@ const DEFAULT_HALFTIME_MS = 5 * 60 * 1000;
 export function AddGame() {
   const { id: gameDayId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [form, setForm] = useState<CreateGameInput>({
     gameDayId: gameDayId ?? undefined,
     homeTeamName: "",
@@ -57,8 +61,12 @@ export function AddGame() {
     api.games
       .create(body)
       .then(() => navigate(`/game-days/${gameDayId}`))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(e));
   };
+
+  if (isDatabaseUnavailableError(error)) {
+    return <DatabaseUnavailable />;
+  }
 
   return (
     <div className="page">
@@ -68,7 +76,7 @@ export function AddGame() {
       </header>
 
       <form onSubmit={handleSubmit} className="form">
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{formatApiErrorMessage(error)}</p>}
         <label>
           Home team (dark caps)
           <input

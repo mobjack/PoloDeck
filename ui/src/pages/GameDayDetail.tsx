@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GameDay, GameOnDay } from "../types/gameDay";
+import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 
 export function GameDayDetail() {
   const { id } = useParams<{ id: string }>();
   const [gameDay, setGameDay] = useState<GameDay | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -16,12 +17,12 @@ export function GameDayDetail() {
       .then((gd) => {
         setGameDay(gd);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => setError(e))
       .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return <p>Loading…</p>;
-  if (error) return <p className="error">Error: {error}</p>;
+  if (error) return <ApiErrorDisplay error={error} />;
   if (!gameDay) return <p>Game day not found.</p>;
 
   return (

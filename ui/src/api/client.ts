@@ -1,5 +1,22 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
+/** Thrown for failed API responses; includes optional machine-readable `code`. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isDatabaseUnavailableError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === "DATABASE_UNAVAILABLE";
+}
+
 async function request<T>(
   path: string,
   options: (Omit<RequestInit, "body"> & { method?: string; json?: unknown }) = {}
@@ -17,15 +34,19 @@ async function request<T>(
   if (!res.ok) {
     const text = await res.text();
     let message = text || `HTTP ${res.status}`;
+    let code: string | undefined;
     try {
-      const body = JSON.parse(text) as { message?: string };
+      const body = JSON.parse(text) as { message?: string; code?: string };
       if (typeof body?.message === "string") {
         message = body.message;
+      }
+      if (typeof body?.code === "string") {
+        code = body.code;
       }
     } catch {
       /* leave message as text */
     }
-    throw new Error(`Error: ${message}`);
+    throw new ApiError(message, res.status, code);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

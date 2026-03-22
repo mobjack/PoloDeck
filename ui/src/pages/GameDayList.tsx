@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type DeviceCapabilities } from "../api/client";
 import type { GameDay } from "../types/gameDay";
+import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 
 export function GameDayList() {
   const [list, setList] = useState<GameDay[]>([]);
   const [capabilities, setCapabilities] = useState<DeviceCapabilities | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     Promise.all([api.gameDays.list(), api.capabilities()])
@@ -15,12 +16,12 @@ export function GameDayList() {
         setList(gameDays);
         setCapabilities(caps);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => setError(e))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <p>Loading…</p>;
-  if (error) return <p className="error">Error: {error}</p>;
+  if (error) return <ApiErrorDisplay error={error} />;
 
   return (
     <div className="page page--home">

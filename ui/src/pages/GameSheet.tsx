@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
 import { api, type GameAggregate } from "../api/client";
+import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import type { GameDay } from "../types/gameDay";
 
 type TeamSide = "HOME" | "AWAY";
@@ -59,7 +60,7 @@ export function GameSheet() {
   const [gameDay, setGameDay] = useState<GameDay | null>(null);
   const [aggregate, setAggregate] = useState<GameAggregate | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   const [input, setInput] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
@@ -100,7 +101,7 @@ export function GameSheet() {
           }
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => setError(e))
       .finally(() => setLoading(false));
 
     return () => {
@@ -185,7 +186,7 @@ export function GameSheet() {
   }, [aggregate?.events]);
 
   if (loading) return <div className="page"><p>Loading…</p></div>;
-  if (error) return <div className="page"><p className="error">Error: {error}</p></div>;
+  if (error) return <ApiErrorDisplay error={error} />;
   if (!gameDay || !aggregate) return <div className="page"><p>Game not found.</p></div>;
 
   const homeScore = aggregate.score?.homeScore ?? 0;
