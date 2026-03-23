@@ -328,6 +328,22 @@
   font-size: 1rem;
 }
 
+.scoreboard-score-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.scoreboard-score-link:hover {
+  opacity: 0.85;
+}
+
 .scoreboard-footer {
   display: flex;
   justify-content: space-between;
@@ -791,6 +807,37 @@
   margin: 0;
   font-size: 0.85rem;
   opacity: 0.8;
+}
+
+.game-sheet-results-modal {
+  max-width: 420px;
+}
+
+.game-sheet-results-table {
+  margin-bottom: 0;
+  font-size: 0.95rem;
+}
+
+.game-sheet-results-table th,
+.game-sheet-results-table td {
+  text-align: center;
+  white-space: nowrap;
+  padding: 0.4rem 0.7rem;
+}
+
+.game-sheet-results-table td:first-child,
+.game-sheet-results-table th:first-child {
+  text-align: center;
+  font-weight: 600;
+}
+
+.game-sheet-results-table .results-row-divider td {
+  border-top-width: 2px;
+}
+
+.game-sheet-results-table .results-row-final td {
+  border-top-width: 2px;
+  font-weight: 700;
 }
 
 .game-sheet-modal-actions {

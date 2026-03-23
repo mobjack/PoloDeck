@@ -67,6 +67,7 @@ export function GameSheet() {
   const [lastParsed, setLastParsed] = useState<ParsedInput | null>(null);
   const [commandHelpOpen, setCommandHelpOpen] = useState(false);
   const [timeoutsModalOpen, setTimeoutsModalOpen] = useState(false);
+  const [scoreResultsModalOpen, setScoreResultsModalOpen] = useState(false);
   const [eqOvertimeModalOpen, setEqOvertimeModalOpen] = useState(false);
   const [eqEditEntriesModalOpen, setEqEditEntriesModalOpen] = useState(false);
   const pendingEditModalAfterEnd = useRef(false);
@@ -219,6 +220,46 @@ export function GameSheet() {
     }
     return bySide;
   }, [aggregate?.events]);
+
+  const scoreByQuarter = useMemo(() => {
+    const raw = aggregate?.events;
+    const events = Array.isArray(raw) ? [...raw] : [];
+    events.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const home: Record<number, number> = {};
+    const away: Record<number, number> = {};
+    let currentPeriod = 1;
+    for (const ev of events) {
+      const p = ev.payload as Record<string, unknown> | undefined;
+      if (ev.eventType === "PERIOD_ADVANCED") {
+        const to = (p?.to as number) ?? currentPeriod + 1;
+        currentPeriod = to;
+        continue;
+      }
+      if (ev.eventType === "GOAL_HOME") {
+        home[currentPeriod] = (home[currentPeriod] ?? 0) + 1;
+      } else if (ev.eventType === "GOAL_AWAY") {
+        away[currentPeriod] = (away[currentPeriod] ?? 0) + 1;
+      }
+    }
+    const q = (side: "HOME" | "AWAY", period: number) =>
+      side === "HOME" ? (home[period] ?? 0) : (away[period] ?? 0);
+    const otHome = Object.entries(home)
+      .filter(([period]) => Number(period) >= 5)
+      .reduce((sum, [, value]) => sum + value, 0);
+    const otAway = Object.entries(away)
+      .filter(([period]) => Number(period) >= 5)
+      .reduce((sum, [, value]) => sum + value, 0);
+    const finalHome = aggregate?.score?.homeScore ?? 0;
+    const finalAway = aggregate?.score?.awayScore ?? 0;
+    return {
+      q1: { home: q("HOME", 1), away: q("AWAY", 1) },
+      q2: { home: q("HOME", 2), away: q("AWAY", 2) },
+      q3: { home: q("HOME", 3), away: q("AWAY", 3) },
+      q4: { home: q("HOME", 4), away: q("AWAY", 4) },
+      ot: { home: otHome, away: otAway },
+      final: { home: finalHome, away: finalAway },
+    };
+  }, [aggregate?.events, aggregate?.score?.homeScore, aggregate?.score?.awayScore]);
 
   if (loading) return <div className="page"><p>Loading…</p></div>;
   if (error) return <ApiErrorDisplay error={error} />;
@@ -444,7 +485,15 @@ export function GameSheet() {
               </div>
               <div className="scoreboard-body">
                 <div className="scoreboard-column">
-                  <div>Score: <span className="scoreboard-score">{homeScore}</span></div>
+                  <div>
+                    <button
+                      type="button"
+                      className="scoreboard-score-link"
+                      onClick={() => setScoreResultsModalOpen(true)}
+                    >
+                      Score: <span className="scoreboard-score">{homeScore}</span>
+                    </button>
+                  </div>
                   <div className="scoreboard-timeouts">
                     <button
                       type="button"
@@ -459,7 +508,15 @@ export function GameSheet() {
                   </div>
                 </div>
                 <div className="scoreboard-column">
-                  <div>Score: <span className="scoreboard-score">{awayScore}</span></div>
+                  <div>
+                    <button
+                      type="button"
+                      className="scoreboard-score-link"
+                      onClick={() => setScoreResultsModalOpen(true)}
+                    >
+                      Score: <span className="scoreboard-score">{awayScore}</span>
+                    </button>
+                  </div>
                   <div className="scoreboard-timeouts">
                     <button
                       type="button"
@@ -726,6 +783,52 @@ export function GameSheet() {
                   </table>
                 </div>
                 <p className="game-sheet-timeouts-note">Format: game time / quarter</p>
+              </div>
+            </div>
+          )}
+
+          {scoreResultsModalOpen && (
+            <div
+              className="game-sheet-modal-overlay"
+              role="dialog"
+              aria-labelledby="score-results-title"
+              onClick={() => setScoreResultsModalOpen(false)}
+            >
+              <div
+                className="game-sheet-modal game-sheet-results-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="game-sheet-timeouts-header">
+                  <h2 id="score-results-title">RESULTS</h2>
+                  <button
+                    type="button"
+                    className="scoring-command-help-close"
+                    onClick={() => setScoreResultsModalOpen(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="game-sheet-timeouts-table-wrap">
+                  <table className="table game-sheet-results-table">
+                    <thead>
+                      <tr>
+                        <th>QTR</th>
+                        <th>D</th>
+                        <th>W</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>1</td><td>{scoreByQuarter.q1.home}</td><td>{scoreByQuarter.q1.away}</td></tr>
+                      <tr><td>2</td><td>{scoreByQuarter.q2.home}</td><td>{scoreByQuarter.q2.away}</td></tr>
+                      <tr><td>3</td><td>{scoreByQuarter.q3.home}</td><td>{scoreByQuarter.q3.away}</td></tr>
+                      <tr><td>4</td><td>{scoreByQuarter.q4.home}</td><td>{scoreByQuarter.q4.away}</td></tr>
+                      <tr className="results-row-divider"><td>OT</td><td>{scoreByQuarter.ot.home}</td><td>{scoreByQuarter.ot.away}</td></tr>
+                      <tr><td>SD</td><td>---</td><td>---</td></tr>
+                      <tr className="results-row-final"><td>FINAL</td><td>{scoreByQuarter.final.home}</td><td>{scoreByQuarter.final.away}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
