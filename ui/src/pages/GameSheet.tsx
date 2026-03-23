@@ -66,6 +66,7 @@ export function GameSheet() {
   const [inputError, setInputError] = useState<string | null>(null);
   const [lastParsed, setLastParsed] = useState<ParsedInput | null>(null);
   const [commandHelpOpen, setCommandHelpOpen] = useState(false);
+  const [timeoutsModalOpen, setTimeoutsModalOpen] = useState(false);
   const [eqOvertimeModalOpen, setEqOvertimeModalOpen] = useState(false);
   const [eqEditEntriesModalOpen, setEqEditEntriesModalOpen] = useState(false);
   const pendingEditModalAfterEnd = useRef(false);
@@ -183,6 +184,40 @@ export function GameSheet() {
       bySideCap[side][cap].push(`${letter}${period}`);
     }
     return bySideCap;
+  }, [aggregate?.events]);
+
+  const timeoutCalls = useMemo(() => {
+    const raw = aggregate?.events;
+    const events = Array.isArray(raw) ? [...raw] : [];
+    events.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const bySide = {
+      HOME: { full: [] as string[], short: [] as string[] },
+      AWAY: { full: [] as string[], short: [] as string[] },
+    };
+    let currentPeriod = 1;
+    for (const ev of events) {
+      const p = ev.payload as Record<string, unknown> | undefined;
+      if (ev.eventType === "PERIOD_ADVANCED") {
+        const to = (p?.to as number) ?? 1;
+        currentPeriod = to;
+        continue;
+      }
+      if (ev.eventType !== "TIMEOUT_USED") continue;
+      const side = (p?.teamSide as TeamSide) ?? (p?.side as TeamSide);
+      if (!side) continue;
+      const calledAt =
+        typeof p?.timeSeconds === "number" ? formatSeconds(p.timeSeconds) : "—";
+      const slotValue = `${calledAt}/${currentPeriod}`;
+      const timeoutType = (p?.type as string) ?? "full";
+      if (timeoutType === "short") {
+        bySide[side].short.push(slotValue);
+      } else {
+        bySide[side].full.push(slotValue);
+      }
+    }
+    return bySide;
   }, [aggregate?.events]);
 
   if (loading) return <div className="page"><p>Loading…</p></div>;
@@ -411,7 +446,13 @@ export function GameSheet() {
                 <div className="scoreboard-column">
                   <div>Score: <span className="scoreboard-score">{homeScore}</span></div>
                   <div className="scoreboard-timeouts">
-                    <div>Timeouts:</div>
+                    <button
+                      type="button"
+                      className="scoreboard-timeouts-link"
+                      onClick={() => setTimeoutsModalOpen(true)}
+                    >
+                      Timeouts:
+                    </button>
                     <div className="scoreboard-timeouts-value">
                       F: {homeTimeouts?.fullTimeoutsRemaining ?? 0}  30s: {homeTimeouts?.shortTimeoutsRemaining ?? 0}
                     </div>
@@ -420,7 +461,13 @@ export function GameSheet() {
                 <div className="scoreboard-column">
                   <div>Score: <span className="scoreboard-score">{awayScore}</span></div>
                   <div className="scoreboard-timeouts">
-                    <div>Timeouts:</div>
+                    <button
+                      type="button"
+                      className="scoreboard-timeouts-link"
+                      onClick={() => setTimeoutsModalOpen(true)}
+                    >
+                      Timeouts:
+                    </button>
                     <div className="scoreboard-timeouts-value">
                       F: {awayTimeouts?.fullTimeoutsRemaining ?? 0}  30s: {awayTimeouts?.shortTimeoutsRemaining ?? 0}
                     </div>
@@ -620,6 +667,65 @@ export function GameSheet() {
                     No
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {timeoutsModalOpen && (
+            <div
+              className="game-sheet-modal-overlay"
+              role="dialog"
+              aria-labelledby="timeouts-modal-title"
+              onClick={() => setTimeoutsModalOpen(false)}
+            >
+              <div
+                className="game-sheet-modal game-sheet-timeouts-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="game-sheet-timeouts-header">
+                  <h2 id="timeouts-modal-title">Timeout details</h2>
+                  <button
+                    type="button"
+                    className="scoring-command-help-close"
+                    onClick={() => setTimeoutsModalOpen(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="game-sheet-timeouts-table-wrap">
+                  <table className="table game-sheet-timeouts-table">
+                    <thead>
+                      <tr>
+                        <th>Team</th>
+                        <th>T1</th>
+                        <th>T2</th>
+                        <th>T3</th>
+                        <th>T4</th>
+                        <th>30TO</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>DARK</strong></td>
+                        <td>{timeoutCalls.HOME.full[0] ?? "—"}</td>
+                        <td>{timeoutCalls.HOME.full[1] ?? "—"}</td>
+                        <td>{timeoutCalls.HOME.full[2] ?? "—"}</td>
+                        <td>{timeoutCalls.HOME.full[3] ?? "—"}</td>
+                        <td>{timeoutCalls.HOME.short[0] ?? "—"}</td>
+                      </tr>
+                      <tr>
+                        <td><strong>WHITE</strong></td>
+                        <td>{timeoutCalls.AWAY.full[0] ?? "—"}</td>
+                        <td>{timeoutCalls.AWAY.full[1] ?? "—"}</td>
+                        <td>{timeoutCalls.AWAY.full[2] ?? "—"}</td>
+                        <td>{timeoutCalls.AWAY.full[3] ?? "—"}</td>
+                        <td>{timeoutCalls.AWAY.short[0] ?? "—"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="game-sheet-timeouts-note">Format: game time / quarter</p>
               </div>
             </div>
           )}

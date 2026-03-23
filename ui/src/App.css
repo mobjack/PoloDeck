@@ -299,6 +299,22 @@
   white-space: nowrap;
 }
 
+.scoreboard-timeouts-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.scoreboard-timeouts-link:hover {
+  opacity: 0.85;
+}
+
 .scoreboard-column {
   flex: 1;
 }
@@ -733,6 +749,48 @@
 .game-sheet-modal p {
   margin: 0 0 1.25rem;
   opacity: 0.9;
+}
+
+.game-sheet-timeouts-modal {
+  max-width: 780px;
+}
+
+.game-sheet-timeouts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.game-sheet-timeouts-header h2 {
+  margin: 0;
+}
+
+.game-sheet-timeouts-table-wrap {
+  overflow-x: auto;
+}
+
+.game-sheet-timeouts-table {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.game-sheet-timeouts-table th,
+.game-sheet-timeouts-table td {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.game-sheet-timeouts-table td:first-child,
+.game-sheet-timeouts-table th:first-child {
+  text-align: left;
+}
+
+.game-sheet-timeouts-note {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
 }
 
 .game-sheet-modal-actions {
