@@ -384,13 +384,15 @@
   font-weight: 600;
 }
 
-.game-sheet-progress-table-wrapper .table {
-  font-size: 0.75rem;
+/* Beat .game-sheet-page .table (0.9rem) so the progress log is smaller; padding keeps row height close. */
+.game-sheet-page .game-sheet-progress-table-wrapper .table {
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
-.game-sheet-progress-table-wrapper .table th,
-.game-sheet-progress-table-wrapper .table td {
-  padding: 0.25rem 0.4rem;
+.game-sheet-page .game-sheet-progress-table-wrapper .table th,
+.game-sheet-page .game-sheet-progress-table-wrapper .table td {
+  padding: 0.3rem 0.4rem;
 }
 
 .game-sheet-page .table {
