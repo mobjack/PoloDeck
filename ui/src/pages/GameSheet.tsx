@@ -47,6 +47,20 @@ function capSortKey(cap: string): number {
   return Number.MAX_SAFE_INTEGER;
 }
 
+/** API returns events in descending order; reducers need chronological replay. Tie-break on id for same-ms events. */
+function sortGameEventsAsc(events: { createdAt: string; id: string }[]) {
+  events.sort((a, b) => {
+    const ta = new Date(a.createdAt).getTime();
+    const tb = new Date(b.createdAt).getTime();
+    if (ta !== tb) return ta - tb;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function goalEventDelta(payload: Record<string, unknown> | undefined): number {
+  return typeof payload?.delta === "number" ? payload.delta : 1;
+}
+
 interface ParsedInput {
   raw: string;
   type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
@@ -117,9 +131,7 @@ export function GameSheet() {
   const { goalsByPlayerAndPeriod, closedPeriods } = useMemo(() => {
     const raw = aggregate?.events;
     const events = Array.isArray(raw) ? [...raw] : [];
-    events.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    sortGameEventsAsc(events);
     type Side = "HOME" | "AWAY";
     const goals: Record<Side, Record<string, Record<number, number>>> = {
       HOME: {},
@@ -139,13 +151,15 @@ export function GameSheet() {
       }
       if (ev.eventType === "GOAL_HOME" && p?.capNumber) {
         const cap = String(p.capNumber);
+        const d = goalEventDelta(p);
         if (!goals.HOME[cap]) goals.HOME[cap] = {};
-        goals.HOME[cap][currentPeriod] = (goals.HOME[cap][currentPeriod] ?? 0) + 1;
+        goals.HOME[cap][currentPeriod] = Math.max(0, (goals.HOME[cap][currentPeriod] ?? 0) + d);
       }
       if (ev.eventType === "GOAL_AWAY" && p?.capNumber) {
         const cap = String(p.capNumber);
+        const d = goalEventDelta(p);
         if (!goals.AWAY[cap]) goals.AWAY[cap] = {};
-        goals.AWAY[cap][currentPeriod] = (goals.AWAY[cap][currentPeriod] ?? 0) + 1;
+        goals.AWAY[cap][currentPeriod] = Math.max(0, (goals.AWAY[cap][currentPeriod] ?? 0) + d);
       }
     }
 
@@ -158,9 +172,7 @@ export function GameSheet() {
   const foulsByPlayer = useMemo(() => {
     const raw = aggregate?.events;
     const eventList = Array.isArray(raw) ? [...raw] : [];
-    eventList.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    sortGameEventsAsc(eventList);
     type Side = "HOME" | "AWAY";
     const bySideCap: Record<Side, Record<string, string[]>> = {
       HOME: {},
@@ -190,9 +202,7 @@ export function GameSheet() {
   const timeoutCalls = useMemo(() => {
     const raw = aggregate?.events;
     const events = Array.isArray(raw) ? [...raw] : [];
-    events.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    sortGameEventsAsc(events);
     const bySide = {
       HOME: { full: [] as string[], short: [] as string[] },
       AWAY: { full: [] as string[], short: [] as string[] },
@@ -224,7 +234,7 @@ export function GameSheet() {
   const scoreByQuarter = useMemo(() => {
     const raw = aggregate?.events;
     const events = Array.isArray(raw) ? [...raw] : [];
-    events.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    sortGameEventsAsc(events);
     const home: Record<number, number> = {};
     const away: Record<number, number> = {};
     let currentPeriod = 1;
@@ -236,9 +246,11 @@ export function GameSheet() {
         continue;
       }
       if (ev.eventType === "GOAL_HOME") {
-        home[currentPeriod] = (home[currentPeriod] ?? 0) + 1;
+        const d = goalEventDelta(p);
+        home[currentPeriod] = Math.max(0, (home[currentPeriod] ?? 0) + d);
       } else if (ev.eventType === "GOAL_AWAY") {
-        away[currentPeriod] = (away[currentPeriod] ?? 0) + 1;
+        const d = goalEventDelta(p);
+        away[currentPeriod] = Math.max(0, (away[currentPeriod] ?? 0) + d);
       }
     }
     const q = (side: "HOME" | "AWAY", period: number) =>
@@ -306,6 +318,25 @@ export function GameSheet() {
     }
     return { q1, q2, q3, q4, ot, tot };
   };
+
+  const sumRosterGoals = (
+    side: "HOME" | "AWAY",
+    players: typeof homePlayers
+  ): { q1: number; q2: number; q3: number; q4: number; ot: number; tot: number } => {
+    const totals = { q1: 0, q2: 0, q3: 0, q4: 0, ot: 0, tot: 0 };
+    for (const p of players) {
+      const g = getGoalsForPlayer(side, p.capNumber);
+      totals.q1 += typeof g.q1 === "number" ? g.q1 : 0;
+      totals.q2 += typeof g.q2 === "number" ? g.q2 : 0;
+      totals.q3 += typeof g.q3 === "number" ? g.q3 : 0;
+      totals.q4 += typeof g.q4 === "number" ? g.q4 : 0;
+      totals.ot += g.ot;
+      totals.tot += g.tot;
+    }
+    return totals;
+  };
+  const homeRosterTotals = sumRosterGoals("HOME", homePlayers);
+  const awayRosterTotals = sumRosterGoals("AWAY", awayPlayers);
 
   const getFoulSlots = (side: "HOME" | "AWAY", capNumber: string): [string, string, string] => {
     const arr = foulsByPlayer[side]?.[capNumber] ?? [];
@@ -902,37 +933,48 @@ export function GameSheet() {
                     <td colSpan={8}>No roster yet.</td>
                   </tr>
                 ) : (
-                  Array.from({ length: maxRosterRows }, (_, index) => {
-                    const p = homePlayers[index];
-                    if (!p) {
+                  <>
+                    {Array.from({ length: maxRosterRows }, (_, index) => {
+                      const p = homePlayers[index];
+                      if (!p) {
+                        return (
+                          <tr key={`home-empty-${index}`}>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                          </tr>
+                        );
+                      }
+                      const g = getGoalsForPlayer("HOME", p.capNumber);
+                      const isEjected = (foulsByPlayer.HOME?.[p.capNumber]?.length ?? 0) === 3;
                       return (
-                        <tr key={`home-empty-${index}`}>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
+                        <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
+                          <td>{p.capNumber}</td>
+                          <td>{p.playerName}</td>
+                          <td>{g.q1}</td>
+                          <td>{g.q2}</td>
+                          <td>{g.q3}</td>
+                          <td>{g.q4}</td>
+                          <td>{g.ot}</td>
+                          <td>{g.tot}</td>
                         </tr>
                       );
-                    }
-                    const g = getGoalsForPlayer("HOME", p.capNumber);
-                    const isEjected = (foulsByPlayer.HOME?.[p.capNumber]?.length ?? 0) === 3;
-                    return (
-                      <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
-                        <td>{p.capNumber}</td>
-                        <td>{p.playerName}</td>
-                        <td>{g.q1}</td>
-                        <td>{g.q2}</td>
-                        <td>{g.q3}</td>
-                        <td>{g.q4}</td>
-                        <td>{g.ot}</td>
-                        <td>{g.tot}</td>
-                      </tr>
-                    );
-                  })
+                    })}
+                    <tr className="roster-totals-row">
+                      <td colSpan={2}>Totals</td>
+                      <td>{homeRosterTotals.q1}</td>
+                      <td>{homeRosterTotals.q2}</td>
+                      <td>{homeRosterTotals.q3}</td>
+                      <td>{homeRosterTotals.q4}</td>
+                      <td>{homeRosterTotals.ot}</td>
+                      <td>{homeRosterTotals.tot}</td>
+                    </tr>
+                  </>
                 )}
               </tbody>
             </table>
@@ -1018,37 +1060,48 @@ export function GameSheet() {
                     <td colSpan={8}>No roster yet.</td>
                   </tr>
                 ) : (
-                  Array.from({ length: maxRosterRows }, (_, index) => {
-                    const p = awayPlayers[index];
-                    if (!p) {
+                  <>
+                    {Array.from({ length: maxRosterRows }, (_, index) => {
+                      const p = awayPlayers[index];
+                      if (!p) {
+                        return (
+                          <tr key={`away-empty-${index}`}>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                          </tr>
+                        );
+                      }
+                      const g = getGoalsForPlayer("AWAY", p.capNumber);
+                      const isEjected = (foulsByPlayer.AWAY?.[p.capNumber]?.length ?? 0) === 3;
                       return (
-                        <tr key={`away-empty-${index}`}>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
+                        <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
+                          <td>{p.capNumber}</td>
+                          <td>{p.playerName}</td>
+                          <td>{g.q1}</td>
+                          <td>{g.q2}</td>
+                          <td>{g.q3}</td>
+                          <td>{g.q4}</td>
+                          <td>{g.ot}</td>
+                          <td>{g.tot}</td>
                         </tr>
                       );
-                    }
-                    const g = getGoalsForPlayer("AWAY", p.capNumber);
-                    const isEjected = (foulsByPlayer.AWAY?.[p.capNumber]?.length ?? 0) === 3;
-                    return (
-                      <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
-                        <td>{p.capNumber}</td>
-                        <td>{p.playerName}</td>
-                        <td>{g.q1}</td>
-                        <td>{g.q2}</td>
-                        <td>{g.q3}</td>
-                        <td>{g.q4}</td>
-                        <td>{g.ot}</td>
-                        <td>{g.tot}</td>
-                      </tr>
-                    );
-                  })
+                    })}
+                    <tr className="roster-totals-row">
+                      <td colSpan={2}>Totals</td>
+                      <td>{awayRosterTotals.q1}</td>
+                      <td>{awayRosterTotals.q2}</td>
+                      <td>{awayRosterTotals.q3}</td>
+                      <td>{awayRosterTotals.q4}</td>
+                      <td>{awayRosterTotals.ot}</td>
+                      <td>{awayRosterTotals.tot}</td>
+                    </tr>
+                  </>
                 )}
               </tbody>
             </table>

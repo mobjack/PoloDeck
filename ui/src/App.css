@@ -588,6 +588,23 @@
   }
 }
 
+.game-sheet-roster-table tbody tr.roster-totals-row {
+  border-top: 2px solid rgba(255, 255, 255, 0.22);
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.game-sheet-roster-table tbody tr.roster-totals-row td:nth-child(n + 3) {
+  text-align: center;
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-roster-table tbody tr.roster-totals-row {
+    border-top-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.06);
+  }
+}
+
 .game-sheet-input {
   margin-top: 1.5rem;
   font-size: 0.85rem;
