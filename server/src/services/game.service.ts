@@ -385,9 +385,10 @@ export class GameService {
         exclusions: {
           where: { status: "ACTIVE" },
         },
+        // Full history required: roster/quarter breakdown replays PERIOD_ADVANCED + goals in order.
+        // A cap (e.g. 50) misattributes goals to wrong periods once early events fall off the window.
         events: {
           orderBy: { createdAt: "desc" },
-          take: 50,
         },
       },
     });
