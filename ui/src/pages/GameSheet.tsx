@@ -490,11 +490,22 @@ export function GameSheet() {
     }
   };
 
+  const sheetTitlePrefix = [aggregate.level, aggregate.gender]
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .join(" ");
+
   return (
     <div className="page game-sheet-page">
-      <header className="page-header">
-        <Link to={gameDayId ? `/game-days/${gameDayId}` : "/"}>← Back to game day</Link>
-        <h1>{aggregate.awayTeamName} vs {aggregate.homeTeamName}</h1>
+      <header className="page-header game-sheet-page-header">
+        <div className="game-sheet-page-header-back">
+          <Link to={gameDayId ? `/game-days/${gameDayId}` : "/"}>← Back to game day</Link>
+        </div>
+        <div className="game-sheet-page-header-title">
+          <h1>
+            {sheetTitlePrefix ? `${sheetTitlePrefix}: ` : ""}
+            {aggregate.homeTeamName} vs {aggregate.awayTeamName}
+          </h1>
+        </div>
       </header>
 
       <div className="game-sheet-main">
