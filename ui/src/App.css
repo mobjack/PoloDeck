@@ -213,6 +213,32 @@
   min-height: 100vh;
 }
 
+/* Match .game-sheet-main flex proportions: back over sidebar col, title over both roster cols */
+.game-sheet-page > .game-sheet-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3rem;
+}
+
+.game-sheet-page > .game-sheet-page-header > .game-sheet-page-header-back {
+  flex: 1 1 320px;
+  min-width: 320px;
+}
+
+.game-sheet-page > .game-sheet-page-header > .game-sheet-page-header-title {
+  flex: 2 1 0;
+  min-width: min(100%, 280px);
+  display: flex;
+  justify-content: center;
+}
+
+.game-sheet-page > .game-sheet-page-header > .game-sheet-page-header-title h1 {
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
 .game-sheet-header h2 {
   margin-top: 0;
   margin-bottom: 0.75rem;
@@ -999,8 +1025,10 @@
   align-items: flex-start;
 }
 
-.page-header a:first-child {
-  font-size: 0.95rem;
+/* Back / nav link in page headers (gamesheet wraps link in .game-sheet-page-header-back) */
+.page-header a:first-child,
+.page-header .game-sheet-page-header-back a {
+  font-size: 0.8rem;
 }
 
 .client-status-line {
