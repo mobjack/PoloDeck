@@ -7,7 +7,7 @@ import {
 } from "../components/DatabaseUnavailable";
 import type { UpdateGameInput } from "../types/gameDay";
 
-const LEVELS = ["Varsity", "JV", "14U", "16U", "18U", ""];
+const LEVELS = ["Varsity", "JV", "10U", "12U", "14U", "16U", "18U", "Masters", ""];
 const GENDERS = ["Boys", "Girls", "Co-ed", ""];
 const GAME_TYPES = ["League", "Tournament", "Scrimmage", "Practice", ""];
 const MS_PER_MIN = 60 * 1000;

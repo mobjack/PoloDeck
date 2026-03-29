@@ -7,7 +7,7 @@ import {
 } from "../components/DatabaseUnavailable";
 import type { CreateGameInput } from "../types/gameDay";
 
-const LEVELS = ["Varsity", "JV", "14U", "16U", "18U", ""];
+const LEVELS = ["Varsity", "JV", "10U", "12U", "14U", "16U", "18U", "Masters", ""];
 const GENDERS = ["Boys", "Girls", "Co-ed", ""];
 const GAME_TYPES = ["League", "Tournament", "Scrimmage", "Practice", ""];
 const DEFAULT_QUARTER_MS = 8 * 60 * 1000;
