@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ClipboardList, Settings, UserRoundCheck } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GameDay, GameOnDay } from "../types/gameDay";
@@ -29,7 +30,7 @@ export function GameDayDetail() {
     <div className="page">
       <header className="page-header">
         <Link to="/">← Game Days</Link>
-        <h1>{gameDay.date} — {gameDay.location}</h1>
+        <h1>{gameDay.date} @ {gameDay.location}</h1>
         <Link to={`/game-days/${gameDay.id}/edit`} className="btn secondary">
           Edit day
         </Link>
@@ -49,7 +50,7 @@ export function GameDayDetail() {
               <th>Gender</th>
               <th>Roster</th>
               <th>Game sheet</th>
-              <th></th>
+              <th>Settings</th>
             </tr>
           </thead>
           <tbody>
@@ -96,24 +97,35 @@ function GameRow({
       <td>{game.level ?? "—"}</td>
       <td>{game.gameType ?? "—"}</td>
       <td>{game.gender ?? "—"}</td>
-      <td>
+      <td className="games-action-cell">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/roster`}
-          className="btn secondary btn-compact"
+          className="btn btn-compact btn-games-row-action btn-roster-icon"
+          aria-label="Edit Roster"
+          title="Edit Roster"
         >
-          Roster
+          <UserRoundCheck size={16} strokeWidth={2} aria-hidden />
         </Link>
       </td>
-      <td>
+      <td className="games-action-cell">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/sheet`}
-          className="btn secondary btn-compact"
+          className="btn primary game-sheet-button btn-compact btn-games-row-action"
+          aria-label="Edit Game Sheet"
+          title="Edit Game Sheet"
         >
-          Game sheet
+          <ClipboardList size={16} strokeWidth={2} aria-hidden />
         </Link>
       </td>
-      <td>
-        <Link to={`/game-days/${gameDayId}/games/${game.id}/edit`}>Edit</Link>
+      <td className="games-action-cell">
+        <Link
+          to={`/game-days/${gameDayId}/games/${game.id}/edit`}
+          className="btn secondary btn-compact btn-games-row-action btn-settings-gear"
+          aria-label="Edit game"
+          title="Edit game"
+        >
+          <Settings size={16} strokeWidth={2} aria-hidden />
+        </Link>
       </td>
     </tr>
   );
