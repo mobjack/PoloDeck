@@ -85,6 +85,25 @@ export function GameSheet() {
   const [eqOvertimeModalOpen, setEqOvertimeModalOpen] = useState(false);
   const [eqEditEntriesModalOpen, setEqEditEntriesModalOpen] = useState(false);
   const pendingEditModalAfterEnd = useRef(false);
+  const [progressEditOpen, setProgressEditOpen] = useState(false);
+  const [progressEditEvents, setProgressEditEvents] = useState<GameAggregate["events"] | null>(null);
+  const [progressEditSelectedId, setProgressEditSelectedId] = useState<string | null>(null);
+  const [progressEditError, setProgressEditError] = useState<string | null>(null);
+  const [progressEditBusy, setProgressEditBusy] = useState(false);
+  const [progressInsertMode, setProgressInsertMode] = useState<null | "before" | "after">(null);
+  const [insertKind, setInsertKind] = useState<
+    "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30"
+  >("GOAL");
+  const [insertSide, setInsertSide] = useState<TeamSide>("HOME");
+  const [insertCap, setInsertCap] = useState("");
+  const [insertTimeSec, setInsertTimeSec] = useState("");
+  const [gfSide, setGfSide] = useState<TeamSide>("HOME");
+  const [gfCap, setGfCap] = useState("");
+  const [gfTime, setGfTime] = useState("");
+  const [exPenalty, setExPenalty] = useState(false);
+  const [exTime, setExTime] = useState("");
+  const [toSide, setToSide] = useState<TeamSide>("HOME");
+  const [toShort, setToShort] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -95,6 +114,51 @@ export function GameSheet() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [commandHelpOpen]);
+
+  useEffect(() => {
+    if (!progressEditOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setProgressEditOpen(false);
+        setProgressInsertMode(null);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [progressEditOpen]);
+
+  const progressSelected =
+    progressEditEvents?.find((e) => e.id === progressEditSelectedId) ?? null;
+
+  useEffect(() => {
+    if (!progressEditOpen || !progressSelected) return;
+    const p = progressSelected.payload as Record<string, unknown>;
+    if (
+      progressSelected.eventType === "GOAL_HOME" ||
+      progressSelected.eventType === "GOAL_AWAY"
+    ) {
+      setGfSide(progressSelected.eventType === "GOAL_HOME" ? "HOME" : "AWAY");
+      setGfCap(String(p.capNumber ?? ""));
+      setGfTime(
+        typeof p.timeSeconds === "number"
+          ? formatGameClockTimeForInput(p.timeSeconds)
+          : ""
+      );
+    }
+    if (progressSelected.eventType === "EXCLUSION_STARTED") {
+      setExPenalty(p.isPenalty === true);
+      setExTime(
+        typeof p.timeSeconds === "number"
+          ? formatGameClockTimeForInput(p.timeSeconds)
+          : ""
+      );
+    }
+    if (progressSelected.eventType === "TIMEOUT_USED") {
+      const side = (p.teamSide ?? p.side) as TeamSide;
+      if (side === "HOME" || side === "AWAY") setToSide(side);
+      setToShort(p.type === "short");
+    }
+  }, [progressEditOpen, progressEditSelectedId, progressSelected?.id, progressSelected?.eventType]);
 
   useEffect(() => {
     if (!gameDayId || !gameId) return;
@@ -425,8 +489,236 @@ export function GameSheet() {
       isQuarterStart,
       isQuarterEnd,
       foulCount,
+      editable: ev.eventType !== "GAME_CREATED",
     };
   });
+
+  const openProgressEditForRow = (rowId: string) => {
+    const full = [...(aggregate.events ?? [])];
+    sortGameEventsAsc(full);
+    setProgressEditEvents(full);
+    setProgressEditSelectedId(rowId);
+    setProgressEditError(null);
+    setProgressInsertMode(null);
+    setProgressEditOpen(true);
+  };
+
+  const applyInsertEntry = () => {
+    if (!progressEditEvents || !progressEditSelectedId || !gameId || !progressInsertMode) return;
+    let built: { eventType: string; payload: Record<string, unknown> };
+    let ts: { timeSeconds?: number } = {};
+    if (insertTimeSec.trim() !== "") {
+      const parsed = parseOptionalGameClockTime(insertTimeSec);
+      if (!parsed.ok) {
+        setProgressEditError(parsed.error);
+        return;
+      }
+      if (parsed.seconds !== undefined) ts = { timeSeconds: parsed.seconds };
+    }
+    try {
+      if (insertKind === "GOAL") {
+        const et = insertSide === "HOME" ? "GOAL_HOME" : "GOAL_AWAY";
+        if (!insertCap.trim()) throw new Error("Cap # is required for a goal.");
+        built = {
+          eventType: et,
+          payload: {
+            side: insertSide,
+            capNumber: insertCap.trim(),
+            delta: 1,
+            ...ts,
+          },
+        };
+      } else if (insertKind === "EXCLUSION" || insertKind === "PENALTY") {
+        const pl = aggregate.players.find(
+          (p) => p.teamSide === insertSide && p.capNumber === insertCap.trim()
+        );
+        if (!pl) throw new Error("No roster player matches that team and cap.");
+        built = {
+          eventType: "EXCLUSION_STARTED",
+          payload: {
+            playerId: pl.id,
+            teamSide: insertSide,
+            capNumber: pl.capNumber,
+            durationMs: 20000,
+            isPenalty: insertKind === "PENALTY",
+            ...ts,
+          },
+        };
+      } else if (insertKind === "TIMEOUT") {
+        built = {
+          eventType: "TIMEOUT_USED",
+          payload: { teamSide: insertSide, type: "full", ...ts },
+        };
+      } else {
+        built = {
+          eventType: "TIMEOUT_USED",
+          payload: { teamSide: insertSide, type: "short", ...ts },
+        };
+      }
+    } catch (e) {
+      setProgressEditError(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    const anchorId = progressEditSelectedId;
+    const idx = progressEditEvents.findIndex((e) => e.id === anchorId);
+    if (idx === -1) return;
+    const insertIdx = progressInsertMode === "before" ? idx : idx + 1;
+    const prevEv = insertIdx > 0 ? progressEditEvents[insertIdx - 1] : null;
+    const nextEv =
+      insertIdx < progressEditEvents.length ? progressEditEvents[insertIdx] : null;
+    let createdAt: string;
+    if (prevEv && nextEv) {
+      const ta = new Date(prevEv.createdAt).getTime();
+      const tb = new Date(nextEv.createdAt).getTime();
+      if (tb > ta) {
+        createdAt = new Date(ta + Math.floor((tb - ta) / 2)).toISOString();
+      } else {
+        createdAt = new Date(ta + 1).toISOString();
+      }
+    } else if (prevEv) {
+      createdAt = new Date(new Date(prevEv.createdAt).getTime() + 500).toISOString();
+    } else if (nextEv) {
+      createdAt = new Date(new Date(nextEv.createdAt).getTime() - 500).toISOString();
+    } else {
+      createdAt = new Date().toISOString();
+    }
+    const newRow: GameAggregate["events"][number] = {
+      id: `__insert_${Date.now()}`,
+      gameId,
+      eventType: built.eventType,
+      payload: built.payload,
+      createdAt,
+      source: "operator",
+    };
+    const copy = [...progressEditEvents];
+    copy.splice(insertIdx, 0, newRow);
+    setProgressEditEvents(copy);
+    setProgressInsertMode(null);
+    setProgressEditError(null);
+  };
+
+  const deleteProgressEntry = () => {
+    if (!progressEditEvents || !progressEditSelectedId) return;
+    const target = progressEditEvents.find((e) => e.id === progressEditSelectedId);
+    if (target?.eventType === "GAME_CREATED") {
+      setProgressEditError("Cannot delete the Game created row.");
+      return;
+    }
+    const delIdx = progressEditEvents.findIndex((e) => e.id === progressEditSelectedId);
+    const filtered = progressEditEvents.filter((e) => e.id !== progressEditSelectedId);
+    if (filtered.length === 0 || filtered[0]?.eventType !== "GAME_CREATED") {
+      setProgressEditError("Timeline must keep Game created as the first row.");
+      return;
+    }
+    if (
+      !confirm(
+        "Delete this entry from the timeline? Click Update & rerun to save to the server."
+      )
+    ) {
+      return;
+    }
+    const nextSel =
+      filtered[Math.max(0, delIdx - 1)]?.id ?? filtered[0]?.id ?? null;
+    setProgressEditEvents(filtered);
+    setProgressEditSelectedId(nextSel);
+  };
+
+  const submitProgressRebuild = async () => {
+    if (!gameId || !progressEditEvents?.length) return;
+    let list = [...progressEditEvents];
+    const sel = list.find((e) => e.id === progressEditSelectedId);
+    if (sel) {
+      if (sel.eventType === "GOAL_HOME" || sel.eventType === "GOAL_AWAY") {
+        if (!gfCap.trim()) {
+          setProgressEditError("Cap # is required for a goal.");
+          return;
+        }
+        const newType = gfSide === "HOME" ? "GOAL_HOME" : "GOAL_AWAY";
+        const prev = sel.payload as Record<string, unknown>;
+        const gfParsed = parseOptionalGameClockTime(gfTime);
+        if (!gfParsed.ok) {
+          setProgressEditError(gfParsed.error);
+          return;
+        }
+        list = list.map((e) =>
+          e.id !== sel.id
+            ? e
+            : (() => {
+                const nextPayload: Record<string, unknown> = {
+                  ...prev,
+                  side: gfSide,
+                  capNumber: gfCap.trim(),
+                  delta: typeof prev.delta === "number" ? prev.delta : 1,
+                };
+                if (gfParsed.seconds !== undefined) {
+                  nextPayload.timeSeconds = gfParsed.seconds;
+                } else {
+                  delete nextPayload.timeSeconds;
+                }
+                return { ...e, eventType: newType, payload: nextPayload };
+              })()
+        );
+      } else if (sel.eventType === "EXCLUSION_STARTED") {
+        const prev = sel.payload as Record<string, unknown>;
+        const exParsed = parseOptionalGameClockTime(exTime);
+        if (!exParsed.ok) {
+          setProgressEditError(exParsed.error);
+          return;
+        }
+        list = list.map((e) =>
+          e.id !== sel.id
+            ? e
+            : (() => {
+                const nextPayload: Record<string, unknown> = {
+                  ...prev,
+                  isPenalty: exPenalty,
+                };
+                if (exParsed.seconds !== undefined) {
+                  nextPayload.timeSeconds = exParsed.seconds;
+                } else {
+                  delete nextPayload.timeSeconds;
+                }
+                return { ...e, payload: nextPayload };
+              })()
+        );
+      } else if (sel.eventType === "TIMEOUT_USED") {
+        const prev = sel.payload as Record<string, unknown>;
+        list = list.map((e) =>
+          e.id !== sel.id
+            ? e
+            : {
+                ...e,
+                payload: {
+                  ...prev,
+                  teamSide: toSide,
+                  type: toShort ? "short" : "full",
+                },
+              }
+        );
+      }
+    }
+    setProgressEditBusy(true);
+    setProgressEditError(null);
+    try {
+      const next = await api.games.rebuildEventLog(gameId, {
+        events: list.map((e) => ({
+          id: e.id.startsWith("__insert_") ? undefined : e.id,
+          eventType: e.eventType,
+          payload: e.payload,
+          createdAt: e.createdAt,
+          source: e.source ?? "operator",
+        })),
+      });
+      setAggregate(next);
+      setProgressEditOpen(false);
+      setProgressEditEvents(null);
+      setProgressEditSelectedId(null);
+    } catch (err) {
+      setProgressEditError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProgressEditBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -770,6 +1062,390 @@ export function GameSheet() {
             </div>
           )}
 
+          {progressEditOpen && progressEditEvents && progressEditSelectedId && (
+            <div
+              className="game-sheet-modal-overlay game-sheet-modal-overlay--progress-edit"
+              role="dialog"
+              aria-labelledby="progress-edit-title"
+              onClick={() => {
+                setProgressEditOpen(false);
+                setProgressInsertMode(null);
+              }}
+            >
+              <div
+                className="game-sheet-modal game-sheet-progress-edit-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="game-sheet-timeouts-header">
+                  <h2 id="progress-edit-title">Edit progress entry</h2>
+                  <button
+                    type="button"
+                    className="scoring-command-help-close"
+                    onClick={() => {
+                      setProgressEditOpen(false);
+                      setProgressInsertMode(null);
+                    }}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                {(() => {
+                  const sel =
+                    progressEditEvents.find((e) => e.id === progressEditSelectedId) ??
+                    null;
+                  if (!sel) {
+                    return (
+                      <>
+                        {progressEditError && (
+                          <p className="error">{progressEditError}</p>
+                        )}
+                        <p>No row selected.</p>
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      <div className="game-sheet-progress-edit-scroll">
+                        {progressEditError && (
+                          <p className="error">{progressEditError}</p>
+                        )}
+                        <p className="game-sheet-progress-edit-meta">
+                        <strong>{sel.eventType.replace(/_/g, " ")}</strong>
+                        {" · "}
+                        {new Date(sel.createdAt).toLocaleString()}
+                      </p>
+
+                      {(sel.eventType === "GOAL_HOME" ||
+                        sel.eventType === "GOAL_AWAY") && (
+                        <div className="form game-sheet-progress-edit-fields">
+                          <label>
+                            Team
+                            <select
+                              value={gfSide}
+                              onChange={(e) =>
+                                setGfSide(e.target.value as TeamSide)
+                              }
+                            >
+                              <option value="HOME">Dark (home)</option>
+                              <option value="AWAY">Light (away)</option>
+                            </select>
+                          </label>
+                          <label>
+                            Cap #
+                            <input
+                              value={gfCap}
+                              onChange={(e) => setGfCap(e.target.value)}
+                            />
+                          </label>
+                          <label className="game-sheet-progress-field-span">
+                            Game clock in period (optional, same as scoring: 6.50 or 6:50)
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="e.g. 6.50 or 6:07"
+                              value={gfTime}
+                              onChange={(e) => setGfTime(e.target.value)}
+                            />
+                          </label>
+                          {(() => {
+                            const prev = buildGoalCommandPreview(gfSide, gfCap, gfTime);
+                            return (
+                              <ScoringCommandPreviewBlock
+                                command={prev.command}
+                                note={prev.note}
+                              />
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {sel.eventType === "EXCLUSION_STARTED" && (
+                        <div className="form game-sheet-progress-edit-fields">
+                          <p className="game-sheet-progress-hint">
+                            Team and cap are tied to the stored player. To change them,
+                            delete this row and insert a new exclusion.
+                          </p>
+                          <label className="game-sheet-progress-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={exPenalty}
+                              onChange={(e) => setExPenalty(e.target.checked)}
+                            />
+                            Penalty (vs exclusion)
+                          </label>
+                          <label className="game-sheet-progress-field-span">
+                            Game clock in period (optional, same as scoring: 6.50 or 6:50)
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="e.g. 6.50 or 6:07"
+                              value={exTime}
+                              onChange={(e) => setExTime(e.target.value)}
+                            />
+                          </label>
+                          {(() => {
+                            const pl = sel.payload as Record<string, unknown>;
+                            const rawSide = pl.teamSide ?? pl.side;
+                            const teamSide: TeamSide =
+                              rawSide === "HOME" || rawSide === "AWAY"
+                                ? rawSide
+                                : "HOME";
+                            const prev = buildExclusionCommandPreview(
+                              teamSide,
+                              String(pl.capNumber ?? ""),
+                              exTime,
+                              exPenalty
+                            );
+                            return (
+                              <ScoringCommandPreviewBlock
+                                command={prev.command}
+                                note={prev.note}
+                              />
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {sel.eventType === "TIMEOUT_USED" && (
+                        <div className="form game-sheet-progress-edit-fields">
+                          <label>
+                            Team
+                            <select
+                              value={toSide}
+                              onChange={(e) =>
+                                setToSide(e.target.value as TeamSide)
+                              }
+                            >
+                              <option value="HOME">Dark</option>
+                              <option value="AWAY">Light</option>
+                            </select>
+                          </label>
+                          <label className="game-sheet-progress-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={toShort}
+                              onChange={(e) => setToShort(e.target.checked)}
+                            />
+                            30-second timeout
+                          </label>
+                          {(() => {
+                            const pl = sel.payload as Record<string, unknown>;
+                            const ts =
+                              typeof pl.timeSeconds === "number"
+                                ? pl.timeSeconds
+                                : undefined;
+                            const prev = buildTimeoutCommandPreview(
+                              toSide,
+                              toShort,
+                              ts
+                            );
+                            return (
+                              <ScoringCommandPreviewBlock
+                                command={prev.command}
+                                note={prev.note}
+                              />
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {![
+                        "GOAL_HOME",
+                        "GOAL_AWAY",
+                        "EXCLUSION_STARTED",
+                        "TIMEOUT_USED",
+                      ].includes(sel.eventType) && (
+                        <p className="game-sheet-progress-readonly">
+                          No field editor for this entry type. You can delete it or insert a
+                          goal, exclusion, penalty, or timeout before/after. Quarter and clock
+                          rows should stay consistent with the rest of the log.
+                        </p>
+                      )}
+
+                      <div className="game-sheet-progress-insert-toolbar">
+                        <button
+                          type="button"
+                          className="btn secondary btn-compact"
+                          onClick={() => setProgressInsertMode("before")}
+                          disabled={!!progressInsertMode}
+                        >
+                          Insert before
+                        </button>
+                        <button
+                          type="button"
+                          className="btn secondary btn-compact"
+                          onClick={() => setProgressInsertMode("after")}
+                          disabled={!!progressInsertMode}
+                        >
+                          Insert after
+                        </button>
+                      </div>
+
+                      {progressInsertMode && (
+                        <div className="game-sheet-progress-insert-panel">
+                          <h3>
+                            New entry (
+                            {progressInsertMode === "before" ? "before" : "after"}{" "}
+                            selected row)
+                          </h3>
+                          <p className="game-sheet-progress-hint">
+                            Adds one log row. Quarter starts, clock stops, etc. still use the
+                            scoring command field. Click <strong>Add to timeline</strong> when
+                            ready—<strong>Update &amp; rerun</strong> stays off until then so you
+                            don&apos;t save without the new row.
+                          </p>
+                          <div className="form game-sheet-progress-edit-fields">
+                            <label>
+                              Type
+                              <select
+                                value={insertKind}
+                                onChange={(e) =>
+                                  setInsertKind(
+                                    e.target.value as
+                                      | "GOAL"
+                                      | "EXCLUSION"
+                                      | "PENALTY"
+                                      | "TIMEOUT"
+                                      | "TIMEOUT_30"
+                                  )
+                                }
+                              >
+                                <option value="GOAL">Goal</option>
+                                <option value="EXCLUSION">Exclusion</option>
+                                <option value="PENALTY">Penalty</option>
+                                <option value="TIMEOUT">Timeout (full)</option>
+                                <option value="TIMEOUT_30">Timeout (30s)</option>
+                              </select>
+                            </label>
+                            {(insertKind === "GOAL" ||
+                              insertKind === "EXCLUSION" ||
+                              insertKind === "PENALTY" ||
+                              insertKind === "TIMEOUT" ||
+                              insertKind === "TIMEOUT_30") && (
+                              <label>
+                                Team
+                                <select
+                                  value={insertSide}
+                                  onChange={(e) =>
+                                    setInsertSide(e.target.value as TeamSide)
+                                  }
+                                >
+                                  <option value="HOME">Dark</option>
+                                  <option value="AWAY">Light</option>
+                                </select>
+                              </label>
+                            )}
+                            {(insertKind === "GOAL" ||
+                              insertKind === "EXCLUSION" ||
+                              insertKind === "PENALTY") && (
+                              <label>
+                                Cap #
+                                <input
+                                  value={insertCap}
+                                  onChange={(e) => setInsertCap(e.target.value)}
+                                />
+                              </label>
+                            )}
+                            <label className="game-sheet-progress-field-span">
+                              Game clock in period (optional, same as scoring: 6.50 or 6:50)
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="e.g. 6.50 or 6:07"
+                                value={insertTimeSec}
+                                onChange={(e) => setInsertTimeSec(e.target.value)}
+                              />
+                            </label>
+                            {(() => {
+                              const prev = buildInsertCommandPreview(
+                                insertKind,
+                                insertSide,
+                                insertCap,
+                                insertTimeSec
+                              );
+                              return (
+                                <ScoringCommandPreviewBlock
+                                  command={prev.command}
+                                  note={prev.note}
+                                />
+                              );
+                            })()}
+                          </div>
+                          <div className="game-sheet-modal-actions">
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => setProgressInsertMode(null)}
+                            >
+                              Cancel insert
+                            </button>
+                            <button
+                              type="button"
+                              className="btn primary"
+                              onClick={applyInsertEntry}
+                            >
+                              Add to timeline
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      </div>
+
+                      <div className="game-sheet-progress-edit-sticky-footer">
+                        <div className="game-sheet-modal-actions game-sheet-progress-edit-footer">
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={deleteProgressEntry}
+                            disabled={sel.eventType === "GAME_CREATED"}
+                          >
+                            Delete entry
+                          </button>
+                          <span style={{ flex: 1 }} />
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => {
+                              setProgressEditOpen(false);
+                              setProgressInsertMode(null);
+                            }}
+                          >
+                            Close
+                          </button>
+                          <button
+                            type="button"
+                            className="btn primary game-sheet-progress-update-btn"
+                            onClick={() => void submitProgressRebuild()}
+                            disabled={
+                              progressEditBusy || progressInsertMode != null
+                            }
+                            title={
+                              progressInsertMode
+                                ? "Click Add to timeline first, then this button saves to the server."
+                                : undefined
+                            }
+                          >
+                            {progressEditBusy
+                              ? "Working…"
+                              : progressInsertMode
+                                ? "Add to timeline first…"
+                                : "Update & rerun"}
+                          </button>
+                        </div>
+                        <p className="game-sheet-progress-rerun-note">
+                          {progressInsertMode
+                            ? "Add to timeline adds the row to this dialog only. Then Update & rerun sends the full timeline to the server."
+                            : "Sends the full event timeline to the server and recomputes score, timeouts, fouls, and clocks."}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
           {timeoutsModalOpen && (
             <div
               className="game-sheet-modal-overlay"
@@ -909,7 +1585,19 @@ export function GameSheet() {
                         <td>{row.time}</td>
                         <td>{row.cap}</td>
                         <td>{row.team}</td>
-                        <td>{row.remark}</td>
+                        <td>
+                          {row.editable ? (
+                            <button
+                              type="button"
+                              className="scoreboard-timeouts-link"
+                              onClick={() => openProgressEditForRow(row.id)}
+                            >
+                              {row.remark}
+                            </button>
+                          ) : (
+                            row.remark
+                          )}
+                        </td>
                         <td>{row.score}</td>
                       </tr>
                     ))
@@ -1279,6 +1967,160 @@ function parseTimeToSeconds(time: string): number {
   const seconds = Number(sStr || "0");
   if (isNaN(minutes) || isNaN(seconds)) return 0;
   return minutes * 60 + seconds;
+}
+
+function formatGameClockTimeForInput(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0 && s > 0) return `.${s.toString().padStart(2, "0")}`;
+  if (m === 0 && s === 0) return "0";
+  return `${m}.${s.toString().padStart(2, "0")}`;
+}
+
+function parseOptionalGameClockTime(
+  raw: string
+):
+  | { ok: true; seconds: number | undefined }
+  | { ok: false; error: string } {
+  const t = raw.trim().replace(/:/g, ".");
+  if (t === "") return { ok: true, seconds: undefined };
+  if (!/^(\d+\.\d{1,2}|\d+|\.\d{1,2})$/.test(t)) {
+    return {
+      ok: false,
+      error:
+        "Invalid game clock. Use scoring time: minutes.seconds (e.g. 6.50 or 6:50), minutes only (6), or seconds only (.03).",
+    };
+  }
+  return { ok: true, seconds: parseTimeToSeconds(t) };
+}
+
+function teamSideToScoringChar(side: TeamSide): "b" | "w" {
+  return side === "HOME" ? "b" : "w";
+}
+
+/** Time prefix for scoring-command preview; empty if field blank or invalid while typing. */
+function clockPrefixForPreview(raw: string): string {
+  if (raw.trim() === "") return "";
+  const parsed = parseOptionalGameClockTime(raw);
+  if (!parsed.ok || parsed.seconds === undefined) return "";
+  return formatGameClockTimeForInput(parsed.seconds);
+}
+
+type ScoringCommandPreviewResult = {
+  command: string;
+  note?: string;
+};
+
+function buildGoalCommandPreview(
+  side: TeamSide,
+  cap: string,
+  timeRaw: string
+): ScoringCommandPreviewResult {
+  const prefix = clockPrefixForPreview(timeRaw);
+  const capPart = cap.trim() || "?";
+  const command = `${prefix}${teamSideToScoringChar(side)}${capPart}g`;
+  const invalidClock = timeRaw.trim() !== "" && prefix === "";
+  return {
+    command,
+    note: invalidClock
+      ? "Enter a valid game clock to include time in the preview."
+      : undefined,
+  };
+}
+
+function buildExclusionCommandPreview(
+  teamSide: TeamSide,
+  cap: string,
+  timeRaw: string,
+  isPenalty: boolean
+): ScoringCommandPreviewResult {
+  const prefix = clockPrefixForPreview(timeRaw);
+  const capPart = cap.trim() || "?";
+  const action = isPenalty ? "p" : "e";
+  const command = `${prefix}${teamSideToScoringChar(teamSide)}${capPart}${action}`;
+  const invalidClock = timeRaw.trim() !== "" && prefix === "";
+  return {
+    command,
+    note: invalidClock
+      ? "Enter a valid game clock to include time in the preview."
+      : undefined,
+  };
+}
+
+function buildTimeoutCommandPreview(
+  side: TeamSide,
+  isShort: boolean,
+  timeSeconds: number | undefined
+): ScoringCommandPreviewResult {
+  const c = teamSideToScoringChar(side);
+  const mid = isShort ? "t3" : "t";
+  if (typeof timeSeconds === "number" && Number.isFinite(timeSeconds)) {
+    return {
+      command: `${formatGameClockTimeForInput(timeSeconds)}${mid}${c}`,
+    };
+  }
+  return {
+    command: `${mid}${c}`,
+    note: isShort
+      ? "Main scoring entry normally includes the clock (e.g. 4.13t3w)."
+      : "Main scoring entry normally includes the clock (e.g. 4.13tw).",
+  };
+}
+
+function buildInsertCommandPreview(
+  kind: "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30",
+  side: TeamSide,
+  cap: string,
+  timeRaw: string
+): ScoringCommandPreviewResult {
+  const prefix = clockPrefixForPreview(timeRaw);
+  const invalidClock = timeRaw.trim() !== "" && prefix === "";
+  const clockNote = invalidClock
+    ? "Enter a valid game clock to include time in the preview."
+    : undefined;
+  const c = teamSideToScoringChar(side);
+
+  if (kind === "GOAL") {
+    const capPart = cap.trim() || "?";
+    return { command: `${prefix}${c}${capPart}g`, note: clockNote };
+  }
+  if (kind === "EXCLUSION") {
+    const capPart = cap.trim() || "?";
+    return { command: `${prefix}${c}${capPart}e`, note: clockNote };
+  }
+  if (kind === "PENALTY") {
+    const capPart = cap.trim() || "?";
+    return { command: `${prefix}${c}${capPart}p`, note: clockNote };
+  }
+  if (kind === "TIMEOUT_30") {
+    if (prefix !== "") return { command: `${prefix}t3${c}`, note: clockNote };
+    return {
+      command: `t3${c}`,
+      note: clockNote ?? "Main scoring entry normally includes the clock (e.g. 4.13t3w).",
+    };
+  }
+  if (prefix !== "") return { command: `${prefix}t${c}`, note: clockNote };
+  return {
+    command: `t${c}`,
+    note: clockNote ?? "Main scoring entry normally includes the clock (e.g. 4.13tw).",
+  };
+}
+
+function ScoringCommandPreviewBlock({
+  command,
+  note,
+}: ScoringCommandPreviewResult) {
+  return (
+    <p className="game-sheet-progress-command-preview">
+      <span className="game-sheet-progress-command-preview-label">
+        Scoring command (main entry syntax)
+      </span>
+      <code className="game-sheet-progress-command-preview-code">{command}</code>
+      {note ? (
+        <span className="game-sheet-progress-command-preview-note">{note}</span>
+      ) : null}
+    </p>
+  );
 }
 
 function describeParsed(parsed: ParsedInput): string {

@@ -537,6 +537,199 @@
   text-align: center;
 }
 
+.game-sheet-progress-edit-modal {
+  max-width: min(94vw, 42rem);
+  width: 100%;
+  max-height: min(92vh, 52rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 1.1rem;
+  padding-bottom: 1.1rem;
+}
+
+.game-sheet-progress-edit-modal > .game-sheet-timeouts-header {
+  flex-shrink: 0;
+}
+
+.game-sheet-progress-edit-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+  margin-right: -0.2rem;
+}
+
+.game-sheet-progress-edit-sticky-footer {
+  flex-shrink: 0;
+  margin-top: 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.game-sheet-progress-edit-sticky-footer .game-sheet-progress-rerun-note {
+  margin: 0.5rem 0 0;
+}
+
+.game-sheet-progress-edit-meta {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.game-sheet-progress-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1.25rem;
+  margin-bottom: 1rem;
+  align-items: start;
+}
+
+/* Beat global `.form` (flex + max-width) on progress modal field groups */
+.game-sheet-progress-edit-modal .form.game-sheet-progress-edit-fields {
+  display: grid;
+  max-width: none;
+  gap: 0.65rem 1.25rem;
+}
+
+.game-sheet-progress-edit-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.game-sheet-progress-edit-modal .game-sheet-progress-field-span,
+.game-sheet-progress-edit-modal .game-sheet-progress-edit-fields > .game-sheet-progress-hint,
+.game-sheet-progress-edit-modal .game-sheet-progress-edit-fields > .game-sheet-progress-checkbox,
+.game-sheet-progress-edit-modal .game-sheet-progress-edit-fields > .game-sheet-progress-command-preview {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+  .game-sheet-progress-edit-modal .game-sheet-progress-edit-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .game-sheet-progress-edit-modal .game-sheet-progress-field-span,
+  .game-sheet-progress-edit-modal .game-sheet-progress-edit-fields > .game-sheet-progress-hint,
+  .game-sheet-progress-edit-modal .game-sheet-progress-edit-fields > .game-sheet-progress-checkbox,
+  .game-sheet-progress-edit-modal .game-sheet-progress-edit-fields > .game-sheet-progress-command-preview {
+    grid-column: 1;
+  }
+}
+
+.game-sheet-progress-command-preview {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.game-sheet-progress-command-preview-label {
+  display: block;
+  font-weight: 600;
+  opacity: 0.92;
+}
+
+.game-sheet-progress-command-preview-code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.95em;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  word-break: break-all;
+}
+
+.game-sheet-progress-command-preview-note {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-command-preview {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .game-sheet-progress-command-preview-code {
+    background: rgba(0, 0, 0, 0.06);
+  }
+}
+
+.game-sheet-progress-hint,
+.game-sheet-progress-readonly {
+  font-size: 0.85rem;
+  opacity: 0.88;
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+.game-sheet-progress-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem !important;
+}
+
+.game-sheet-progress-insert-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.game-sheet-progress-insert-panel {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 0.5rem;
+}
+
+.game-sheet-progress-insert-panel .game-sheet-modal-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.game-sheet-progress-insert-panel h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.game-sheet-progress-edit-footer {
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.game-sheet-progress-edit-footer .game-sheet-progress-update-btn {
+  min-width: 12.5rem;
+  text-align: center;
+}
+
+.game-sheet-progress-rerun-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-progress-insert-panel {
+    border-top-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .game-sheet-progress-edit-sticky-footer {
+    border-top-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
 .game-sheet-progress-table-wrapper {
   flex: 1;
   min-height: 0;
@@ -791,6 +984,14 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
+}
+
+/* Tall progress editor: start below top bar, allow overlay scroll if needed */
+.game-sheet-modal-overlay--progress-edit {
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.25rem 1rem 2rem;
+  overflow-y: auto;
 }
 
 .game-sheet-modal {
@@ -1178,6 +1379,33 @@
 
 .btn.primary:hover {
   background: #535bf2;
+}
+
+.btn.primary:disabled,
+.btn.primary[disabled] {
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn.primary:disabled:hover,
+.btn.primary[disabled]:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .btn.primary:disabled,
+  .btn.primary[disabled] {
+    background: #e8e8e8;
+    color: #888;
+    border-color: #d0d0d0;
+  }
+
+  .btn.primary:disabled:hover,
+  .btn.primary[disabled]:hover {
+    background: #e8e8e8;
+  }
 }
 
 .btn.secondary {
