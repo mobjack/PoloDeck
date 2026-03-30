@@ -104,6 +104,7 @@ export interface GameAggregate {
     eventType: string;
     payload: any;
     createdAt: string;
+    source?: string;
   }[];
 }
 
@@ -171,6 +172,22 @@ export const api = {
       }
     ) =>
       request<GameAggregate>(`/games/${id}/score-command`, {
+        method: "POST",
+        json: body,
+      }),
+    rebuildEventLog: (
+      id: string,
+      body: {
+        events: {
+          id?: string;
+          eventType: string;
+          payload?: unknown;
+          createdAt: string;
+          source?: string;
+        }[];
+      }
+    ) =>
+      request<GameAggregate>(`/games/${id}/event-log/rebuild`, {
         method: "POST",
         json: body,
       }),

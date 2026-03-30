@@ -1,3 +1,4 @@
+import { GameEventType } from ".prisma/client";
 import { z } from "zod";
 
 // Game day
@@ -92,6 +93,18 @@ export const scoreCommandBodySchema = z.object({
   overtime: z.boolean().optional(),
 });
 
+export const eventLogRebuildRowSchema = z.object({
+  id: z.string().cuid().optional(),
+  eventType: z.nativeEnum(GameEventType),
+  payload: z.unknown().optional(),
+  createdAt: z.string(),
+  source: z.string().optional(),
+});
+
+export const eventLogRebuildBodySchema = z.object({
+  events: z.array(eventLogRebuildRowSchema).min(1),
+});
+
 export type CreateGameDayBody = z.infer<typeof createGameDayBodySchema>;
 export type UpdateGameDayBody = z.infer<typeof updateGameDayBodySchema>;
 export type GameDayIdParams = z.infer<typeof gameDayIdParamSchema>;
@@ -105,4 +118,5 @@ export type CreateExclusionBody = z.infer<typeof createExclusionBodySchema>;
 export type TriggerHornBody = z.infer<typeof triggerHornBodySchema>;
 export type ReplaceRosterBody = z.infer<typeof replaceRosterBodySchema>;
 export type ScoreCommandBody = z.infer<typeof scoreCommandBodySchema>;
+export type EventLogRebuildBody = z.infer<typeof eventLogRebuildBodySchema>;
 

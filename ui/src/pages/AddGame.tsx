@@ -76,7 +76,9 @@ export function AddGame() {
       </header>
 
       <form onSubmit={handleSubmit} className="form">
-        {error && <p className="error">{formatApiErrorMessage(error)}</p>}
+        {error != null ? (
+          <p className="error">{formatApiErrorMessage(error)}</p>
+        ) : null}
         <label>
           Home team (dark caps)
           <input

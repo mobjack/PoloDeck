@@ -464,7 +464,9 @@ export function GameRoster() {
         </table>
       </div>
 
-      {error && <p className="error">{formatApiErrorMessage(error)}</p>}
+      {error != null ? (
+        <p className="error">{formatApiErrorMessage(error)}</p>
+      ) : null}
 
       <div className="form-actions">
         <button

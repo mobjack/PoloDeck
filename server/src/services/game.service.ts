@@ -7,6 +7,11 @@ import {
   type DeviceSummary,
 } from "./deviceCapabilities";
 import { env } from "../config/env";
+import {
+  rerunGameEventLog,
+  sortEventsForRerun,
+  type RebuildEventInput,
+} from "./gameEventRerun";
 
 export class GameService {
   constructor(private app: FastifyInstance) {}
@@ -1027,6 +1032,33 @@ export class GameService {
     return this.prisma.game.findMany({
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  async rebuildGameFromEventLog(gameId: string, rows: RebuildEventInput[]) {
+    const game = await this.prisma.game.findUnique({ where: { id: gameId } });
+    if (!game) throw this.notFound("Game not found");
+
+    const RERUN_TMP = "__rerun_tmp_";
+    const forSort = rows.map((e, i) => ({
+      ...e,
+      id: e.id ?? `${RERUN_TMP}${i}`,
+    }));
+
+    sortEventsForRerun(forSort);
+
+    const forRerun: RebuildEventInput[] = forSort.map((e) => ({
+      ...e,
+      id: e.id!.startsWith(RERUN_TMP) ? undefined : e.id,
+    }));
+
+    try {
+      await this.prisma.$transaction((tx) => rerunGameEventLog(tx, gameId, forRerun));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw this.badRequest(msg);
+    }
+
+    return this.emitState(gameId);
   }
 }
 
