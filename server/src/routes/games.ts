@@ -10,6 +10,7 @@ import {
   gameDayIdParamSchema,
   gameIdParamSchema,
   setClockBodySchema,
+  setGamePeriodBodySchema,
   triggerHornBodySchema,
   updateGameBodySchema,
   updateGameDayBodySchema,
@@ -185,6 +186,12 @@ export async function registerGameRoutes(app: FastifyInstance) {
   app.post("/games/:id/period/advance", async (request) => {
     const params = gameIdParamSchema.parse(request.params);
     return service.advancePeriod(params.id);
+  });
+
+  app.post("/games/:id/period/set", async (request) => {
+    const params = gameIdParamSchema.parse(request.params);
+    const body = setGamePeriodBodySchema.parse(request.body);
+    return service.setGamePeriod(params.id, body.period);
   });
 
   // Roster

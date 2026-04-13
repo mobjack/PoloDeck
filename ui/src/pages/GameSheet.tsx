@@ -791,6 +791,12 @@ export function GameSheet() {
       <header className="page-header game-sheet-page-header">
         <div className="game-sheet-page-header-back">
           <Link to={gameDayId ? `/game-days/${gameDayId}` : "/"}>← Back to game day</Link>
+          {gameDayId && gameId ? (
+            <>
+              {" · "}
+              <Link to={`/game-days/${gameDayId}/games/${gameId}/scoreboard`}>Scoreboard only</Link>
+            </>
+          ) : null}
         </div>
         <div className="game-sheet-page-header-title">
           <h1>

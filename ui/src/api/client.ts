@@ -22,14 +22,15 @@ async function request<T>(
   options: (Omit<RequestInit, "body"> & { method?: string; json?: unknown }) = {}
 ): Promise<T> {
   const { method = "GET", json, ...rest } = options;
+  const hasJsonBody = json !== undefined;
   const res = await fetch(`${API_BASE}${path}`, {
     ...rest,
     method,
     headers: {
-      "Content-Type": "application/json",
+      ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
       ...rest.headers,
     },
-    body: json != null ? JSON.stringify(json) : undefined,
+    body: hasJsonBody ? JSON.stringify(json) : undefined,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -108,6 +109,44 @@ export interface GameAggregate {
   }[];
 }
 
+/**
+ * Older servers may not expose POST /games/:id/period/set. Uses clock stops + repeated
+ * period/advance (and optional status FINAL) to approximate setGamePeriod for forward moves only.
+ */
+async function setPeriodFallback(id: string, targetPeriod: number): Promise<GameAggregate> {
+  let agg = await request<GameAggregate>(`/games/${id}`);
+  const tp = agg.totalPeriods;
+  if (targetPeriod < 1 || targetPeriod > tp) {
+    throw new ApiError("Invalid period for this game", 400);
+  }
+
+  await request(`/games/${id}/game-clock/stop`, { method: "POST" }).catch(() => undefined);
+  await request(`/games/${id}/shot-clock/stop`, { method: "POST" }).catch(() => undefined);
+
+  agg = await request<GameAggregate>(`/games/${id}`);
+  let cp = agg.currentPeriod;
+
+  if (cp > targetPeriod) {
+    throw new ApiError(
+      "Moving to an earlier period requires a newer API (POST /api/games/:id/period/set). Redeploy or restart the server, or use the game sheet.",
+      400
+    );
+  }
+
+  let guard = 0;
+  while (cp < targetPeriod && guard < 16) {
+    guard += 1;
+    agg = await request<GameAggregate>(`/games/${id}/period/advance`, { method: "POST" });
+    cp = agg.currentPeriod;
+  }
+
+  if (cp < targetPeriod) {
+    throw new ApiError("Could not reach the selected period. Try again or update the server.", 500);
+  }
+
+  return agg;
+}
+
 export const api = {
   capabilities: () =>
     request<DeviceCapabilities>("/capabilities"),
@@ -175,6 +214,27 @@ export const api = {
         method: "POST",
         json: body,
       }),
+    setPeriod: async (id: string, period: number) => {
+      try {
+        return await request<GameAggregate>(`/games/${id}/period/set`, {
+          method: "POST",
+          json: { period },
+        });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) {
+          return setPeriodFallback(id, period);
+        }
+        throw e;
+      }
+    },
+    scoreHomeIncrement: (id: string) =>
+      request<GameAggregate>(`/games/${id}/score/home/increment`, { method: "POST" }),
+    scoreHomeDecrement: (id: string) =>
+      request<GameAggregate>(`/games/${id}/score/home/decrement`, { method: "POST" }),
+    scoreAwayIncrement: (id: string) =>
+      request<GameAggregate>(`/games/${id}/score/away/increment`, { method: "POST" }),
+    scoreAwayDecrement: (id: string) =>
+      request<GameAggregate>(`/games/${id}/score/away/decrement`, { method: "POST" }),
     rebuildEventLog: (
       id: string,
       body: {
