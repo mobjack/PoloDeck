@@ -12,9 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - polodeck-postgres-data:/var/lib/postgresql/data
+    networks:
+      - polodeck
 
   polodeck-app:
-    build: .
+    build: ./server
     container_name: polodeck-app
     depends_on:
       - postgres
@@ -25,7 +27,26 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     command: ["node", "dist/server.js"]
+    networks:
+      - polodeck
+
+  ui:
+    build:
+      context: ./ui
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3000}
+    container_name: polodeck-ui
+    depends_on:
+      - polodeck-app
+    ports:
+      - "127.0.0.1:8080:80"
+    networks:
+      - polodeck
 
 volumes:
   polodeck-postgres-data:
 
+networks:
+  polodeck:
+    driver: bridge
