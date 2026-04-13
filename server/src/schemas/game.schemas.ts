@@ -58,6 +58,10 @@ export const setClockBodySchema = z.object({
   remainingMs: z.number().int().nonnegative(),
 });
 
+export const setGamePeriodBodySchema = z.object({
+  period: z.number().int().min(1),
+});
+
 export const addPlayerBodySchema = z.object({
   capNumber: z.string().min(1), // e.g. "1", "A", "1A"
   playerName: z.string().min(1),

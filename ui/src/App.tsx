@@ -7,6 +7,7 @@ import { AddGame } from "./pages/AddGame";
 import { EditGame } from "./pages/EditGame";
 import { GameRoster } from "./pages/GameRoster";
 import { GameSheet } from "./pages/GameSheet";
+import { ScoreboardControl } from "./pages/ScoreboardControl";
 import "./App.css";
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
           <Route path="/game-days/:id/games/:gameId/edit" element={<EditGame />} />
           <Route path="/game-days/:id/games/:gameId/roster" element={<GameRoster />} />
           <Route path="/game-days/:id/games/:gameId/sheet" element={<GameSheet />} />
+          <Route path="/game-days/:id/games/:gameId/scoreboard" element={<ScoreboardControl />} />
         </Routes>
       </div>
     </BrowserRouter>

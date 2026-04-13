@@ -709,6 +709,87 @@ export class GameService {
     return this.emitState(gameId);
   }
 
+  async setGamePeriod(gameId: string, targetPeriod: number) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { score: true, gameClock: true, shotClock: true },
+    });
+    if (!game) {
+      throw this.notFound("Game not found");
+    }
+
+    const expandToOvertime = game.totalPeriods === 4 && targetPeriod === 5;
+    if (targetPeriod < 1 || (targetPeriod > game.totalPeriods && !expandToOvertime)) {
+      throw this.badRequest("Invalid period for this game");
+    }
+
+    if (game.gameClock?.running) {
+      await this.stopGameClock(gameId);
+    }
+    if (game.shotClock?.running) {
+      await this.stopShotClock(gameId);
+    }
+
+    if (expandToOvertime) {
+      const from = game.currentPeriod;
+      await this.prisma.game.update({
+        where: { id: gameId },
+        data: {
+          totalPeriods: 5,
+          currentPeriod: 5,
+          status: GameStatus.IN_PROGRESS,
+        },
+      });
+      const payload: Record<string, unknown> = {
+        from,
+        to: 5,
+        directSet: true,
+      };
+      if (game.score) {
+        payload.homeScore = game.score.homeScore;
+        payload.awayScore = game.score.awayScore;
+      }
+      await this.createEvent(
+        gameId,
+        GameEventType.PERIOD_ADVANCED,
+        payload as Prisma.InputJsonValue,
+        "operator"
+      );
+      return this.emitState(gameId);
+    }
+
+    const from = game.currentPeriod;
+    if (from !== targetPeriod) {
+      // Scoreboard distinguishes Q4 (last quarter in progress) from game ended; FINAL is PATCH only.
+      const data: { currentPeriod: number; status: GameStatus } = {
+        currentPeriod: targetPeriod,
+        status: GameStatus.IN_PROGRESS,
+      };
+      await this.prisma.game.update({
+        where: { id: gameId },
+        data,
+      });
+
+      const payload: Record<string, unknown> = {
+        from,
+        to: targetPeriod,
+        directSet: true,
+      };
+      if (game.score) {
+        payload.homeScore = game.score.homeScore;
+        payload.awayScore = game.score.awayScore;
+      }
+      await this.createEvent(
+        gameId,
+        GameEventType.PERIOD_ADVANCED,
+        payload as Prisma.InputJsonValue,
+        "operator"
+      );
+    }
+
+    return this.emitState(gameId);
+  }
+
   async startOvertime(gameId: string) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
