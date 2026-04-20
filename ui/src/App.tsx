@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { GameDayList } from "./pages/GameDayList";
+import { GameDayShell } from "./pages/GameDayShell";
+import { GameDayHomeEmpty } from "./pages/GameDayHomeEmpty";
 import { GameDayDetail } from "./pages/GameDayDetail";
 import { NewGameDay } from "./pages/NewGameDay";
 import { EditGameDay } from "./pages/EditGameDay";
@@ -15,15 +16,17 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <Routes>
-          <Route path="/" element={<GameDayList />} />
           <Route path="/game-days/new" element={<NewGameDay />} />
-          <Route path="/game-days/:id" element={<GameDayDetail />} />
           <Route path="/game-days/:id/edit" element={<EditGameDay />} />
           <Route path="/game-days/:id/games/new" element={<AddGame />} />
           <Route path="/game-days/:id/games/:gameId/edit" element={<EditGame />} />
           <Route path="/game-days/:id/games/:gameId/roster" element={<GameRoster />} />
           <Route path="/game-days/:id/games/:gameId/sheet" element={<GameSheet />} />
           <Route path="/game-days/:id/games/:gameId/scoreboard" element={<ScoreboardControl />} />
+          <Route path="/" element={<GameDayShell />}>
+            <Route index element={<GameDayHomeEmpty />} />
+            <Route path="game-days/:id" element={<GameDayDetail />} />
+          </Route>
         </Routes>
       </div>
     </BrowserRouter>
