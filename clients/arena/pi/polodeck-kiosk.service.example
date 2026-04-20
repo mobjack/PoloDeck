@@ -1,0 +1,19 @@
+# Example systemd unit for a dedicated X11 + Chromium kiosk (advanced).
+# Prefer clients/arena/pi/install-kiosk.sh (XDG autostart) on Raspberry Pi OS Desktop.
+#
+# If you use this, customize User=, paths, and the Exec= URL.
+
+[Unit]
+Description=PoloDeck arena Chromium kiosk (example)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs "http://127.0.0.1:8090/"
+Restart=on-failure
+
+[Install]
+WantedBy=graphical.target

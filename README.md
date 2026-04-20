@@ -48,9 +48,11 @@ PoloDeck/
 │   ├── prisma/      # Schema and migrations
 │   ├── src/         # App, routes, services, plugins
 │   ├── postman/     # Postman collection for local testing
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── ui/              # Frontend app (game-day admin, future operator/scoreboard views)
+│   └── Dockerfile
+├── ui/              # Frontend app (game-day admin, operator views)
+├── clients/arena/   # Arena scoreboard, timer, shot clock (static SPAs + Pi kiosk helpers)
+├── docker-compose.yml
+├── setup.sh         # Optional interactive .env for Docker bind + arena profile
 └── README.md
 ```
 
@@ -92,26 +94,27 @@ The UI currently focuses on **game-day setup**:
 - View a game day and see its games.
 - Add/edit games for a day (home/away, level, gender, type, label).
 
-## Docker (backend only, for now)
-
-To run the backend stack via Docker:
+## Docker (full stack from repo root)
 
 ```bash
-cd server
-cp .env.example .env   # ensure DATABASE_URL matches docker-compose setup
-docker-compose up -d --build
+cp .env.example .env          # optional; see POLODECK_BIND_ADDRESS for LAN access
+./setup.sh                    # optional interactive .env for bind + arena profile
+docker compose up -d --build
 ```
 
 Then run migrations (once per environment):
 
 ```bash
-docker-compose exec polodeck-app npx prisma migrate deploy
+docker compose exec polodeck-app npx prisma migrate deploy
 ```
 
 - **API:** `http://localhost:3000`
+- **Admin UI:** `http://localhost:8080`
 - **Health:** `GET http://localhost:3000/health`
 
-The UI will later get its own container and compose service.
+**LAN / Raspberry Pi:** By default, published ports bind to `127.0.0.1` only. Set `POLODECK_BIND_ADDRESS=0.0.0.0` in `.env` (or run `./setup.sh` and choose LAN) so other machines on the pool network can reach the API and browser UIs. Only do this on networks you trust; use a host firewall if needed.
+
+**Arena scoreboard / timer / shot clock (optional):** `docker compose --profile arena up -d --build` serves static clients on port **8090**. See [clients/arena/README.md](clients/arena/README.md).
 
 ## Status
 
