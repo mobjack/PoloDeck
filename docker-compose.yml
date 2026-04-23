@@ -25,7 +25,8 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-polodeck}:${POSTGRES_PASSWORD:-polodeck}@postgres:5432/${POSTGRES_DB:-polodeck}?schema=public
     ports:
-      - "127.0.0.1:3000:3000"
+      # Use POLODECK_BIND_ADDRESS=0.0.0.0 so Pis and other PCs on the LAN can reach the API and Socket.IO.
+      - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:3000:3000"
     command: ["node", "dist/server.js"]
     networks:
       - polodeck
@@ -40,7 +41,24 @@ services:
     depends_on:
       - polodeck-app
     ports:
-      - "127.0.0.1:8080:80"
+      - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:8080:80"
+    networks:
+      - polodeck
+
+  # Arena scoreboard / timer / shot clock static UI (optional). Enable with: docker compose --profile arena up -d
+  arena-ui:
+    profiles: ["arena"]
+    build:
+      context: ./clients/arena
+      args:
+        VITE_DEFAULT_SERVER: ${VITE_DEFAULT_SERVER:-http://localhost:3000}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3000}
+    container_name: polodeck-arena-ui
+    depends_on:
+      - polodeck-app
+    ports:
+      - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:8090:80"
     networks:
       - polodeck
 
