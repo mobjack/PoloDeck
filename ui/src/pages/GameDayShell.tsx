@@ -23,6 +23,33 @@ export function GameDayShell() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const refreshCapabilities = () => {
+      api
+        .capabilities()
+        .then((caps) => {
+          if (!cancelled) setCapabilities(caps);
+        })
+        .catch(() => {
+          /* keep last good snapshot on transient errors */
+        });
+    };
+
+    const id = window.setInterval(refreshCapabilities, 6000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshCapabilities();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!guideOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setGuideOpen(false);
