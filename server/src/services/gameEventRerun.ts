@@ -292,17 +292,65 @@ export async function rerunGameEventLog(
       }
 
       case GameEventType.SHOT_CLOCK_RESET: {
+        const g = await tx.game.findUnique({
+          where: { id: gameId },
+          include: { gameClock: true, shotClock: true },
+        });
+        const clock = g?.shotClock;
+        if (!clock) throw new Error("Shot clock missing");
+        const gameTimeRunning = g?.gameClock?.running ?? false;
+        const p = asPayload(ev.payload);
+        if (
+          typeof p.priorRemainingMs === "number" &&
+          typeof p.priorRunning === "boolean"
+        ) {
+          // New resets omit priorLastStartedAt; legacy rows may include it.
+          payloadOut = {
+            ...p,
+            durationMs: clock.durationMs,
+            priorRemainingMs: p.priorRemainingMs,
+            priorRunning: p.priorRunning,
+          } as Prisma.InputJsonValue;
+        } else {
+          payloadOut = { durationMs: clock.durationMs } as Prisma.InputJsonValue;
+        }
+        const newData = gameTimeRunning
+          ? {
+              remainingMs: clock.durationMs,
+              running: true,
+              lastStartedAt: createdAt,
+            }
+          : {
+              remainingMs: clock.durationMs,
+              running: false,
+              lastStartedAt: null,
+            };
+        await tx.shotClock.update({
+          where: { id: clock.id },
+          data: newData,
+        });
+        break;
+      }
+
+      case GameEventType.SHOT_CLOCK_RESET_UNDONE: {
+        const p = asPayload(ev.payload);
+        const remainingMs =
+          typeof p.restoredRemainingMs === "number" ? p.restoredRemainingMs : 0;
+        const running = p.restoredRunning === true;
+        const lastStartedAt =
+          p.restoredLastStartedAt != null && p.restoredLastStartedAt !== ""
+            ? new Date(String(p.restoredLastStartedAt))
+            : null;
         const clock = await tx.shotClock.findUnique({ where: { gameId } });
         if (!clock) throw new Error("Shot clock missing");
         await tx.shotClock.update({
           where: { id: clock.id },
           data: {
-            remainingMs: clock.durationMs,
-            running: false,
-            lastStartedAt: null,
+            remainingMs: Math.max(0, remainingMs),
+            running,
+            lastStartedAt,
           },
         });
-        payloadOut = { durationMs: clock.durationMs } as Prisma.InputJsonValue;
         break;
       }
 

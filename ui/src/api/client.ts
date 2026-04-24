@@ -73,6 +73,10 @@ export interface GameAggregate {
   currentPeriod: number;
   totalPeriods: number;
   status: "PENDING" | "IN_PROGRESS" | "FINAL";
+  /** Per-period length; mirrors game clock duration. */
+  quarterDurationMs?: number;
+  breakBetweenQuartersDurationMs?: number;
+  halftimeDurationMs?: number;
   score: {
     homeScore: number;
     awayScore: number;
@@ -81,11 +85,13 @@ export interface GameAggregate {
     durationMs: number;
     remainingMs: number;
     running: boolean;
+    lastStartedAt?: string | null;
   } | null;
   shotClock: {
     durationMs: number;
     remainingMs: number;
     running: boolean;
+    lastStartedAt?: string | null;
   } | null;
   timeoutStates: {
     teamSide: "HOME" | "AWAY";
@@ -250,6 +256,24 @@ export const api = {
       request<GameAggregate>(`/games/${id}/event-log/rebuild`, {
         method: "POST",
         json: body,
+      }),
+    gameClockStart: (id: string) =>
+      request<GameAggregate>(`/games/${id}/game-clock/start`, { method: "POST" }),
+    gameClockStop: (id: string) =>
+      request<GameAggregate>(`/games/${id}/game-clock/stop`, { method: "POST" }),
+    shotClockReset: (id: string) =>
+      request<GameAggregate>(`/games/${id}/shot-clock/reset`, { method: "POST" }),
+    shotClockUndoReset: (id: string) =>
+      request<GameAggregate>(`/games/${id}/shot-clock/undo-reset`, { method: "POST" }),
+    setGameClockRemaining: (id: string, remainingMs: number) =>
+      request<GameAggregate>(`/games/${id}/game-clock/set`, {
+        method: "POST",
+        json: { remainingMs },
+      }),
+    setShotClockRemaining: (id: string, remainingMs: number) =>
+      request<GameAggregate>(`/games/${id}/shot-clock/set`, {
+        method: "POST",
+        json: { remainingMs },
       }),
   },
 };

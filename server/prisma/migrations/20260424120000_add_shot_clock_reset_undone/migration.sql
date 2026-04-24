@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "GameEventType" ADD VALUE 'SHOT_CLOCK_RESET_UNDONE';

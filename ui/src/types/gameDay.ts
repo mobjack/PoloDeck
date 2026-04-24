@@ -74,5 +74,7 @@ export interface UpdateGameInput {
   quarterDurationMs?: number;
   breakBetweenQuartersDurationMs?: number;
   halftimeDurationMs?: number;
+  /** Shots: updates shot clock duration/reset value for this game. */
+  shotClockDurationMs?: number;
   status?: "PENDING" | "IN_PROGRESS" | "FINAL";
 }
