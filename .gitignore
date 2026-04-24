@@ -6,6 +6,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Vite dependency pre-bundle cache
+**/.vite/
+
 # Environment and secrets (do not commit)
 .env
 .env.local

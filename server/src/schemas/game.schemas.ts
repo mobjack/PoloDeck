@@ -43,6 +43,7 @@ export const updateGameBodySchema = z.object({
   quarterDurationMs: z.number().int().positive().optional(),
   breakBetweenQuartersDurationMs: z.number().int().nonnegative().optional(),
   halftimeDurationMs: z.number().int().nonnegative().optional(),
+  shotClockDurationMs: z.number().int().positive().optional(),
   status: z.enum(["PENDING", "IN_PROGRESS", "FINAL"]).optional(),
 });
 

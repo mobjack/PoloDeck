@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ClipboardList, Settings, Tally5, UserRoundCheck } from "lucide-react";
+import { ClipboardList, Settings, Tally5, Timer, UserRoundCheck } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GameDay, GameOnDay } from "../types/gameDay";
@@ -101,13 +101,14 @@ export function GameDayDetail() {
               <th>Roster</th>
               <th>Game sheet</th>
               <th>Scoreboard</th>
+              <th>Timer</th>
               <th>Settings</th>
             </tr>
           </thead>
           <tbody>
             {gameDay.games.length === 0 ? (
               <tr>
-              <td colSpan={11}>No games. Add one below.</td>
+              <td colSpan={12}>No games. Add one below.</td>
               </tr>
             ) : (
               gameDay.games.map((g) => (
@@ -221,6 +222,16 @@ function GameRow({
           title="Scoreboard"
         >
           <Tally5 size={16} strokeWidth={2} aria-hidden />
+        </Link>
+      </td>
+      <td className="games-action-cell">
+        <Link
+          to={`/game-days/${gameDayId}/games/${game.id}/timer`}
+          className="btn btn-compact btn-games-row-action btn-timer"
+          aria-label="Timer"
+          title="Timer"
+        >
+          <Timer size={16} strokeWidth={2} aria-hidden />
         </Link>
       </td>
       <td className="games-action-cell">

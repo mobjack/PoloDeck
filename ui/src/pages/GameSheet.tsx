@@ -795,6 +795,8 @@ export function GameSheet() {
             <>
               {" · "}
               <Link to={`/game-days/${gameDayId}/games/${gameId}/scoreboard`}>Scoreboard only</Link>
+              {" · "}
+              <Link to={`/game-days/${gameDayId}/games/${gameId}/timer`}>Timer</Link>
             </>
           ) : null}
         </div>

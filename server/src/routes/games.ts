@@ -176,6 +176,11 @@ export async function registerGameRoutes(app: FastifyInstance) {
     return service.resetShotClock(params.id);
   });
 
+  app.post("/games/:id/shot-clock/undo-reset", async (request) => {
+    const params = gameIdParamSchema.parse(request.params);
+    return service.undoLastShotClockReset(params.id);
+  });
+
   app.post("/games/:id/shot-clock/set", async (request) => {
     const params = gameIdParamSchema.parse(request.params);
     const body = setClockBodySchema.parse(request.body);

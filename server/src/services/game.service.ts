@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { DeviceType, GameEventType, GameStatus, TeamSide, type Prisma } from ".prisma/client";
-import { startClock, stopClock, setClockRemaining } from "../lib/clock";
+import {
+  startClock,
+  stopClock,
+  setClockRemaining,
+  getEffectiveRemainingMs,
+} from "../lib/clock";
 import {
   buildDeviceCapabilities,
   type DeviceCapabilities,
@@ -47,15 +52,17 @@ export class GameService {
     eventType: GameEventType,
     payload: Prisma.InputJsonValue,
     source: string
-  ) {
-    await this.prisma.gameEvent.create({
+  ): Promise<string> {
+    const created = await this.prisma.gameEvent.create({
       data: {
         gameId,
         eventType,
         payload,
         source,
       },
+      select: { id: true },
     });
+    return created.id;
   }
 
   private async assertPlayerNotRolled(
@@ -342,10 +349,14 @@ export class GameService {
       quarterDurationMs?: number;
       breakBetweenQuartersDurationMs?: number;
       halftimeDurationMs?: number;
+      shotClockDurationMs?: number;
       status?: GameStatus;
     }
   ) {
-    const existing = await this.prisma.game.findUnique({ where: { id: gameId } });
+    const existing = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gameClock: true, shotClock: true },
+    });
     if (!existing) throw this.notFound("Game not found");
     const data: {
       scheduledAt?: Date | null;
@@ -371,9 +382,58 @@ export class GameService {
     if (input.breakBetweenQuartersDurationMs !== undefined) data.breakBetweenQuartersDurationMs = input.breakBetweenQuartersDurationMs;
     if (input.halftimeDurationMs !== undefined) data.halftimeDurationMs = input.halftimeDurationMs;
     if (input.status !== undefined) data.status = input.status;
-    await this.prisma.game.update({
-      where: { id: gameId },
-      data,
+    const now = Date.now();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.game.update({
+        where: { id: gameId },
+        data,
+      });
+      if (input.quarterDurationMs !== undefined && existing.gameClock) {
+        const g = existing.gameClock;
+        const d = input.quarterDurationMs;
+        const eff = getEffectiveRemainingMs(
+          {
+            durationMs: g.durationMs,
+            remainingMs: g.remainingMs,
+            running: g.running,
+            lastStartedAt: g.lastStartedAt,
+          },
+          now
+        );
+        const newRem = g.running ? Math.min(eff, d) : d;
+        await tx.gameClock.update({
+          where: { id: g.id },
+          data: {
+            durationMs: d,
+            remainingMs: newRem,
+            lastStartedAt: g.running ? new Date(now) : null,
+            running: g.running,
+          },
+        });
+      }
+      if (input.shotClockDurationMs !== undefined && existing.shotClock) {
+        const s = existing.shotClock;
+        const d = input.shotClockDurationMs;
+        const eff = getEffectiveRemainingMs(
+          {
+            durationMs: s.durationMs,
+            remainingMs: s.remainingMs,
+            running: s.running,
+            lastStartedAt: s.lastStartedAt,
+          },
+          now
+        );
+        const newRem = s.running ? Math.min(eff, d) : d;
+        await tx.shotClock.update({
+          where: { id: s.id },
+          data: {
+            durationMs: d,
+            remainingMs: newRem,
+            lastStartedAt: s.running ? new Date(now) : null,
+            running: s.running,
+          },
+        });
+      }
     });
     return this.emitState(gameId);
   }
@@ -462,6 +522,10 @@ export class GameService {
       throw this.notFound("Game clock not found");
     }
 
+    if (clock.running) {
+      return this.emitState(gameId);
+    }
+
     const newState = startClock({
       durationMs: clock.durationMs,
       remainingMs: clock.remainingMs,
@@ -478,6 +542,9 @@ export class GameService {
     });
 
     await this.createEvent(gameId, GameEventType.GAME_CLOCK_STARTED, {}, "operator");
+    // Always resync the shot: materialize then start (repairs "running" without lastStartedAt, or
+    // a stale pre-coupling shot-while-game-stopped state).
+    await this.resyncShotClockWithGameStart(gameId);
     return this.emitState(gameId);
   }
 
@@ -506,7 +573,100 @@ export class GameService {
     });
 
     await this.createEvent(gameId, GameEventType.GAME_CLOCK_STOPPED, {}, "operator");
+    await this.stopShotClockIfRunning(gameId);
     return this.emitState(gameId);
+  }
+
+  /**
+   * When the game clock starts, the shot must run with a fresh anchor. We materialize
+   * (stop), then start so we never no-op on `running: true` with a missing/invalid
+   * `lastStartedAt`, or a stale "shot running" row left from before game/shot coupling.
+   */
+  private async resyncShotClockWithGameStart(gameId: string) {
+    const clock = await this.prisma.shotClock.findUnique({
+      where: { gameId },
+    });
+    if (!clock) {
+      throw this.notFound("Shot clock not found");
+    }
+    const now = Date.now();
+    const before = {
+      durationMs: clock.durationMs,
+      remainingMs: clock.remainingMs,
+      running: clock.running,
+      lastStartedAt: clock.lastStartedAt,
+    };
+    const afterStop = stopClock(before, now);
+    const afterStart = startClock(afterStop, now);
+    if (before.running) {
+      await this.createEvent(
+        gameId,
+        GameEventType.SHOT_CLOCK_STOPPED,
+        {},
+        "operator"
+      );
+    }
+    await this.prisma.shotClock.update({
+      where: { id: clock.id },
+      data: {
+        running: afterStart.running,
+        remainingMs: afterStart.remainingMs,
+        lastStartedAt: afterStart.lastStartedAt,
+      },
+    });
+    await this.createEvent(
+      gameId,
+      GameEventType.SHOT_CLOCK_STARTED,
+      {},
+      "operator"
+    );
+  }
+
+  /** Standalone "start shot" (admin): only start if not already in a good running state. */
+  private async startShotClockIfStopped(gameId: string) {
+    const clock = await this.prisma.shotClock.findUnique({
+      where: { gameId },
+    });
+    if (!clock) {
+      throw this.notFound("Shot clock not found");
+    }
+    if (clock.running && clock.lastStartedAt != null) {
+      return;
+    }
+    await this.resyncShotClockWithGameStart(gameId);
+  }
+
+  /** When game clock stops, the shot clock must stop (idempotent if already stopped). */
+  private async stopShotClockIfRunning(gameId: string) {
+    const clock = await this.prisma.shotClock.findUnique({
+      where: { gameId },
+    });
+    if (!clock) {
+      throw this.notFound("Shot clock not found");
+    }
+    if (!clock.running) {
+      return;
+    }
+    const newState = stopClock({
+      durationMs: clock.durationMs,
+      remainingMs: clock.remainingMs,
+      running: clock.running,
+      lastStartedAt: clock.lastStartedAt,
+    });
+    await this.prisma.shotClock.update({
+      where: { id: clock.id },
+      data: {
+        running: newState.running,
+        remainingMs: newState.remainingMs,
+        lastStartedAt: newState.lastStartedAt,
+      },
+    });
+    await this.createEvent(
+      gameId,
+      GameEventType.SHOT_CLOCK_STOPPED,
+      {},
+      "operator"
+    );
   }
 
   async setGameClock(gameId: string, remainingMs: number, options?: { skipEvent?: boolean }) {
@@ -547,91 +707,175 @@ export class GameService {
   }
 
   async startShotClock(gameId: string) {
-    const clock = await this.prisma.shotClock.findUnique({
-      where: { gameId },
-    });
-    if (!clock) {
-      throw this.notFound("Shot clock not found");
-    }
-
-    const newState = startClock({
-      durationMs: clock.durationMs,
-      remainingMs: clock.remainingMs,
-      running: clock.running,
-      lastStartedAt: clock.lastStartedAt,
-    });
-
-    await this.prisma.shotClock.update({
-      where: { id: clock.id },
-      data: {
-        running: newState.running,
-        lastStartedAt: newState.lastStartedAt,
-      },
-    });
-
-    await this.createEvent(
-      gameId,
-      GameEventType.SHOT_CLOCK_STARTED,
-      {},
-      "operator"
-    );
+    await this.startShotClockIfStopped(gameId);
     return this.emitState(gameId);
   }
 
   async stopShotClock(gameId: string) {
-    const clock = await this.prisma.shotClock.findUnique({
-      where: { gameId },
+    await this.stopShotClockIfRunning(gameId);
+    return this.emitState(gameId);
+  }
+
+  async resetShotClock(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gameClock: true, shotClock: true },
     });
-    if (!clock) {
-      throw this.notFound("Shot clock not found");
+    const clock = game?.shotClock;
+    if (!game || !clock) {
+      throw this.notFound("Game or shot clock not found");
     }
 
-    const newState = stopClock({
-      durationMs: clock.durationMs,
-      remainingMs: clock.remainingMs,
-      running: clock.running,
-      lastStartedAt: clock.lastStartedAt,
-    });
+    const now = Date.now();
+    // Frozen "time at this instant" for undo (not a live/background running process in the log).
+    const priorRemainingMs = getEffectiveRemainingMs(
+      {
+        durationMs: clock.durationMs,
+        remainingMs: clock.remainingMs,
+        running: clock.running,
+        lastStartedAt: clock.lastStartedAt,
+      },
+      now
+    );
+    const priorRunning = clock.running;
+
+    const gameTimeRunning = game.gameClock?.running ?? false;
+    const newData = gameTimeRunning
+      ? {
+          remainingMs: clock.durationMs,
+          running: true,
+          lastStartedAt: new Date(now),
+        }
+      : {
+          remainingMs: clock.durationMs,
+          running: false,
+          lastStartedAt: null,
+        };
 
     await this.prisma.shotClock.update({
       where: { id: clock.id },
-      data: {
-        running: newState.running,
-        remainingMs: newState.remainingMs,
-        lastStartedAt: newState.lastStartedAt,
-      },
+      data: newData,
     });
 
+    // priorRemainingMs = display time *at* reset. priorRunning = was the display actively
+    // counting. We do not store priorLastStartedAt (avoids a "background" live clock in the
+    // event; undo re-anchors with lastStartedAt = now if game + priorRunning warrant it).
+    const resetPayload: Prisma.InputJsonValue = {
+      durationMs: clock.durationMs,
+      priorRemainingMs,
+      priorRunning,
+    };
     await this.createEvent(
       gameId,
-      GameEventType.SHOT_CLOCK_STOPPED,
-      {},
+      GameEventType.SHOT_CLOCK_RESET,
+      resetPayload,
       "operator"
     );
     return this.emitState(gameId);
   }
 
-  async resetShotClock(gameId: string) {
-    const clock = await this.prisma.shotClock.findUnique({
-      where: { gameId },
+  async undoLastShotClockReset(gameId: string) {
+    const [resets, undones] = await Promise.all([
+      this.prisma.gameEvent.findMany({
+        where: { gameId, eventType: GameEventType.SHOT_CLOCK_RESET },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, payload: true },
+      }),
+      this.prisma.gameEvent.findMany({
+        where: { gameId, eventType: GameEventType.SHOT_CLOCK_RESET_UNDONE },
+        select: { payload: true },
+      }),
+    ]);
+
+    const undoneResetIds = new Set(
+      undones
+        .map((e) => {
+          const p = e.payload as Record<string, unknown> | null;
+          return p != null && typeof p.resetEventId === "string" ? p.resetEventId : null;
+        })
+        .filter((x): x is string => x != null)
+    );
+
+    const reset = resets.find((r) => {
+      if (undoneResetIds.has(r.id)) return false;
+      const p = r.payload as Record<string, unknown> | null;
+      return (
+        p != null &&
+        typeof p.priorRemainingMs === "number" &&
+        typeof p.priorRunning === "boolean"
+      );
     });
+    if (!reset) {
+      throw this.badRequest("No shot clock reset to undo");
+    }
+
+    const p = reset.payload as Record<string, unknown>;
+    const priorMs = p.priorRemainingMs as number;
+    const wasCounting = p.priorRunning as boolean;
+    const hasLegacyLastStarted = Object.prototype.hasOwnProperty.call(
+      p,
+      "priorLastStartedAt"
+    );
+
+    const fullGame = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gameClock: true, shotClock: true },
+    });
+    const gClock = fullGame?.gameClock;
+    const gameRunning = gClock?.running ?? false;
+
+    const clock = fullGame?.shotClock;
     if (!clock) {
       throw this.notFound("Shot clock not found");
+    }
+
+    const remaining = Math.max(0, priorMs);
+    let running: boolean;
+    let lastStartedAt: Date | null;
+
+    if (hasLegacyLastStarted) {
+      // Older events: exact row snapshot including prior lastStartedAt.
+      running = wasCounting;
+      const raw = p.priorLastStartedAt;
+      if (raw != null && String(raw) !== "") {
+        lastStartedAt = new Date(String(raw));
+        if (Number.isNaN(lastStartedAt.getTime())) {
+          lastStartedAt = null;
+        }
+      } else {
+        lastStartedAt = null;
+      }
+    } else {
+      // New events: a frozen "time at reset" + whether the display was elapsing; no live
+      // process stashed. If undo should be a running shot, re-anchor to now.
+      if (gameRunning && wasCounting) {
+        running = true;
+        lastStartedAt = new Date();
+      } else {
+        running = false;
+        lastStartedAt = null;
+      }
     }
 
     await this.prisma.shotClock.update({
       where: { id: clock.id },
       data: {
-        remainingMs: clock.durationMs,
-        running: false,
-        lastStartedAt: null,
+        remainingMs: remaining,
+        running,
+        lastStartedAt,
       },
     });
 
+    const undoPayload: Prisma.InputJsonValue = {
+      resetEventId: reset.id,
+      restoredRemainingMs: remaining,
+      restoredRunning: running,
+      restoredLastStartedAt: lastStartedAt?.toISOString() ?? null,
+    };
     await this.createEvent(
       gameId,
-      GameEventType.SHOT_CLOCK_RESET,
-      { durationMs: clock.durationMs },
+      GameEventType.SHOT_CLOCK_RESET_UNDONE,
+      undoPayload,
       "operator"
     );
     return this.emitState(gameId);
@@ -725,8 +969,8 @@ export class GameService {
 
     if (game.gameClock?.running) {
       await this.stopGameClock(gameId);
-    }
-    if (game.shotClock?.running) {
+    } else if (game.shotClock?.running) {
+      // Game clock not running (e.g. old state) but shot still on — only stop once.
       await this.stopShotClock(gameId);
     }
 

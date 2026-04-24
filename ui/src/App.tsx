@@ -9,6 +9,7 @@ import { EditGame } from "./pages/EditGame";
 import { GameRoster } from "./pages/GameRoster";
 import { GameSheet } from "./pages/GameSheet";
 import { ScoreboardControl } from "./pages/ScoreboardControl";
+import { GameTimer } from "./pages/GameTimer";
 import "./App.css";
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/game-days/:id/games/:gameId/roster" element={<GameRoster />} />
           <Route path="/game-days/:id/games/:gameId/sheet" element={<GameSheet />} />
           <Route path="/game-days/:id/games/:gameId/scoreboard" element={<ScoreboardControl />} />
+          <Route path="/game-days/:id/games/:gameId/timer" element={<GameTimer />} />
           <Route path="/" element={<GameDayShell />}>
             <Route index element={<GameDayHomeEmpty />} />
             <Route path="game-days/:id" element={<GameDayDetail />} />
