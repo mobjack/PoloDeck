@@ -1,0 +1,8 @@
+# Optional: if you ever use repo-root build contexts from setup/, ignore heavy trees.
+.git
+**/.git
+**/dist
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example

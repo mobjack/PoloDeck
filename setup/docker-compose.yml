@@ -1,0 +1,67 @@
+name: deckServer
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: polodeck-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-polodeck}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-polodeck}
+      POSTGRES_DB: ${POSTGRES_DB:-polodeck}
+    ports:
+      - "5432:5432"
+    volumes:
+      - polodeck-postgres-data:/var/lib/postgresql/data
+    networks:
+      - polodeck
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-polodeck} -d ${POSTGRES_DB:-polodeck}",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  polodeck-api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    container_name: polodeck-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-polodeck}:${POSTGRES_PASSWORD:-polodeck}@postgres:5432/${POSTGRES_DB:-polodeck}?schema=public
+    ports:
+      # Use POLODECK_BIND_ADDRESS=0.0.0.0 so Pis and other PCs on the LAN can reach the API and Socket.IO.
+      - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+    command: ["node", "dist/server.js"]
+    networks:
+      - polodeck
+
+  web-app:
+    build:
+      context: ..
+      dockerfile: web-app/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}
+    container_name: polodeck-web-app
+    depends_on:
+      - polodeck-api
+    ports:
+      - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:8080:80"
+    networks:
+      - polodeck
+
+volumes:
+  polodeck-postgres-data:
+
+networks:
+  polodeck:
+    driver: bridge
