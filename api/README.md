@@ -1,4 +1,4 @@
-## PoloDeck Server
+# PoloDeck Server
 
 PoloDeck is a **local-first water polo scoreboard and game control platform** designed to run on a pool deck using affordable hardware. This `server/` project is the authoritative backend for managing water polo games, clocks, scores, rosters, exclusions, timeouts, horns, and event history.
 
@@ -62,7 +62,7 @@ Returns a shell script that downloads `bootstrap-kiosk.sh` from `http://<host>:8
 curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash
 ```
 
-Optional query parameters: `host=<LAN-IP>` (embed correct URLs when `Host` would otherwise be wrong), `kiosk=setup|board|clock|timer` (default `setup` = static setup screen), `gameId=<id>` (with `board`/`clock`/`timer`, open that game’s kiosk URL). Canonical scripts live under [`../pi/kiosk`](../pi/kiosk) and are copied into the web-app image at build time.
+Optional query parameters: `host=<LAN-IP>` (embed correct URLs when `Host` would otherwise be wrong), `kiosk=setup|board|clock|timer` (default `setup` = static setup screen), `gameId=<id>` (with `board`/`clock`/`timer`, open that game’s kiosk URL), `aptProxy=<http://cache:3142>` (Apt-Cacher NG — overrides optional env `POLODECK_PI_APT_PROXY` on the API container). Canonical scripts live under [`../pi/kiosk`](../pi/kiosk) and are copied into the web-app image at build time.
 
 For a guided install (including migrations), prefer from repo root: `./setup/setup.sh`.
 
@@ -151,7 +151,7 @@ All API endpoints are exposed under `/api` except for health.
 
 ### Health
 
-- **GET** `/health`  
+- **GET** `/health`
   Returns simple server status.
 
 Example:
@@ -164,7 +164,7 @@ curl http://localhost:3000/health
 
 ### Game Management
 
-- **POST** `/api/games`  
+- **POST** `/api/games`
   Create a new game.
 
 Request body:
@@ -187,10 +187,10 @@ curl -X POST http://localhost:3000/api/games \
   -d '{"homeTeamName":"Home","awayTeamName":"Away","totalPeriods":4,"gameClockDurationMs":480000,"shotClockDurationMs":30000}'
 ```
 
-- **GET** `/api/games`  
+- **GET** `/api/games`
   List games.
 
-- **GET** `/api/games/:id`  
+- **GET** `/api/games/:id`
   Return full game aggregate including:
   - game
   - score

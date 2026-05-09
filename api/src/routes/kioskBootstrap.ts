@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
+import { env } from "../config/env.js";
+
 /** Published UI port (docker compose maps host 8080 → nginx in web-app). */
 const UI_PORT = 8080;
 
@@ -15,6 +17,19 @@ function publicHost(request: FastifyRequest, q: Record<string, string | undefine
   }
   const h = request.hostname;
   return h && h.length > 0 ? h : "localhost";
+}
+
+/** Apt-Cacher NG base URL for Pi bootstrap (--apt-proxy); query overrides POLODECK_PI_APT_PROXY. */
+function validateAptProxyUrl(raw: string | string[] | undefined): string | undefined {
+  const v = (Array.isArray(raw) ? raw[0] : raw)?.toString().trim();
+  if (!v) return undefined;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return undefined;
+    return v.replace(/\/$/, "");
+  } catch {
+    return undefined;
+  }
 }
 
 function validateGameId(raw: string | string[] | undefined): string | undefined {
@@ -66,10 +81,12 @@ function buildKioskChromiumUrl(opts: {
  *   host=<ip-or-dns>   override hostname when curl Host header is wrong
  *   kiosk=setup|board|clock|timer   (default: setup — static setup screen)
  *   gameId=<id>        with board|clock|timer, open that game’s display route
+ *   aptProxy=<url>     Apt-Cacher NG base URL (http://cache:3142); overrides POLODECK_PI_APT_PROXY
  *
  * Examples:
  *   curl -fsSL 'http://LAN:3000/kb' | sudo bash
  *   curl -fsSL 'http://LAN:3000/kb?kiosk=board&gameId=...' | sudo bash
+ *   curl -fsSL 'http://LAN:3000/kb?aptProxy=http://192.168.1.5:3142' | sudo bash
  */
 export async function registerKioskBootstrapRoutes(app: FastifyInstance) {
   app.get("/kb", async (request, reply) => {
@@ -86,17 +103,21 @@ export async function registerKioskBootstrapRoutes(app: FastifyInstance) {
     const artifactsBase = `${webOrigin.replace(/\/$/, "")}/kiosk`;
     const kioskUrl = buildKioskChromiumUrl({ host, role, gameId });
     const bootUrl = `${artifactsBase}/bootstrap-kiosk.sh`;
+    const aptProxy = validateAptProxyUrl(q.aptProxy) ?? env.POLODECK_PI_APT_PROXY;
 
-    const body = [
+    const lines = [
       "#!/usr/bin/env bash",
       "# PoloDeck Pi kiosk — from GET /kb (web UI :8080; API :3000)",
       "set -euo pipefail",
       `curl -fsSL ${shellSingleQuote(bootUrl)} -o /tmp/polodeck-bootstrap.sh`,
       `exec bash /tmp/polodeck-bootstrap.sh -- \\`,
       `  --artifacts-base ${shellSingleQuote(artifactsBase)} \\`,
-      `  --url ${shellSingleQuote(kioskUrl)}`,
-      "",
-    ].join("\n");
+    ];
+    if (aptProxy) {
+      lines.push(`  --apt-proxy ${shellSingleQuote(aptProxy)} \\`);
+    }
+    lines.push(`  --url ${shellSingleQuote(kioskUrl)}`, "");
+    const body = lines.join("\n");
 
     return reply
       .header("Content-Type", "text/x-shellscript; charset=utf-8")
