@@ -38,6 +38,7 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+setup/docker-compose.override.yml
 .docker/
 
 # Test and coverage

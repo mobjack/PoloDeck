@@ -1,0 +1,28 @@
+[Unit]
+Description=PoloDeck Chromium kiosk (X11)
+# Use network.target (not network-online): Chromium retries the URL; network-online can block or flap on WiFi.
+After=network.target systemd-user-sessions.service
+Wants=network.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=polodeck
+Group=polodeck
+WorkingDirectory=/home/polodeck
+Environment=HOME=/home/polodeck
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty-force
+StandardOutput=tty
+TTYReset=yes
+TTYVHangup=yes
+# Cold boot: DRM/KMS nodes are sometimes not ready the instant multi-user starts; avoids blank tty1 + cursor.
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/bin/xinit /home/polodeck/.xsession -- :0 vt1 -keeptty -nolisten tcp
+Restart=always
+RestartSec=5
+
+[Install]
+# Lite images default to multi-user.target; graphical.target is not activated on boot, so kiosk would never start.
+WantedBy=multi-user.target graphical.target

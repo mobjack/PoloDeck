@@ -44,26 +44,28 @@ Updates are pushed to clients in real time via **Socket.IO** (`game:stateUpdated
 
 ```text
 PoloDeck/
-├── server/          # Backend API + WebSockets (Fastify, Prisma, Socket.IO)
-│   ├── prisma/      # Schema and migrations
-│   ├── src/         # App, routes, services, plugins
-│   ├── postman/     # Postman collection for local testing
+├── api/             # Backend API + WebSockets (Fastify, Prisma, Socket.IO)
+│   ├── prisma/    # Schema and migrations
+│   ├── src/       # App, routes, services, plugins
+│   ├── postman/   # Postman collection for local testing
 │   └── Dockerfile
-├── ui/              # Frontend app (game-day admin, operator views)
-├── clients/arena/   # Arena scoreboard, timer, shot clock (static SPAs + Pi kiosk helpers)
-├── docker-compose.yml
-├── setup.sh         # Optional interactive .env for Docker bind + arena profile
+├── web-app/       # Browser UI (game-day admin, operator views)
+├── pi/            # Raspberry Pi kiosk scripts (served under /kiosk/ from the web-app image)
+├── setup/         # Docker Compose + install helper (Postgres, API, web-app)
+│   ├── docker-compose.yml
+│   ├── setup.sh
+│   └── .env.example
 └── README.md
 ```
 
 ## Local development
 
-From the repo root, you typically run **server** and **UI** separately during development.
+From the repo root, you typically run **api** and **web-app** separately during development.
 
-### 1. Backend server
+### 1. Backend API
 
 ```bash
-cd server
+cd api
 cp .env.example .env   # configure DATABASE_URL, etc.
 npm install
 npx prisma migrate dev
@@ -76,12 +78,12 @@ Key endpoints:
 - **Games API:** `http://localhost:3000/api/games`
 - **Game days API:** `http://localhost:3000/api/game-days`
 
-You can also import `server/postman/PoloDeck-API.postman_collection.json` into Postman to exercise all endpoints (including game days, games, rosters, clocks, and horn).
+You can also import `api/postman/PoloDeck-API.postman_collection.json` into Postman to exercise all endpoints (including game days, games, rosters, clocks, and horn).
 
-### 2. Frontend UI
+### 2. Web app
 
 ```bash
-cd ui
+cd web-app
 npm install
 cp .env.example .env   # optional; defaults to http://localhost:3000/api
 npm run dev            # Vite dev server (e.g. http://localhost:5173)
@@ -94,27 +96,35 @@ The UI currently focuses on **game-day setup**:
 - View a game day and see its games.
 - Add/edit games for a day (home/away, level, gender, type, label).
 
-## Docker (full stack from repo root)
+## Docker (full stack)
+
+From the repo root, one command creates `setup/.env` (if missing), prompts for LAN binding when your terminal is interactive, starts Postgres + API + web-app, and applies Prisma migrations:
 
 ```bash
-cp .env.example .env          # optional; see POLODECK_BIND_ADDRESS for LAN access
-./setup.sh                    # optional interactive .env for bind + arena profile
-docker compose up -d --build
+./setup/setup.sh
 ```
 
-Then run migrations (once per environment):
+Other useful commands:
 
 ```bash
-docker compose exec polodeck-app npx prisma migrate deploy
+./setup/setup.sh config    # only write/update setup/.env
+./setup/setup.sh up        # start stack without the full install/migrate flow
+./setup/setup.sh migrate   # prisma migrate deploy (API container must be running)
+./setup/setup.sh down
+./setup/setup.sh help
+```
+
+Manual compose (equivalent to what the script uses):
+
+```bash
+cd setup && docker compose up -d --build
 ```
 
 - **API:** `http://localhost:3000`
-- **Admin UI:** `http://localhost:8080`
+- **Web app:** `http://localhost:8080`
 - **Health:** `GET http://localhost:3000/health`
 
-**LAN / Raspberry Pi:** By default, published ports bind to `127.0.0.1` only. Set `POLODECK_BIND_ADDRESS=0.0.0.0` in `.env` (or run `./setup.sh` and choose LAN) so other machines on the pool network can reach the API and browser UIs. Only do this on networks you trust; use a host firewall if needed.
-
-**Arena scoreboard / timer / shot clock (optional):** `docker compose --profile arena up -d --build` serves static clients on port **8090**. See [clients/arena/README.md](clients/arena/README.md).
+**LAN / Raspberry Pi:** By default, published ports bind to `127.0.0.1` only. Run `./setup/setup.sh` and choose LAN binding, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`, so other machines on the pool network can reach the stack. The **web-app** nginx container proxies `/api/` and `/socket.io/` to the API, so browsers and kiosk Pis usually use port **8080** only (same-origin). Install a Pi with `curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash` (optional query `?host=<LAN-IP>` if the `Host` header would be wrong). See [`pi/README.md`](pi/README.md). Only expose `0.0.0.0` on networks you trust.
 
 ## Status
 

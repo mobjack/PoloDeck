@@ -1,0 +1,23 @@
+[Unit]
+Description=PoloDeck Chromium kiosk (X11)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=polodeck
+Group=polodeck
+WorkingDirectory=/home/polodeck
+Environment=HOME=/home/polodeck
+PAMName=login
+TTYPath=/dev/tty7
+StandardInput=tty
+StandardOutput=tty
+TTYReset=yes
+TTYVHangup=yes
+ExecStart=/usr/bin/xinit /home/polodeck/.xsession -- :0 vt7 -nolisten tcp
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
