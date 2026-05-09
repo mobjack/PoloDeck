@@ -37,6 +37,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-polodeck}:${POSTGRES_PASSWORD:-polodeck}@postgres:5432/${POSTGRES_DB:-polodeck}?schema=public
+      POLODECK_PI_APT_PROXY: ${POLODECK_PI_APT_PROXY:-}
     ports:
       # Use POLODECK_BIND_ADDRESS=0.0.0.0 so Pis and other PCs on the LAN can reach the API and Socket.IO.
       - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:3000:3000"

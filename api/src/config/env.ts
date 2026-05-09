@@ -18,6 +18,21 @@ const envSchema = z.object({
     .string()
     .default("180000")
     .transform((v) => parseInt(v, 10)),
+  /** Optional default for Pi installer GET /kb — Apt-Cacher NG base URL (e.g. http://host:3142). */
+  POLODECK_PI_APT_PROXY: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v.trim() === "") return undefined;
+      const t = v.trim().replace(/\/$/, "");
+      try {
+        const u = new URL(t);
+        if (u.protocol !== "http:" && u.protocol !== "https:") return undefined;
+        return t;
+      } catch {
+        return undefined;
+      }
+    }),
 });
 
 const parsed = envSchema.safeParse(process.env);
