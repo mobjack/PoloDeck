@@ -20,6 +20,8 @@ Shell artifacts live in [`kiosk/`](kiosk/). Before building the `web-app` Docker
 
 3. Reboot if the kiosk service does not start cleanly the first time. If `tty7` is busy, stop the getty on that VT or adjust the unit in `pi/kiosk/polodeck-kiosk.service`.
 
+   The installer now configures Xorg for Raspberry Pi DRM (`modesetting` + `kmsdev`) and disables `getty@tty1` so kiosk boot is reliable on Bookworm-era images.
+
 ## WiFi (optional)
 
 After install, `polodeck-wifi` is in `/usr/local/bin/`:
