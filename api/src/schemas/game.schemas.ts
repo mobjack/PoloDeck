@@ -110,6 +110,20 @@ export const eventLogRebuildBodySchema = z.object({
   events: z.array(eventLogRebuildRowSchema).min(1),
 });
 
+export const deviceCheckInBodySchema = z.object({
+  clientId: z.string().min(1),
+  name: z.string().optional(),
+});
+
+export const deviceIdParamSchema = z.object({
+  deviceId: z.string().cuid(),
+});
+
+export const patchDeviceBodySchema = z.object({
+  type: z.enum(["UNASSIGNED", "SCOREBOARD", "SHOT_CLOCK", "TIMER"]).optional(),
+  gameId: z.string().cuid().nullable().optional(),
+});
+
 export type CreateGameDayBody = z.infer<typeof createGameDayBodySchema>;
 export type UpdateGameDayBody = z.infer<typeof updateGameDayBodySchema>;
 export type GameDayIdParams = z.infer<typeof gameDayIdParamSchema>;
@@ -124,4 +138,6 @@ export type TriggerHornBody = z.infer<typeof triggerHornBodySchema>;
 export type ReplaceRosterBody = z.infer<typeof replaceRosterBodySchema>;
 export type ScoreCommandBody = z.infer<typeof scoreCommandBodySchema>;
 export type EventLogRebuildBody = z.infer<typeof eventLogRebuildBodySchema>;
+export type DeviceCheckInBody = z.infer<typeof deviceCheckInBodySchema>;
+export type PatchDeviceBody = z.infer<typeof patchDeviceBodySchema>;
 

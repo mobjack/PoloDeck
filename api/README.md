@@ -62,7 +62,7 @@ Returns a shell script that downloads `bootstrap-kiosk.sh` from `http://<host>:8
 curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash
 ```
 
-Optional query parameters: `host=<LAN-IP>` (embed correct URLs when `Host` would otherwise be wrong), `kiosk=setup|board|clock|timer` (default `setup` = static setup screen), `gameId=<id>` (with `board`/`clock`/`timer`, open that game’s kiosk URL), `aptProxy=<http://cache:3142>` (Apt-Cacher NG — overrides optional env `POLODECK_PI_APT_PROXY` on the API container). Canonical scripts live under [`../pi/kiosk`](../pi/kiosk) and are copied into the web-app image at build time.
+Optional query parameters: `host=<LAN-IP>` (embed correct URLs when `Host` would otherwise be wrong), `kiosk=managed|setup|board|clock|timer` (default `managed` = `/kiosk/managed` for server-assigned roles; `setup` = static connectivity screen), `gameId=<id>` (only with `board`/`clock`/`timer`, open that game’s legacy kiosk URL), `aptProxy=<http://cache:3142>` (Apt-Cacher NG — overrides optional env `POLODECK_PI_APT_PROXY` on the API container). Canonical scripts live under [`../pi/kiosk`](../pi/kiosk) and are copied into the web-app image at build time.
 
 For a guided install (including migrations), prefer from repo root: `./setup/setup.sh`.
 

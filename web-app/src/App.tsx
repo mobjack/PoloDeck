@@ -11,9 +11,11 @@ import { GameSheet } from "./pages/GameSheet";
 import { ScoreboardControl } from "./pages/ScoreboardControl";
 import { GameTimer } from "./pages/GameTimer";
 import { KioskHome } from "./pages/KioskHome";
+import { KioskManaged } from "./pages/KioskManaged";
 import { KioskScoreboardDisplay } from "./pages/KioskScoreboardDisplay";
 import { KioskShotClockDisplay } from "./pages/KioskShotClockDisplay";
 import { KioskTimerDisplay } from "./pages/KioskTimerDisplay";
+import { KiosksAdmin } from "./pages/KiosksAdmin";
 import "./App.css";
 
 function App() {
@@ -22,6 +24,7 @@ function App() {
       <div className="app">
         <Routes>
           <Route path="/kiosk" element={<KioskHome />} />
+          <Route path="/kiosk/managed" element={<KioskManaged />} />
           <Route path="/kiosk/g/:gameId/display" element={<KioskScoreboardDisplay />} />
           <Route path="/kiosk/g/:gameId/shot-clock" element={<KioskShotClockDisplay />} />
           <Route path="/kiosk/g/:gameId/timer" element={<KioskTimerDisplay />} />
@@ -36,6 +39,7 @@ function App() {
           <Route path="/" element={<GameDayShell />}>
             <Route index element={<GameDayHomeEmpty />} />
             <Route path="game-days/:id" element={<GameDayDetail />} />
+            <Route path="kiosks" element={<KiosksAdmin />} />
           </Route>
         </Routes>
       </div>

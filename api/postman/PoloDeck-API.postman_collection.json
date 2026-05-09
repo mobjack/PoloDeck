@@ -125,7 +125,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clientId\": \"sb-001\",\n  \"type\": \"SCOREBOARD\",\n  \"name\": \"Main scoreboard\"\n}"
+              "raw": "{\n  \"clientId\": \"sb-001\",\n  \"name\": \"Main scoreboard\"\n}"
             },
             "url": "{{baseUrl}}/api/devices/check-in"
           }
@@ -136,6 +136,18 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/devices"
+          }
+        },
+        {
+          "name": "Patch Device",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SCOREBOARD\",\n  \"gameId\": \"{{gameId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/devices/{{deviceId}}"
           }
         },
         {

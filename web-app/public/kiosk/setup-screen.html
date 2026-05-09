@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PoloDeck — Kiosk setup</title>
+    <title>PoloDeck kiosk registration</title>
     <style>
       :root {
         color-scheme: dark;
@@ -11,6 +11,7 @@
         --fg: #e8eef4;
         --muted: #8b9aab;
         --accent: #3d9cf0;
+        --warn: #f6c44f;
       }
       * {
         box-sizing: border-box;
@@ -54,22 +55,155 @@
         font-weight: 500;
         font-size: 0.95rem;
       }
+      .warn {
+        color: var(--warn);
+      }
       code {
         font-size: 0.9em;
         background: rgba(255, 255, 255, 0.06);
         padding: 0.15em 0.45em;
         border-radius: 0.25rem;
       }
+      .device {
+        margin-top: 1rem;
+      }
+      .device code {
+        font-size: 1.35rem;
+        letter-spacing: 0.08em;
+      }
+      .actions {
+        margin-top: 1rem;
+      }
+      .fallback-btn {
+        border: 1px solid rgba(61, 156, 240, 0.45);
+        background: rgba(61, 156, 240, 0.18);
+        color: var(--fg);
+        border-radius: 0.5rem;
+        padding: 0.55rem 0.9rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .attempts {
+        margin-top: 0.75rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>PoloDeck kiosk is online</h1>
-      <p>
-        This Pi reached the PoloDeck web server and loaded the setup screen. Use the main web app to
-        pick games and open display links from <code>/kiosk</code>.
+      <h1 id="title">PoloDeck kiosk registration</h1>
+      <p id="body">
+        Checking server connectivity and registering this kiosk. Do not type on this device.
       </p>
-      <p class="ok" aria-live="polite">Network and kiosk path OK</p>
+      <p id="device" class="device" hidden>Device ID: <code id="device-code"></code></p>
+      <p id="status" class="ok" aria-live="polite">Connecting…</p>
+      <div id="actions" class="actions" hidden>
+        <button id="open-managed-btn" class="fallback-btn" type="button">
+          Open managed page
+        </button>
+      </div>
+      <p id="attempts" class="attempts" hidden></p>
     </main>
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const managedMode = params.get("managed") === "1";
+        if (!managedMode) {
+          document.getElementById("title").textContent = "PoloDeck kiosk is online";
+          document.getElementById("body").innerHTML =
+            "This Pi reached the PoloDeck web server. Use <strong>Kiosks</strong> in the main app to assign role/game, or reinstall with default <code>/kb</code> to auto-register.";
+          document.getElementById("status").textContent = "Network and kiosk path OK";
+          return;
+        }
+
+        const storageKey = "polodeck-kiosk-client-id";
+        const statusEl = document.getElementById("status");
+        const bodyEl = document.getElementById("body");
+        const deviceWrap = document.getElementById("device");
+        const deviceCode = document.getElementById("device-code");
+        const actionsEl = document.getElementById("actions");
+        const attemptsEl = document.getElementById("attempts");
+        const openManagedBtn = document.getElementById("open-managed-btn");
+        const maxAutoRetriesBeforeButton = 10;
+        let failedAttempts = 0;
+
+        openManagedBtn.addEventListener("click", function () {
+          window.location.href = "/kiosk/managed";
+        });
+
+        function getOrCreateClientId() {
+          let id = localStorage.getItem(storageKey);
+          if (!id) {
+            id = (crypto && typeof crypto.randomUUID === "function")
+              ? crypto.randomUUID()
+              : "kiosk-" + Math.random().toString(36).slice(2, 12);
+            localStorage.setItem(storageKey, id);
+          }
+          return id;
+        }
+
+        function shortId(clientId) {
+          return clientId.replace(/-/g, "").slice(-8).toUpperCase();
+        }
+
+        function assignmentUrl(device) {
+          if (!device || !device.gameId || !device.type) return "";
+          if (device.type === "SCOREBOARD") return "/kiosk/g/" + device.gameId + "/display";
+          if (device.type === "SHOT_CLOCK") return "/kiosk/g/" + device.gameId + "/shot-clock";
+          if (device.type === "TIMER") return "/kiosk/g/" + device.gameId + "/timer";
+          return "";
+        }
+
+        async function checkInLoop() {
+          const clientId = getOrCreateClientId();
+          deviceWrap.hidden = false;
+          deviceCode.textContent = shortId(clientId);
+
+          let retryMs = 15000;
+          try {
+            const res = await fetch("/api/devices/check-in", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ clientId }),
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const json = await res.json();
+            const device = json && json.device ? json.device : null;
+            const target = assignmentUrl(device);
+            retryMs =
+              json && json.config && typeof json.config.heartbeatIntervalMs === "number"
+                ? json.config.heartbeatIntervalMs
+                : 15000;
+
+            if (target) {
+              statusEl.textContent = "Assigned. Opening display…";
+              window.location.replace(target);
+              return;
+            }
+            failedAttempts = 0;
+            actionsEl.hidden = true;
+            attemptsEl.hidden = true;
+            bodyEl.innerHTML =
+              "Connected to server. This kiosk is waiting for assignment in <strong>Kiosks</strong> in the main app.";
+            statusEl.textContent = "Registered and waiting for assignment";
+            statusEl.className = "ok";
+          } catch (_err) {
+            failedAttempts += 1;
+            statusEl.textContent = "Could not reach server. Retrying…";
+            statusEl.className = "ok warn";
+            attemptsEl.hidden = false;
+            attemptsEl.textContent = "Connection attempts failed: " + failedAttempts;
+            if (failedAttempts >= maxAutoRetriesBeforeButton) {
+              actionsEl.hidden = false;
+            }
+          }
+
+          window.setTimeout(checkInLoop, retryMs);
+        }
+
+        checkInLoop();
+      })();
+    </script>
   </body>
 </html>

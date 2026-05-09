@@ -10,13 +10,18 @@ import {
 } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
-export function KioskShotClockDisplay() {
-  const { gameId } = useParams<{ gameId: string }>();
+type KioskShotClockDisplayProps = {
+  gameId?: string;
+};
+
+export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
+  const { gameId: routeGameId } = useParams<{ gameId: string }>();
+  const gameId = props.gameId ?? routeGameId;
   const [aggregate, setAggregate] = useState<GameAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [now, setNow] = useState(() => Date.now());
-  useKioskDeviceCheckIn("SHOT_CLOCK");
+  useKioskDeviceCheckIn();
 
   useEffect(() => {
     if (!gameId) return;

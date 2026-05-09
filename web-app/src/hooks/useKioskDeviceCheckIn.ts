@@ -3,7 +3,7 @@ import { api } from "../api/client";
 
 const STORAGE_KEY = "polodeck-kiosk-client-id";
 
-function getOrCreateClientId(): string {
+export function getOrCreateKioskClientId(): string {
   let id = localStorage.getItem(STORAGE_KEY);
   if (!id) {
     id = crypto.randomUUID();
@@ -12,13 +12,12 @@ function getOrCreateClientId(): string {
   return id;
 }
 
-export function useKioskDeviceCheckIn(type: "SCOREBOARD" | "SHOT_CLOCK" | "TIMER") {
+/** Heartbeat only; device role and game are assigned on the server (see /kiosk/managed). */
+export function useKioskDeviceCheckIn() {
   useEffect(() => {
-    const clientId = getOrCreateClientId();
-    void api.devices
-      .checkIn({ clientId, type, name: `kiosk-${type.toLowerCase()}` })
-      .catch(() => {
-        /* display still works without check-in */
-      });
-  }, [type]);
+    const clientId = getOrCreateKioskClientId();
+    void api.devices.checkIn({ clientId }).catch(() => {
+      /* display still works without check-in */
+    });
+  }, []);
 }

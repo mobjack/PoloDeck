@@ -6,9 +6,13 @@ export type GameMode =
 export interface DeviceSummary {
   id: string;
   clientId: string;
-  type: "SCOREBOARD" | "SHOT_CLOCK" | "TIMER";
+  type: "UNASSIGNED" | "SCOREBOARD" | "SHOT_CLOCK" | "TIMER";
   name?: string | null;
+  gameId: string | null;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
   lastCheckInAt: string;
+  updatedAt: string;
 }
 
 export interface DeviceCapabilities {
@@ -29,6 +33,7 @@ export function buildDeviceCapabilities(input: {
 }): DeviceCapabilities {
   const { now, devices, staleAfterMs } = input;
   const freshDevices = devices.filter((d) => {
+    if (d.type === "UNASSIGNED") return false;
     const last = new Date(d.lastCheckInAt).getTime();
     return now.getTime() - last <= staleAfterMs;
   });

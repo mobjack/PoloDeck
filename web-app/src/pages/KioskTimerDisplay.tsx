@@ -11,13 +11,18 @@ import {
 } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
-export function KioskTimerDisplay() {
-  const { gameId } = useParams<{ gameId: string }>();
+type KioskTimerDisplayProps = {
+  gameId?: string;
+};
+
+export function KioskTimerDisplay(props: KioskTimerDisplayProps) {
+  const { gameId: routeGameId } = useParams<{ gameId: string }>();
+  const gameId = props.gameId ?? routeGameId;
   const [aggregate, setAggregate] = useState<GameAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [now, setNow] = useState(() => Date.now());
-  useKioskDeviceCheckIn("TIMER");
+  useKioskDeviceCheckIn();
 
   useEffect(() => {
     if (!gameId) return;

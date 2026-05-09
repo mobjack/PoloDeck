@@ -39,20 +39,21 @@ function validateGameId(raw: string | string[] | undefined): string | undefined 
   return id;
 }
 
-type KioskRole = "SETUP" | "SCOREBOARD" | "SHOT_CLOCK" | "TIMER";
+type KioskRole = "SETUP" | "MANAGED" | "SCOREBOARD" | "SHOT_CLOCK" | "TIMER";
 
 function parseKioskRole(
   raw: string | string[] | undefined
 ): { ok: true; role: KioskRole } | { ok: false; message: string } {
   const v = (Array.isArray(raw) ? raw[0] : raw)?.toString().trim().toLowerCase() ?? "";
-  if (v === "" || v === "setup") return { ok: true, role: "SETUP" };
+  if (v === "" || v === "managed") return { ok: true, role: "MANAGED" };
+  if (v === "setup") return { ok: true, role: "SETUP" };
   if (v === "board") return { ok: true, role: "SCOREBOARD" };
   if (v === "clock") return { ok: true, role: "SHOT_CLOCK" };
   if (v === "timer") return { ok: true, role: "TIMER" };
   return {
     ok: false,
     message:
-      "Invalid kiosk query. Use kiosk=setup (default), kiosk=board, kiosk=clock, kiosk=timer. Optional: gameId=<id>. Example: /kb?kiosk=clock&gameId=...\n",
+      "Invalid kiosk query. Use kiosk=managed (default), kiosk=setup, kiosk=board, kiosk=clock, kiosk=timer. Optional: gameId=<id> with board|clock|timer. Example: /kb?kiosk=clock&gameId=...\n",
   };
 }
 
@@ -64,6 +65,10 @@ function buildKioskChromiumUrl(opts: {
   const origin = `http://${opts.host}:${UI_PORT}`;
   if (opts.role === "SETUP") {
     return `${origin}/kiosk/setup-screen.html`;
+  }
+  if (opts.role === "MANAGED") {
+    // Static page handles first-registration and redirects to assigned display.
+    return `${origin}/kiosk/setup-screen.html?managed=1`;
   }
   const gid = opts.gameId;
   if (!gid) {
@@ -79,8 +84,8 @@ function buildKioskChromiumUrl(opts: {
  *
  * GET /kb — optional query:
  *   host=<ip-or-dns>   override hostname when curl Host header is wrong
- *   kiosk=setup|board|clock|timer   (default: setup — static setup screen)
- *   gameId=<id>        with board|clock|timer, open that game’s display route
+ *   kiosk=managed|setup|board|clock|timer   (default: managed — server-assigned /kiosk/managed)
+ *   gameId=<id>        with board|clock|timer only, open that game’s display route
  *   aptProxy=<url>     Apt-Cacher NG base URL (http://cache:3142); overrides POLODECK_PI_APT_PROXY
  *
  * Examples:

@@ -6,12 +6,18 @@ import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import { useKioskDeviceCheckIn } from "../hooks/useKioskDeviceCheckIn";
 import { createGameSocket } from "../lib/socketUrl";
 
-export function KioskScoreboardDisplay() {
-  const { gameId } = useParams<{ gameId: string }>();
+type KioskScoreboardDisplayProps = {
+  /** When set (e.g. server-managed kiosk), overrides `useParams` game id. */
+  gameId?: string;
+};
+
+export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
+  const { gameId: routeGameId } = useParams<{ gameId: string }>();
+  const gameId = props.gameId ?? routeGameId;
   const [aggregate, setAggregate] = useState<GameAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
-  useKioskDeviceCheckIn("SCOREBOARD");
+  useKioskDeviceCheckIn();
 
   useEffect(() => {
     if (!gameId) return;
