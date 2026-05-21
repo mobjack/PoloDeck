@@ -2975,6 +2975,84 @@
   background: rgba(59, 130, 246, 0.15);
 }
 
+/* Stretch root chain — body flex row otherwise shrink-wraps #root to the left */
+body:has(.kiosk-scoreboard-display) {
+  display: block;
+  background: #000;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+body:has(.kiosk-scoreboard-display) #root,
+body:has(.kiosk-scoreboard-display) .app {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+}
+
+/* Kiosk scoreboard display: upper-field layout, black field, red Orbitron scores */
+.kiosk-scoreboard-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: clamp(2rem, 10vh, 5rem) 1.25rem 2rem;
+  box-sizing: border-box;
+  text-align: center;
+  background: #000;
+  color: #f1f5f9;
+}
+
+.kiosk-scoreboard-display .kiosk-display-columns,
+.kiosk-scoreboard-display .kiosk-display-periods {
+  width: min(100%, 1200px);
+}
+
+.kiosk-scoreboard-display .kiosk-display-columns {
+  margin-bottom: 2.5rem;
+}
+
+.kiosk-scoreboard-display .kiosk-display-side {
+  padding: 1.75rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.kiosk-scoreboard-display .kiosk-display-team-label {
+  font-size: clamp(1rem, 2.2vw, 1.5rem);
+  margin-bottom: 0.5rem;
+}
+
+.kiosk-scoreboard-display .kiosk-display-team-name {
+  font-size: clamp(1.75rem, 4.5vw, 3rem);
+  margin-bottom: 1rem;
+}
+
+.kiosk-scoreboard-display .kiosk-phase {
+  font-size: clamp(1.15rem, 2.8vw, 1.75rem);
+  padding: 0.55rem 1rem;
+}
+
+.kiosk-scoreboard-display .kiosk-display-side--dark,
+.kiosk-scoreboard-display .kiosk-display-side--light {
+  background: #000;
+  color: #f1f5f9;
+}
+
+.kiosk-scoreboard-display .kiosk-display-score {
+  font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(4.5rem, 20vw, 11rem);
+  font-weight: 900;
+  color: #ff1a1a;
+  letter-spacing: 0;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
 .kiosk-shot-display {
   display: flex;
   flex-direction: column;
