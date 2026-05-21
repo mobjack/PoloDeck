@@ -1,14 +1,17 @@
 import type { FastifyInstance } from "fastify";
-import { TeamSide } from ".prisma/client";
+import { DeviceType, TeamSide } from ".prisma/client";
 import { env } from "../config/env";
 import {
   addPlayerBodySchema,
   createExclusionBodySchema,
   createGameBodySchema,
   createGameDayBodySchema,
+  deviceCheckInBodySchema,
+  deviceIdParamSchema,
   exclusionIdParamSchema,
   gameDayIdParamSchema,
   gameIdParamSchema,
+  patchDeviceBodySchema,
   setClockBodySchema,
   setGamePeriodBodySchema,
   triggerHornBodySchema,
@@ -70,26 +73,9 @@ export async function registerGameRoutes(app: FastifyInstance) {
 
   // Global devices & capabilities (one server -> one game, many devices)
   app.post("/devices/check-in", async (request) => {
-    const body = request.body as {
-      clientId?: string;
-      type?: string;
-      name?: string;
-    };
-
-    if (!body?.clientId || !body?.type) {
-      throw new Error("clientId and type are required");
-    }
-
-    const normalizedType = body.type.toUpperCase();
-    const allowedTypes = ["SCOREBOARD", "SHOT_CLOCK", "TIMER"] as const;
-
-    if (!allowedTypes.includes(normalizedType as any)) {
-      throw new Error("Invalid device type");
-    }
-
+    const body = deviceCheckInBodySchema.parse(request.body);
     const device = await service.checkInDevice({
       clientId: body.clientId,
-      type: normalizedType as (typeof allowedTypes)[number],
       name: body.name,
     });
 
@@ -100,6 +86,16 @@ export async function registerGameRoutes(app: FastifyInstance) {
         staleAfterMs: env.DEVICE_STALE_AFTER_MS,
       },
     };
+  });
+
+  app.patch("/devices/:deviceId", async (request) => {
+    const params = deviceIdParamSchema.parse(request.params);
+    const body = patchDeviceBodySchema.parse(request.body);
+    const type = body.type !== undefined ? (body.type as DeviceType) : undefined;
+    return service.patchDevice(params.deviceId, {
+      type,
+      gameId: body.gameId,
+    });
   });
 
   app.get("/devices", async () => {

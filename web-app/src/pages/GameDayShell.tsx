@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircleQuestionMark } from "lucide-react";
+import { MessageCircleQuestionMark, Monitor } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { api, type DeviceCapabilities } from "../api/client";
 import type { GameDay } from "../types/gameDay";
@@ -122,15 +122,27 @@ export function GameDayShell() {
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="game-day-shell-help-btn"
-          onClick={() => setGuideOpen(true)}
-          aria-label="Open user guide"
-          title="User guide"
-        >
-          <MessageCircleQuestionMark size={22} strokeWidth={2} aria-hidden />
-        </button>
+        <div className="game-day-shell-header-actions">
+          <NavLink
+            to="/kiosks"
+            className={({ isActive }) =>
+              `game-day-shell-icon-btn${isActive ? " game-day-shell-icon-btn--active" : ""}`
+            }
+            aria-label="Kiosks"
+            title="Kiosks"
+          >
+            <Monitor size={22} strokeWidth={2} aria-hidden />
+          </NavLink>
+          <button
+            type="button"
+            className="game-day-shell-icon-btn"
+            onClick={() => setGuideOpen(true)}
+            aria-label="Open user guide"
+            title="User guide"
+          >
+            <MessageCircleQuestionMark size={22} strokeWidth={2} aria-hidden />
+          </button>
+        </div>
       </header>
 
       <div className="game-day-shell-layout">
@@ -202,8 +214,8 @@ export function GameDayShell() {
                 Use <strong>Roster</strong> on each game to enter or import player names by cap number.
               </li>
               <li>
-                Connect <strong>scoreboard</strong>, <strong>timer</strong>, and <strong>shot clock</strong> clients to
-                the server; status appears above.
+                Open <strong>Kiosks</strong> (monitor icon) to assign Raspberry Pi displays; connection status
+                appears above.
               </li>
             </ul>
           </div>

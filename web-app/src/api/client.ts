@@ -72,6 +72,25 @@ export interface DeviceCapabilities {
   mode: string;
 }
 
+export type KioskDeviceType = "UNASSIGNED" | "SCOREBOARD" | "SHOT_CLOCK" | "TIMER";
+
+export interface KioskDevice {
+  id: string;
+  clientId: string;
+  type: KioskDeviceType;
+  name: string | null;
+  gameId: string | null;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
+  lastCheckInAt: string;
+  updatedAt: string;
+}
+
+export interface DeviceCheckInResponse {
+  device: KioskDevice;
+  config: { heartbeatIntervalMs: number; staleAfterMs: number };
+}
+
 export interface GameAggregate {
   id: string;
   gameDayId: string | null;
@@ -166,11 +185,14 @@ async function setPeriodFallback(id: string, targetPeriod: number): Promise<Game
 
 export const api = {
   devices: {
-    checkIn: (body: { clientId: string; type: string; name?: string }) =>
-      request<{ device: unknown; config: unknown }>("/devices/check-in", {
+    checkIn: (body: { clientId: string; name?: string }) =>
+      request<DeviceCheckInResponse>("/devices/check-in", {
         method: "POST",
         json: body,
       }),
+    list: () => request<KioskDevice[]>("/devices"),
+    update: (id: string, body: { type?: KioskDeviceType; gameId?: string | null }) =>
+      request<KioskDevice>(`/devices/${id}`, { method: "PATCH", json: body }),
   },
   capabilities: () =>
     request<DeviceCapabilities>("/capabilities"),

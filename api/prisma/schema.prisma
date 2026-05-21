@@ -24,6 +24,7 @@ enum ExclusionStatus {
 }
 
 enum DeviceType {
+  UNASSIGNED
   SCOREBOARD
   SHOT_CLOCK
   TIMER
@@ -88,6 +89,7 @@ model Game {
   players        Player[]
   exclusions     PlayerExclusion[]
   timeoutStates  TeamTimeoutState[]
+  devices        Device[]
 }
 
 model Score {
@@ -187,9 +189,12 @@ model Device {
   clientId      String     @unique
   type          DeviceType
   name          String?
+  gameId        String?
   lastCheckInAt DateTime
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+
+  game          Game?      @relation(fields: [gameId], references: [id], onDelete: SetNull)
 }
 
 

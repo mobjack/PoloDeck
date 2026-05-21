@@ -1,6 +1,6 @@
 # PoloDeck web app
 
-Vite + React operator UI and **kiosk** routes under `/kiosk` (read-only scoreboard, shot clock, timer). Static Pi installer assets and the Phase 1 **setup screen** live in `public/kiosk/` (also copied from [`../pi/kiosk`](../pi/kiosk) during `npm run sync-kiosk` or the Docker build).
+Vite + React operator UI and **kiosk** routes under `/kiosk` (including **`/kiosk/managed`** for server-assigned Pis, plus per-game display URLs). Static Pi installer assets and the optional **setup screen** live in `public/kiosk/` (shell scripts are copied from [`../pi/kiosk`](../pi/kiosk) during `npm run sync-kiosk` or the Docker build).
 
 **Docker / production:** The image uses nginx. It serves the SPA and proxies **`/api/`** and **`/socket.io/`** to the `polodeck-api` service. Default build args use **`VITE_API_URL=/api`** and an empty **`VITE_SOCKET_URL`** so the browser uses the same origin as the page (port **8080** on the host).
 

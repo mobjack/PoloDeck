@@ -6,12 +6,18 @@ import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import { useKioskDeviceCheckIn } from "../hooks/useKioskDeviceCheckIn";
 import { createGameSocket } from "../lib/socketUrl";
 
-export function KioskScoreboardDisplay() {
-  const { gameId } = useParams<{ gameId: string }>();
+type KioskScoreboardDisplayProps = {
+  /** When set (e.g. server-managed kiosk), overrides `useParams` game id. */
+  gameId?: string;
+};
+
+export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
+  const { gameId: routeGameId } = useParams<{ gameId: string }>();
+  const gameId = props.gameId ?? routeGameId;
   const [aggregate, setAggregate] = useState<GameAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
-  useKioskDeviceCheckIn("SCOREBOARD");
+  useKioskDeviceCheckIn();
 
   useEffect(() => {
     if (!gameId) return;
@@ -43,21 +49,21 @@ export function KioskScoreboardDisplay() {
 
   if (loading) {
     return (
-      <div className="page kiosk-display-page">
+      <div className="kiosk-display-page kiosk-scoreboard-display">
         <p>Loading…</p>
       </div>
     );
   }
   if (error && !aggregate) {
     return (
-      <div className="page kiosk-display-page">
+      <div className="kiosk-display-page kiosk-scoreboard-display">
         <ApiErrorDisplay error={error} />
       </div>
     );
   }
   if (!gameId || !aggregate) {
     return (
-      <div className="page kiosk-display-page">
+      <div className="kiosk-display-page kiosk-scoreboard-display">
         <p>Game not found.</p>
       </div>
     );
@@ -69,32 +75,36 @@ export function KioskScoreboardDisplay() {
   const cp = aggregate.currentPeriod;
   const isFinal = aggregate.status === "FINAL";
 
+  const inP3 = !isFinal && cp === 3;
+  const halftimeMs = aggregate.halftimeDurationMs ?? 5 * 60 * 1000;
+  const clockDur = aggregate.gameClock?.durationMs;
+  const halfTimeActive =
+    inP3 && clockDur != null && Math.abs(clockDur - halftimeMs) < 500;
+  const q3Active = inP3 && !halfTimeActive;
+
   const phaseActive = {
     q1: !isFinal && cp === 1,
     q2: !isFinal && cp === 2,
-    q3: !isFinal && cp === 3,
+    ht: halfTimeActive,
+    q3: q3Active,
     q4: !isFinal && cp === 4 && tp >= 4,
     ot: !isFinal && cp === 5 && tp >= 5,
     final: isFinal,
   };
 
   return (
-    <div className="page kiosk-display-page kiosk-scoreboard-display">
-      <header className="kiosk-display-header">
-        <h1 className="kiosk-display-title">
-          {aggregate.homeTeamName} vs {aggregate.awayTeamName}
-        </h1>
-        <p className="kiosk-display-meta">Scoreboard · Period {cp} of {tp}</p>
-      </header>
-
+    <div
+      className="kiosk-display-page kiosk-scoreboard-display"
+      aria-label={`${aggregate.homeTeamName} vs ${aggregate.awayTeamName}, period ${cp} of ${tp}`}
+    >
       <div className="kiosk-display-columns">
         <section className="kiosk-display-side kiosk-display-side--dark" aria-label="Home">
           <div className="kiosk-display-team-label">Home · Dark</div>
           <div className="kiosk-display-team-name">{aggregate.homeTeamName}</div>
           <div className="kiosk-display-score">{homeScore}</div>
         </section>
-        <section className="kiosk-display-side kiosk-display-side--light" aria-label="Away">
-          <div className="kiosk-display-team-label">Away · Light</div>
+        <section className="kiosk-display-side kiosk-display-side--light" aria-label="Guest">
+          <div className="kiosk-display-team-label">Guest · Light</div>
           <div className="kiosk-display-team-name">{aggregate.awayTeamName}</div>
           <div className="kiosk-display-score">{awayScore}</div>
         </section>
@@ -104,7 +114,8 @@ export function KioskScoreboardDisplay() {
         <div className="kiosk-display-period-row">
           <span className={`kiosk-phase${phaseActive.q1 ? " is-active" : ""}`}>Q1</span>
           <span className={`kiosk-phase${phaseActive.q2 ? " is-active" : ""}`}>Q2</span>
-          <span className={`kiosk-phase${phaseActive.q3 ? " is-active" : ""}`}>Q3 / HT</span>
+          <span className={`kiosk-phase${phaseActive.ht ? " is-active" : ""}`}>HT</span>
+          <span className={`kiosk-phase${phaseActive.q3 ? " is-active" : ""}`}>Q3</span>
           <span className={`kiosk-phase${phaseActive.q4 ? " is-active" : ""}`}>Q4</span>
           <span className={`kiosk-phase${phaseActive.ot ? " is-active" : ""}`}>OT</span>
           <span className={`kiosk-phase${phaseActive.final ? " is-active" : ""}`}>Final</span>

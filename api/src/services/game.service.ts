@@ -86,12 +86,32 @@ export class GameService {
     }
   }
 
-  async checkInDevice(input: {
+  private mapDeviceToSummary(d: {
+    id: string;
     clientId: string;
     type: DeviceType;
-    name?: string;
-  }) {
+    name: string | null;
+    gameId: string | null;
+    lastCheckInAt: Date;
+    updatedAt: Date;
+    game?: { homeTeamName: string; awayTeamName: string } | null;
+  }): DeviceSummary {
+    return {
+      id: d.id,
+      clientId: d.clientId,
+      type: d.type,
+      name: d.name,
+      gameId: d.gameId,
+      homeTeamName: d.game?.homeTeamName ?? null,
+      awayTeamName: d.game?.awayTeamName ?? null,
+      lastCheckInAt: d.lastCheckInAt.toISOString(),
+      updatedAt: d.updatedAt.toISOString(),
+    };
+  }
+
+  async checkInDevice(input: { clientId: string; name?: string }): Promise<DeviceSummary> {
     const now = new Date();
+    const gameInclude = { select: { homeTeamName: true, awayTeamName: true } as const };
 
     const existing = await this.prisma.device.findUnique({
       where: { clientId: input.clientId },
@@ -101,38 +121,73 @@ export class GameService {
       const updated = await this.prisma.device.update({
         where: { id: existing.id },
         data: {
-          type: input.type,
-          name: input.name,
+          ...(input.name !== undefined ? { name: input.name } : {}),
           lastCheckInAt: now,
         },
+        include: { game: gameInclude },
       });
-      return updated;
+      return this.mapDeviceToSummary(updated);
     }
 
     const created = await this.prisma.device.create({
       data: {
         clientId: input.clientId,
-        type: input.type,
+        type: DeviceType.UNASSIGNED,
         name: input.name,
         lastCheckInAt: now,
       },
+      include: { game: gameInclude },
     });
 
-    return created;
+    return this.mapDeviceToSummary(created);
+  }
+
+  async patchDevice(
+    deviceId: string,
+    input: { type?: DeviceType; gameId?: string | null }
+  ): Promise<DeviceSummary> {
+    const existing = await this.prisma.device.findUnique({ where: { id: deviceId } });
+    if (!existing) {
+      throw this.notFound("Device not found");
+    }
+
+    let nextType = input.type ?? existing.type;
+    let nextGameId = existing.gameId;
+
+    if (input.gameId !== undefined) {
+      nextGameId = input.gameId;
+    }
+
+    if (nextType === DeviceType.UNASSIGNED) {
+      nextGameId = null;
+    }
+
+    if (nextType !== DeviceType.UNASSIGNED) {
+      if (!nextGameId) {
+        throw this.badRequest("gameId is required for assigned display types");
+      }
+      const game = await this.prisma.game.findUnique({ where: { id: nextGameId } });
+      if (!game) {
+        throw this.badRequest("Game not found");
+      }
+    }
+
+    const updated = await this.prisma.device.update({
+      where: { id: deviceId },
+      data: { type: nextType, gameId: nextGameId },
+      include: { game: { select: { homeTeamName: true, awayTeamName: true } } },
+    });
+
+    return this.mapDeviceToSummary(updated);
   }
 
   async listAllDevices(): Promise<DeviceSummary[]> {
     const devices = await this.prisma.device.findMany({
       orderBy: { createdAt: "asc" },
+      include: { game: { select: { homeTeamName: true, awayTeamName: true } } },
     });
 
-    return devices.map((d: any) => ({
-      id: d.id,
-      clientId: d.clientId,
-      type: d.type,
-      name: d.name,
-      lastCheckInAt: d.lastCheckInAt.toISOString(),
-    }));
+    return devices.map((d) => this.mapDeviceToSummary(d));
   }
 
   async getGlobalDeviceCapabilities(): Promise<DeviceCapabilities> {

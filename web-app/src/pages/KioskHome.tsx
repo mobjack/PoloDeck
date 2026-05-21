@@ -49,10 +49,14 @@ export function KioskHome() {
     <div className="page kiosk-home-page">
       <header className="kiosk-home-header">
         <h1>PoloDeck kiosk</h1>
-        <p className="kiosk-home-sub">Open a display link on each Pi (fullscreen, read-only).</p>
+        <p className="kiosk-home-sub">
+          New Pis: run the installer below, then assign each device under <strong>Kiosks</strong> in the main app.
+          Legacy links below open a fixed game URL without server assignment.
+        </p>
         <p className="kiosk-home-install">
           Install a Pi with:{" "}
-          <code className="kiosk-home-code">{`curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash`}</code>
+          <code className="kiosk-home-code">{`curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash`}</code>{" "}
+          (opens <code className="kiosk-home-code">/kiosk/managed</code>)
         </p>
       </header>
       {games.length === 0 ? (
