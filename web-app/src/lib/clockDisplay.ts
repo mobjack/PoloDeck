@@ -1,3 +1,19 @@
+import type { GameAggregate } from "../api/client";
+
+/** Period 3 with game clock duration set to the game's halftime length (see scoreboard HT). */
+export function isHalftimeActive(
+  aggregate: Pick<
+    GameAggregate,
+    "status" | "currentPeriod" | "halftimeDurationMs" | "gameClock"
+  >
+): boolean {
+  if (aggregate.status === "FINAL") return false;
+  if (aggregate.currentPeriod !== 3) return false;
+  const halftimeMs = aggregate.halftimeDurationMs ?? 5 * 60 * 1000;
+  const clockDur = aggregate.gameClock?.durationMs;
+  return clockDur != null && Math.abs(clockDur - halftimeMs) < 500;
+}
+
 /** Remaining time from server snapshot + running state (mirrors server/src/lib/clock). */
 export function getEffectiveRemainingMs(
   state: {
