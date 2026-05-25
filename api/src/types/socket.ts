@@ -1,14 +1,18 @@
 import type { Server as HttpServer } from "http";
 import type { Server as IOServer, Socket } from "socket.io";
 
+import type { DeviceSummary } from "../services/deviceCapabilities";
+
 export interface ServerToClientEvents {
   "game:stateUpdated": (payload: { gameId: string; aggregate: any }) => void;
   "game:hornTriggered": (payload: { gameId: string; reason?: string }) => void;
+  "device:updated": (payload: { device: DeviceSummary }) => void;
 }
 
 export interface ClientToServerEvents {
   "game:join": (payload: { gameId: string }) => void;
   "game:leave": (payload: { gameId: string }) => void;
+  "device:register": (payload: { clientId: string }) => void;
 }
 
 export interface InterServerEvents {
@@ -17,6 +21,7 @@ export interface InterServerEvents {
 
 export interface SocketData {
   gameId?: string;
+  clientId?: string;
 }
 
 export type TypedIOServer = IOServer<

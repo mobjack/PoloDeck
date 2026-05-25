@@ -12,6 +12,7 @@ import {
   gameDayIdParamSchema,
   gameIdParamSchema,
   patchDeviceBodySchema,
+  setActiveGameBodySchema,
   setClockBodySchema,
   setGamePeriodBodySchema,
   triggerHornBodySchema,
@@ -47,6 +48,12 @@ export async function registerGameRoutes(app: FastifyInstance) {
     const params = gameDayIdParamSchema.parse(request.params);
     const body = updateGameDayBodySchema.parse(request.body);
     return service.updateGameDay(params.gameDayId, body);
+  });
+
+  app.put("/game-days/:gameDayId/active-game", async (request) => {
+    const params = gameDayIdParamSchema.parse(request.params);
+    const body = setActiveGameBodySchema.parse(request.body);
+    return service.setActiveGame(params.gameDayId, body.gameId);
   });
 
   app.post("/games", async (request, reply) => {
@@ -92,10 +99,13 @@ export async function registerGameRoutes(app: FastifyInstance) {
     const params = deviceIdParamSchema.parse(request.params);
     const body = patchDeviceBodySchema.parse(request.body);
     const type = body.type !== undefined ? (body.type as DeviceType) : undefined;
-    return service.patchDevice(params.deviceId, {
-      type,
-      gameId: body.gameId,
-    });
+    return service.patchDevice(params.deviceId, { type });
+  });
+
+  app.delete("/devices/:deviceId", async (request, reply) => {
+    const params = deviceIdParamSchema.parse(request.params);
+    await service.deleteDevice(params.deviceId);
+    reply.code(204);
   });
 
   app.get("/devices", async () => {

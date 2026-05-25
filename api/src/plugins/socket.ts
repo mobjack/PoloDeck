@@ -32,6 +32,13 @@ const socketPlugin = fp(async (fastify: FastifyInstance) => {
         socket.data.gameId = undefined;
       }
     });
+
+    socket.on("device:register", ({ clientId }) => {
+      const id = clientId?.trim();
+      if (!id || id.length > 128) return;
+      socket.join(`device:${id}`);
+      socket.data.clientId = id;
+    });
   });
 
   fastify.addHook("onClose", async () => {

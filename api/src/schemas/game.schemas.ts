@@ -10,7 +10,13 @@ export const createGameDayBodySchema = z.object({
   defaultHalftimeDurationMs: z.number().int().nonnegative(),
 });
 
-export const updateGameDayBodySchema = createGameDayBodySchema.partial();
+export const updateGameDayBodySchema = createGameDayBodySchema.partial().extend({
+  activeGameId: z.string().cuid().nullable().optional(),
+});
+
+export const setActiveGameBodySchema = z.object({
+  gameId: z.string().cuid(),
+});
 
 export const gameDayIdParamSchema = z.object({
   gameDayId: z.string().cuid(),

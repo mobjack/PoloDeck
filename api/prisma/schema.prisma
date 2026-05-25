@@ -56,10 +56,12 @@ model GameDay {
   defaultQuarterDurationMs     Int
   defaultBreakBetweenQuartersMs Int
   defaultHalftimeDurationMs   Int
+  activeGameId                String?  @unique
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 
   games                       Game[]
+  activeGame                  Game?    @relation("ActiveGameOnDay", fields: [activeGameId], references: [id], onDelete: SetNull)
 }
 
 model Game {
@@ -82,6 +84,7 @@ model Game {
   updatedAt      DateTime     @updatedAt
 
   gameDay       GameDay?     @relation(fields: [gameDayId], references: [id], onDelete: SetNull)
+  activeOnGameDay GameDay?   @relation("ActiveGameOnDay")
   score          Score?
   gameClock      GameClock?
   shotClock      ShotClock?

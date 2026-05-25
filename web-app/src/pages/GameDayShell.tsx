@@ -128,8 +128,8 @@ export function GameDayShell() {
             className={({ isActive }) =>
               `game-day-shell-icon-btn${isActive ? " game-day-shell-icon-btn--active" : ""}`
             }
-            aria-label="Kiosks"
-            title="Kiosks"
+            aria-label="Manage kiosks"
+            title="Manage kiosks"
           >
             <Monitor size={22} strokeWidth={2} aria-hidden />
           </NavLink>

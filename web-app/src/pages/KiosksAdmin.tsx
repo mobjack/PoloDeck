@@ -17,18 +17,15 @@ function isStale(lastCheckInAt: string): boolean {
 
 export function KiosksAdmin() {
   const [devices, setDevices] = useState<KioskDevice[]>([]);
-  const [games, setGames] = useState<{ id: string; homeTeamName: string; awayTeamName: string }[]>(
-    []
-  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [devList, gameList] = await Promise.all([api.devices.list(), api.games.list()]);
+    const devList = await api.devices.list();
     setDevices(devList);
-    setGames(gameList);
   }, []);
 
   useEffect(() => {
@@ -37,24 +34,40 @@ export function KiosksAdmin() {
       .finally(() => setLoading(false));
   }, [load]);
 
-  const onSave = async (device: KioskDevice, type: KioskDeviceType, gameId: string) => {
+  const onActivate = async (device: KioskDevice, type: KioskDeviceType) => {
     setSavingId(device.id);
     setRowError(null);
     try {
       if (type === "UNASSIGNED") {
-        await api.devices.update(device.id, { type: "UNASSIGNED", gameId: null });
+        await api.devices.update(device.id, { type: "UNASSIGNED" });
       } else {
-        if (!gameId) {
-          setRowError("Choose a game for this role.");
-          return;
-        }
-        await api.devices.update(device.id, { type, gameId });
+        await api.devices.update(device.id, { type });
       }
       await load();
     } catch (e) {
-      setRowError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Save failed");
+      setRowError(
+        e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Activate failed"
+      );
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const onDelete = async (device: KioskDevice) => {
+    if (!window.confirm("Remove this kiosk from the list? It can register again when reopened.")) {
+      return;
+    }
+    setDeletingId(device.id);
+    setRowError(null);
+    try {
+      await api.devices.delete(device.id);
+      await load();
+    } catch (e) {
+      setRowError(
+        e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Delete failed"
+      );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -78,8 +91,9 @@ export function KiosksAdmin() {
       <header className="kiosks-admin-header">
         <h1 className="kiosks-admin-title">Kiosks</h1>
         <p className="kiosks-admin-sub">
-          Devices appear here after they open <code className="kiosks-admin-code">/kiosk/managed</code>. Assign
-          a display role and game for each Pi; no typing is required on the device.
+          Devices appear here after they open <code className="kiosks-admin-code">/kiosk/managed</code>.
+          Set the <strong>live game</strong> on the game day page, then choose what each Pi displays
+          (scoreboard, shot clock, or timer) and click Activate.
         </p>
       </header>
 
@@ -95,7 +109,6 @@ export function KiosksAdmin() {
                 <th>Status</th>
                 <th>Device ID (match on screen)</th>
                 <th>Role</th>
-                <th>Game</th>
                 <th />
               </tr>
             </thead>
@@ -104,9 +117,10 @@ export function KiosksAdmin() {
                 <KioskDeviceRow
                   key={d.id}
                   device={d}
-                  games={games}
                   saving={savingId === d.id}
-                  onSave={onSave}
+                  deleting={deletingId === d.id}
+                  onActivate={onActivate}
+                  onDelete={onDelete}
                 />
               ))}
             </tbody>
@@ -119,27 +133,28 @@ export function KiosksAdmin() {
 
 function KioskDeviceRow({
   device: d,
-  games,
   saving,
-  onSave,
+  deleting,
+  onActivate,
+  onDelete,
 }: {
   device: KioskDevice;
-  games: { id: string; homeTeamName: string; awayTeamName: string }[];
   saving: boolean;
-  onSave: (device: KioskDevice, type: KioskDeviceType, gameId: string) => void;
+  deleting: boolean;
+  onActivate: (device: KioskDevice, type: KioskDeviceType) => void;
+  onDelete: (device: KioskDevice) => void;
 }) {
   const [type, setType] = useState<KioskDeviceType>(d.type);
-  const [gameId, setGameId] = useState(d.gameId ?? "");
 
   /* eslint-disable react-hooks/set-state-in-effect -- sync selects when server row changes */
   useEffect(() => {
     setType(d.type);
-    setGameId(d.gameId ?? "");
-  }, [d.type, d.gameId]);
+  }, [d.type]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const stale = isStale(d.lastCheckInAt);
   const shortLabel = d.clientId.replace(/-/g, "").slice(-8).toUpperCase();
+  const isUnassigned = type === "UNASSIGNED";
 
   return (
     <tr className={stale ? "kiosks-admin-row--stale" : undefined}>
@@ -166,30 +181,22 @@ function KioskDeviceRow({
           ))}
         </select>
       </td>
-      <td>
-        <select
-          className="kiosks-admin-select"
-          value={gameId}
-          onChange={(e) => setGameId(e.target.value)}
-          disabled={type === "UNASSIGNED"}
-          aria-label="Game"
-        >
-          <option value="">—</option>
-          {games.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.homeTeamName} vs {g.awayTeamName}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td>
+      <td className="kiosks-admin-actions">
         <button
           type="button"
           className="btn btn-compact primary"
-          disabled={saving}
-          onClick={() => onSave(d, type, gameId)}
+          disabled={saving || deleting}
+          onClick={() => onActivate(d, type)}
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? "…" : isUnassigned ? "Clear assignment" : "Activate"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-compact secondary"
+          disabled={saving || deleting}
+          onClick={() => onDelete(d)}
+        >
+          {deleting ? "…" : "Delete"}
         </button>
       </td>
     </tr>
