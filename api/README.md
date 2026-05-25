@@ -201,6 +201,9 @@ curl -X POST http://localhost:3000/api/games \
   - active exclusions
   - recent events
 
+- **DELETE** `/api/games/:id`
+  Permanently delete a game and all related data (score, clocks, events, roster, etc.). Returns `204` with no body.
+
 ---
 
 ### Score Commands

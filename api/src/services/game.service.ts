@@ -284,6 +284,14 @@ export class GameService {
     await this.prisma.device.delete({ where: { id: deviceId } });
   }
 
+  async deleteGame(gameId: string): Promise<void> {
+    const existing = await this.prisma.game.findUnique({ where: { id: gameId } });
+    if (!existing) {
+      throw this.notFound("Game not found");
+    }
+    await this.prisma.game.delete({ where: { id: gameId } });
+  }
+
   async listAllDevices(): Promise<DeviceSummary[]> {
     const devices = await this.prisma.device.findMany({
       orderBy: { createdAt: "asc" },

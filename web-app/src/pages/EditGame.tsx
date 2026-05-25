@@ -10,6 +10,7 @@ import type { UpdateGameInput } from "../types/gameDay";
 const LEVELS = ["Varsity", "JV", "10U", "12U", "14U", "16U", "18U", "Masters", ""];
 const GENDERS = ["Boys", "Girls", "Co-ed", ""];
 const GAME_TYPES = ["League", "Tournament", "Scrimmage", "Practice", ""];
+const DELETE_CONFIRM_WORD = "delete";
 const MS_PER_MIN = 60 * 1000;
 function msToMinutes(ms: number): number {
   return Math.round(ms / MS_PER_MIN);
@@ -23,6 +24,11 @@ export function EditGame() {
   const navigate = useNavigate();
   const [error, setError] = useState<unknown>(null);
   const [form, setForm] = useState<UpdateGameInput>({});
+  const [matchupLabel, setMatchupLabel] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState<unknown>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!gameDayId || !gameId) return;
@@ -31,6 +37,7 @@ export function EditGame() {
       .then((gd) => {
         const game = gd.games.find((g) => g.id === gameId);
         if (game) {
+          setMatchupLabel(`${game.homeTeamName} vs ${game.awayTeamName}`);
           setForm({
             homeTeamName: game.homeTeamName,
             awayTeamName: game.awayTeamName,
@@ -45,6 +52,12 @@ export function EditGame() {
       })
       .catch((e) => setError(e));
   }, [gameDayId, gameId]);
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setDeleteConfirmText("");
+    setDeleteError(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,9 +78,24 @@ export function EditGame() {
       .catch((e) => setError(e));
   };
 
+  const handleDeleteConfirm = () => {
+    if (!gameId || deleteConfirmText !== DELETE_CONFIRM_WORD) return;
+    setDeleteError(null);
+    setDeleting(true);
+    api.games
+      .delete(gameId)
+      .then(() => navigate(`/game-days/${gameDayId}`))
+      .catch((e) => {
+        setDeleteError(e);
+        setDeleting(false);
+      });
+  };
+
   if (isDatabaseUnavailableError(error)) {
     return <DatabaseUnavailable />;
   }
+
+  const deleteConfirmed = deleteConfirmText === DELETE_CONFIRM_WORD;
 
   return (
     <div className="page">
@@ -179,6 +207,83 @@ export function EditGame() {
           </Link>
         </div>
       </form>
+
+      <section className="edit-game-danger" aria-labelledby="edit-game-delete-heading">
+        <h2 id="edit-game-delete-heading" className="edit-game-danger-title">
+          Delete game
+        </h2>
+        <p className="edit-game-danger-text">
+          Permanently removes this game, including score, roster, game sheet events, and clock
+          state. This cannot be undone.
+        </p>
+        <button
+          type="button"
+          className="btn danger"
+          onClick={() => setDeleteModalOpen(true)}
+        >
+          Delete game…
+        </button>
+      </section>
+
+      {deleteModalOpen ? (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal
+          aria-labelledby="edit-game-delete-modal-title"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deleting) closeDeleteModal();
+          }}
+        >
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <h3 id="edit-game-delete-modal-title">Delete this game?</h3>
+            <p className="modal-text">
+              {matchupLabel != null ? (
+                <>
+                  You are about to permanently delete <strong>{matchupLabel}</strong>.
+                </>
+              ) : (
+                <>You are about to permanently delete this game.</>
+              )}
+            </p>
+            <p className="modal-warning">
+              All score, roster, timeline, and clock data for this game will be removed.
+            </p>
+            {deleteError != null ? (
+              <p className="error">{formatApiErrorMessage(deleteError)}</p>
+            ) : null}
+            <label className="edit-game-delete-confirm-label">
+              Type <strong>delete</strong> to confirm
+              <input
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                disabled={deleting}
+              />
+            </label>
+            <div className="form-actions modal-actions">
+              <button
+                type="button"
+                className="btn danger"
+                disabled={!deleteConfirmed || deleting}
+                onClick={handleDeleteConfirm}
+              >
+                {deleting ? "Deleting…" : "Delete game"}
+              </button>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={deleting}
+                onClick={closeDeleteModal}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

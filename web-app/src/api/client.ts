@@ -228,6 +228,8 @@ export const api = {
       body: import("../types/gameDay").UpdateGameInput
     ) =>
       request<GameAggregate>(`/games/${id}`, { method: "PATCH", json: body }),
+    delete: (id: string) =>
+      request<void>(`/games/${id}`, { method: "DELETE" }),
     getAggregate: (id: string) =>
       request<GameAggregate>(`/games/${id}`),
     getRoster: (
