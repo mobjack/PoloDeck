@@ -3053,34 +3053,102 @@ body:has(.kiosk-scoreboard-display) .app {
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
 }
 
-.kiosk-shot-display {
+/* Stretch root chain for portrait shot clock kiosk */
+body:has(.kiosk-shotclock-display) {
+  display: block;
+  background: #000;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+body:has(.kiosk-shotclock-display) #root,
+body:has(.kiosk-shotclock-display) .app {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+}
+
+/* Portrait shot clock kiosk: yellow game time on top, bold red shot clock below */
+.kiosk-shotclock-display {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  gap: 1.5vmin;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 2vmin 2vmin;
+  box-sizing: border-box;
+  overflow: hidden;
   text-align: center;
+  background: #000;
+  color: #f1f5f9;
 }
 
-.kiosk-shot-meta {
-  margin: 0 0 1rem;
-  font-size: 1rem;
-  opacity: 0.85;
+/* Seven-segment LED fonts (bundled to public/fonts via scripts/copy-kiosk-fonts.mjs) */
+@font-face {
+  font-family: "DSEG7-Classic";
+  src: url("/fonts/DSEG7Classic-Bold.woff2") format("woff2");
+  font-weight: bold;
+  font-style: normal;
+  font-display: block;
 }
 
-.kiosk-shot-digits {
-  font-size: min(28vw, 18rem);
-  font-weight: 800;
-  line-height: 1;
+@font-face {
+  font-family: "DSEG14-Classic";
+  src: url("/fonts/DSEG14Classic-Bold.woff2") format("woff2");
+  font-weight: bold;
+  font-style: normal;
+  font-display: block;
+}
+
+.kiosk-shotclock-game,
+.kiosk-shotclock-shot {
   font-variant-numeric: tabular-nums;
+  line-height: 0.9;
+  max-width: 100%;
+  white-space: nowrap;
+  font-weight: bold;
+  font-style: normal;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  text-shadow: none;
 }
 
-.kiosk-shot-label {
-  margin: 1rem 0 0;
-  font-size: 1.1rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.75;
+.kiosk-shotclock-game {
+  flex: 0 0 auto;
+  font-family: "DSEG14-Classic", monospace;
+  font-size: min(52vw, 20vh);
+  color: #ffd700;
+}
+
+.kiosk-shotclock-shot {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  max-height: 52vh;
+  font-family: "DSEG7-Classic", monospace;
+  font-size: min(68vw, 46vh);
+  color: #ff1a1a;
+  letter-spacing: 0.02em;
+}
+
+/* Landscape viewports (e.g. dev browser): height-limited — lean on vh for shot */
+@media (orientation: landscape) {
+  .kiosk-shotclock-game {
+    font-size: min(38vw, 26vh);
+  }
+
+  .kiosk-shotclock-shot {
+    max-height: 62vh;
+    font-size: min(56vw, 58vh);
+  }
 }
 
 .kiosk-timer-display .kiosk-timer-title {

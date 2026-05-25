@@ -7,6 +7,7 @@ Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
+PermissionsStartOnly=yes
 User=polodeck
 Group=polodeck
 WorkingDirectory=/home/polodeck
@@ -17,6 +18,9 @@ StandardInput=tty-force
 StandardOutput=tty
 TTYReset=yes
 TTYVHangup=yes
+# Free tty1 for X on first kiosk start (not during curl install — keeps the installer login usable).
+ExecStartPre=-/bin/systemctl disable --now getty@tty1.service
+ExecStartPre=-/bin/systemctl mask getty@tty1.service
 # Cold boot: DRM/KMS nodes are sometimes not ready the instant multi-user starts; avoids blank tty1 + cursor.
 ExecStartPre=/bin/sleep 3
 ExecStart=/usr/bin/xinit /home/polodeck/.xsession -- :0 vt1 -keeptty -nolisten tcp

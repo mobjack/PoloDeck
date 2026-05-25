@@ -5,8 +5,10 @@ import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import { useKioskDeviceCheckIn } from "../hooks/useKioskDeviceCheckIn";
 import {
+  formatGameTimeDisplay,
   formatShotClockDisplay,
   getEffectiveRemainingMs,
+  isHalftimeActive,
 } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
@@ -51,48 +53,58 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
     };
   }, [gameId]);
 
+  const gameRunning = aggregate?.gameClock?.running ?? false;
   const shotRunning = aggregate?.shotClock?.running ?? false;
+  const anyRunning = gameRunning || shotRunning;
+
   useEffect(() => {
-    if (!shotRunning) return;
+    if (!anyRunning) return;
     const id = window.setInterval(() => setNow(Date.now()), 100);
     return () => window.clearInterval(id);
-  }, [shotRunning]);
+  }, [anyRunning]);
 
   if (loading) {
     return (
-      <div className="page kiosk-display-page">
+      <div className="kiosk-display-page kiosk-shotclock-display">
         <p>Loading…</p>
       </div>
     );
   }
   if (error && !aggregate) {
     return (
-      <div className="page kiosk-display-page">
+      <div className="kiosk-display-page kiosk-shotclock-display">
         <ApiErrorDisplay error={error} />
       </div>
     );
   }
   if (!gameId || !aggregate) {
     return (
-      <div className="page kiosk-display-page">
+      <div className="kiosk-display-page kiosk-shotclock-display">
         <p>Game not found.</p>
       </div>
     );
   }
 
+  const halftime = isHalftimeActive(aggregate);
+  const gameMs = aggregate.gameClock
+    ? getEffectiveRemainingMs(aggregate.gameClock, now)
+    : 0;
   const shotMs = aggregate.shotClock
     ? getEffectiveRemainingMs(aggregate.shotClock, now)
     : 0;
+  const mainDisplayMs = halftime ? gameMs : shotMs;
 
   return (
-    <div className="page kiosk-display-page kiosk-shot-display">
-      <p className="kiosk-shot-meta">
-        {aggregate.homeTeamName} vs {aggregate.awayTeamName}
-      </p>
-      <div className="kiosk-shot-digits" aria-live="polite">
-        {formatShotClockDisplay(shotMs)}
+    <div className="kiosk-display-page kiosk-shotclock-display" aria-live="polite">
+      <div className="kiosk-shotclock-game" aria-label="Game time">
+        {formatGameTimeDisplay(gameMs)}
       </div>
-      <p className="kiosk-shot-label">Shot clock</p>
+      <div
+        className="kiosk-shotclock-shot"
+        aria-label={halftime ? "Halftime remaining" : "Shot clock"}
+      >
+        {formatShotClockDisplay(mainDisplayMs)}
+      </div>
     </div>
   );
 }

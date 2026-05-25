@@ -4,6 +4,7 @@ import type { Socket } from "socket.io-client";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import { useKioskDeviceCheckIn } from "../hooks/useKioskDeviceCheckIn";
+import { isHalftimeActive } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
 type KioskScoreboardDisplayProps = {
@@ -76,10 +77,7 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
   const isFinal = aggregate.status === "FINAL";
 
   const inP3 = !isFinal && cp === 3;
-  const halftimeMs = aggregate.halftimeDurationMs ?? 5 * 60 * 1000;
-  const clockDur = aggregate.gameClock?.durationMs;
-  const halfTimeActive =
-    inP3 && clockDur != null && Math.abs(clockDur - halftimeMs) < 500;
+  const halfTimeActive = isHalftimeActive(aggregate);
   const q3Active = inP3 && !halfTimeActive;
 
   const phaseActive = {
