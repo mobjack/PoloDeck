@@ -1907,6 +1907,64 @@
   }
 }
 
+.btn.danger {
+  background: transparent;
+  color: #e57373;
+  border: 1px solid rgba(229, 115, 115, 0.6);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: rgba(229, 115, 115, 0.12);
+}
+
+.btn.danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: light) {
+  .btn.danger {
+    color: #c62828;
+    border-color: rgba(198, 40, 40, 0.45);
+  }
+
+  .btn.danger:hover:not(:disabled) {
+    background: rgba(198, 40, 40, 0.08);
+  }
+}
+
+.edit-game-danger {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 32rem;
+}
+
+.edit-game-danger-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.edit-game-danger-text {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.edit-game-delete-confirm-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .edit-game-danger {
+    border-top-color: rgba(0, 0, 0, 0.12);
+  }
+}
+
 .btn.primary.game-sheet-button {
   background: #2e7d32;
   color: #fff;

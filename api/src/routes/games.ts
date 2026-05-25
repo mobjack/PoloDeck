@@ -69,6 +69,12 @@ export async function registerGameRoutes(app: FastifyInstance) {
     return service.updateGame(params.id, body);
   });
 
+  app.delete("/games/:id", async (request, reply) => {
+    const params = gameIdParamSchema.parse(request.params);
+    await service.deleteGame(params.id);
+    reply.code(204);
+  });
+
   app.get("/games", async () => {
     return service.listGames();
   });
