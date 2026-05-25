@@ -47,6 +47,37 @@ export class GameService {
     return aggregate;
   }
 
+  /** True if this period already has a GAME_CLOCK_STARTED (clock resume should not add another). */
+  private async quarterStartAlreadyLogged(gameId: string): Promise<boolean> {
+    const lastPeriodAdvance = await this.prisma.gameEvent.findFirst({
+      where: { gameId, eventType: GameEventType.PERIOD_ADVANCED },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { createdAt: true, id: true },
+    });
+
+    const afterPeriod: Prisma.GameEventWhereInput = lastPeriodAdvance
+      ? {
+          OR: [
+            { createdAt: { gt: lastPeriodAdvance.createdAt } },
+            {
+              createdAt: lastPeriodAdvance.createdAt,
+              id: { gt: lastPeriodAdvance.id },
+            },
+          ],
+        }
+      : {};
+
+    const existing = await this.prisma.gameEvent.findFirst({
+      where: {
+        gameId,
+        eventType: GameEventType.GAME_CLOCK_STARTED,
+        ...afterPeriod,
+      },
+      select: { id: true },
+    });
+    return existing != null;
+  }
+
   private async createEvent(
     gameId: string,
     eventType: GameEventType,
@@ -714,6 +745,14 @@ export class GameService {
   }
 
   async startGameClock(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      select: { currentPeriod: true },
+    });
+    if (!game) {
+      throw this.notFound("Game not found");
+    }
+
     const clock = await this.prisma.gameClock.findUnique({
       where: { gameId },
     });
@@ -740,7 +779,14 @@ export class GameService {
       },
     });
 
-    await this.createEvent(gameId, GameEventType.GAME_CLOCK_STARTED, {}, "operator");
+    if (!(await this.quarterStartAlreadyLogged(gameId))) {
+      await this.createEvent(
+        gameId,
+        GameEventType.GAME_CLOCK_STARTED,
+        { period: game.currentPeriod },
+        "operator"
+      );
+    }
     // Always resync the shot: materialize then start (repairs "running" without lastStartedAt, or
     // a stale pre-coupling shot-while-game-stopped state).
     await this.resyncShotClockWithGameStart(gameId);

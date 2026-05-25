@@ -818,10 +818,38 @@
 
 .scoreboard-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 2rem;
+  align-items: baseline;
+  gap: 0.75rem 1.5rem;
   font-size: 0.85rem;
   opacity: 0.9;
+}
+
+.scoreboard-footer-clocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+}
+
+.scoreboard-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.scoreboard-clock-label {
+  opacity: 0.85;
+}
+
+.scoreboard-clock-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 2.5ch;
+}
+
+.scoreboard-clock--running .scoreboard-clock-value {
+  color: var(--color-primary, #6b8cff);
 }
 
 .game-sheet-rosters {

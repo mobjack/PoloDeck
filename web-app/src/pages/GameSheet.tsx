@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Socket } from "socket.io-client";
-import { isGameProgressRowHidden } from "../lib/gameProgressDisplay";
+import {
+  formatGameTimeDisplay,
+  formatShotClockDisplay,
+  getEffectiveRemainingMs,
+  isHalftimeActive,
+} from "../lib/clockDisplay";
+import { eventsForGameProgressDisplay } from "../lib/gameProgressDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
@@ -106,7 +112,17 @@ export function GameSheet() {
   const [exTime, setExTime] = useState("");
   const [toSide, setToSide] = useState<TeamSide>("HOME");
   const [toShort, setToShort] = useState(false);
+  const [tick, setTick] = useState(0);
   const navigate = useNavigate();
+
+  const gameRunning = aggregate?.gameClock?.running ?? false;
+  const shotRunning = aggregate?.shotClock?.running ?? false;
+
+  useEffect(() => {
+    if (!gameRunning && !shotRunning) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 100);
+    return () => window.clearInterval(id);
+  }, [gameRunning, shotRunning]);
 
   useEffect(() => {
     if (!commandHelpOpen) return;
@@ -407,17 +423,9 @@ export function GameSheet() {
     return [arr[0] ?? "—", arr[1] ?? "—", arr[2] ?? "—"];
   };
 
-  const formatMsToClock = (ms: number | null | undefined) => {
-    if (ms == null) return "—";
-    const totalSeconds = Math.floor(ms / 1000);
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  const progressRows = (Array.isArray(aggregate.events) ? aggregate.events : [])
-    .filter((ev) => !isGameProgressRowHidden(ev.eventType))
-    .map((ev) => {
+  const progressRows = eventsForGameProgressDisplay(
+    Array.isArray(aggregate.events) ? aggregate.events : []
+  ).map((ev) => {
     const p = ev.payload as Record<string, unknown> | undefined;
     const side = (p?.side ?? p?.teamSide) as string | undefined;
     const team = side === "HOME" ? "Dark" : side === "AWAY" ? "Light" : "—";
@@ -783,6 +791,16 @@ export function GameSheet() {
     .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
     .join(" ");
 
+  void tick;
+  const now = Date.now();
+  const halftimeActive = isHalftimeActive(aggregate);
+  const gameClockDisplay = aggregate.gameClock
+    ? formatGameTimeDisplay(getEffectiveRemainingMs(aggregate.gameClock, now))
+    : "—";
+  const shotClockDisplay = aggregate.shotClock
+    ? formatShotClockDisplay(getEffectiveRemainingMs(aggregate.shotClock, now))
+    : "—";
+
   return (
     <div className="page game-sheet-page">
       <header className="page-header game-sheet-page-header">
@@ -871,8 +889,32 @@ export function GameSheet() {
                 </div>
               </div>
               <div className="scoreboard-footer">
-                <div>Period: Q{aggregate.currentPeriod}</div>
-                <div>Game clock: {aggregate.gameClock?.running ? formatMsToClock(aggregate.gameClock.remainingMs) : "—"}</div>
+                <div className="scoreboard-footer-period">
+                  Period: Q{aggregate.currentPeriod}
+                  {halftimeActive ? " · HT" : null}
+                </div>
+                <div className="scoreboard-footer-clocks" aria-live="polite">
+                  <div
+                    className={
+                      gameRunning
+                        ? "scoreboard-clock scoreboard-clock--running"
+                        : "scoreboard-clock"
+                    }
+                  >
+                    <span className="scoreboard-clock-label">Game</span>
+                    <span className="scoreboard-clock-value">{gameClockDisplay}</span>
+                  </div>
+                  <div
+                    className={
+                      shotRunning
+                        ? "scoreboard-clock scoreboard-clock--running"
+                        : "scoreboard-clock"
+                    }
+                  >
+                    <span className="scoreboard-clock-label">Shot</span>
+                    <span className="scoreboard-clock-value">{shotClockDisplay}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
