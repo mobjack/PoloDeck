@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Socket } from "socket.io-client";
+import { isGameProgressRowHidden } from "../lib/gameProgressDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
@@ -415,7 +416,7 @@ export function GameSheet() {
   };
 
   const progressRows = (Array.isArray(aggregate.events) ? aggregate.events : [])
-    .filter((ev) => ev.eventType !== "GAME_CLOCK_STOPPED")
+    .filter((ev) => !isGameProgressRowHidden(ev.eventType))
     .map((ev) => {
     const p = ev.payload as Record<string, unknown> | undefined;
     const side = (p?.side ?? p?.teamSide) as string | undefined;
@@ -459,9 +460,6 @@ export function GameSheet() {
         break;
       case "GAME_CLOCK_STARTED":
         remark = "Quarter started";
-        break;
-      case "GAME_CLOCK_SET":
-        remark = "Clock set";
         break;
       case "HORN_TRIGGERED":
         remark = "Horn";
