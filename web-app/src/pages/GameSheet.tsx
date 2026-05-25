@@ -767,14 +767,7 @@ export function GameSheet() {
       ...(parsed.value.capNumber != null && { capNumber: parsed.value.capNumber }),
     };
     try {
-      let next: GameAggregate;
-      const betweenQuarters = !aggregate.gameClock?.running;
-      if (betweenQuarters && parsed.value.type !== "START_QUARTER") {
-        await api.games.applyScoreCommand(gameId, { type: "START_QUARTER" });
-        next = await api.games.applyScoreCommand(gameId, payload);
-      } else {
-        next = await api.games.applyScoreCommand(gameId, payload);
-      }
+      const next = await api.games.applyScoreCommand(gameId, payload);
       setAggregate(next);
       setInput("");
       if (pendingEditModalAfterEnd.current) {
@@ -936,7 +929,7 @@ export function GameSheet() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="e.g. 6.07w13g"
+                    placeholder="e.g. w13g or 6.07w13g"
                     disabled={isGameOver}
                     aria-label="Scoring command"
                   />
@@ -1000,12 +993,17 @@ export function GameSheet() {
                 <div className="scoring-command-help-body">
                   <h3>Quarter</h3>
                   <ul>
-                    <li><strong>sq</strong> — Start quarter</li>
+                    <li><strong>sq</strong> — Start quarter (log only; use Timer for clock)</li>
                     <li><strong>eq</strong> — End quarter</li>
                   </ul>
 
                   <h3>Time</h3>
-                  <p>Use a dot or colon: <strong>6.07</strong> or <strong>6:07</strong> = 6 min 7 sec. Optional at the start of goal/exclusion/penalty.</p>
+                  <p>
+                    Use a dot or colon: <strong>6.07</strong> or <strong>6:07</strong> = 6 min 7 sec.
+                    Optional at the start of goals, exclusions, penalties, and timeouts. If omitted, the
+                    current <strong>game clock</strong> on the scoreboard is recorded. Does not change the
+                    live clock (use <strong>Timer</strong>).
+                  </p>
 
                   <h3>Team</h3>
                   <ul>
@@ -1014,26 +1012,28 @@ export function GameSheet() {
                   </ul>
 
                   <h3>Goal / Exclusion / Penalty</h3>
-                  <p>Either order works:</p>
+                  <p>Either order works (time optional):</p>
                   <ul>
-                    <li><strong>[time] team cap action</strong> — e.g. <code>6.07w13g</code> (Light cap 13 goal at 6:07)</li>
-                    <li><strong>[time] action cap team</strong> — e.g. <code>6.07g13w</code></li>
+                    <li><strong>[time] team cap action</strong> — e.g. <code>6.07w13g</code> or <code>w13g</code></li>
+                    <li><strong>[time] action cap team</strong> — e.g. <code>6.07g13w</code> or <code>g13w</code></li>
                   </ul>
                   <p>Actions: <strong>g</strong> = goal, <strong>e</strong> = exclusion, <strong>p</strong> = penalty. Cap number is required.</p>
 
                   <h3>Timeout</h3>
                   <ul>
-                    <li><strong>4.13tw</strong> or <strong>4.13tb</strong> — Full timeout at 4:13 for light (w) or dark (b)</li>
-                    <li><strong>4.13t3w</strong> — 30-second timeout</li>
+                    <li><strong>[time]t w/b</strong> — Full timeout for light (w) or dark (b); e.g. <code>tw</code> or <code>4.13tw</code></li>
+                    <li><strong>[time]t3 w/b</strong> — 30-second timeout; e.g. <code>t3w</code> or <code>4.13t3w</code></li>
                   </ul>
 
                   <h3>Examples</h3>
                   <ul className="scoring-command-help-examples">
-                    <li><code>sq</code> — start quarter</li>
+                    <li><code>sq</code> — start quarter (does not change clock)</li>
                     <li><code>eq</code> — end quarter</li>
+                    <li><code>w13g</code> — Light cap 13 goal (current game clock)</li>
                     <li><code>6:50w13g</code> — Light cap 13 goal at 6:50</li>
                     <li><code>5.53b2e</code> — Dark cap 2 exclusion at 5:53</li>
-                    <li><code>g13w</code> — Light cap 13 goal (no time)</li>
+                    <li><code>g13w</code> — Light cap 13 goal (current game clock)</li>
+                    <li><code>tw</code> — Light full timeout (current game clock)</li>
                     <li><code>4.13tw</code> — Light full timeout at 4:13</li>
                   </ul>
                 </div>
@@ -1913,6 +1913,26 @@ export function GameSheet() {
   );
 }
 
+/** Split optional game-clock prefix from goal/exclusion/penalty commands. */
+function splitScoringTimePrefix(lower: string): { timePart: string; rest: string } {
+  const timePartRe = /^(\d*(\.\d{1,2})?)?/;
+  const timePartMatch = lower.match(timePartRe);
+  const timePart = timePartMatch?.[1] ?? "";
+  const rest = lower.slice(timePart.length);
+  const standardRe = /^([bdwl])(\d+)([gep])$/;
+  // Avoid "8b8g" → 8:00 + cap 8; single-digit bare minutes before team+cap+action is not a time prefix.
+  if (
+    timePart.length > 0 &&
+    !timePart.includes(".") &&
+    !timePart.includes(":") &&
+    timePart.length < 2 &&
+    standardRe.test(rest)
+  ) {
+    return { timePart: "", rest: lower };
+  }
+  return { timePart, rest };
+}
+
 function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: false; error: string } {
   // Allow colon as time separator; normalize to dot for parsing
   const normalized = raw.replace(/:/g, ".");
@@ -1928,11 +1948,13 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
   // b and d both mean dark; w and l both mean light
   const darkChars = "bd";
 
-  // Timeout with time and side: 4.13tw or 4.13tb (t or t3 before side)
-  const timeoutPattern = /^(\d+(\.\d{1,2})?)(t3?|t)([bdwl])$/;
+  // Timeout with optional time and side: tw, 4.13tw, 4.13t3w (t or t3 before side)
+  const timeoutPattern = /^(\d+(\.\d{1,2})?)?(t3?|t)([bdwl])$/;
   const timeoutMatch = lower.match(timeoutPattern);
   if (timeoutMatch) {
-    const timeSeconds = parseTimeToSeconds(timeoutMatch[1]);
+    const timePart = timeoutMatch[1];
+    const timeSeconds =
+      timePart != null && timePart.length > 0 ? parseTimeToSeconds(timePart) : undefined;
     const action = timeoutMatch[3];
     const sideChar = timeoutMatch[4];
     const side: TeamSide = darkChars.includes(sideChar) ? "HOME" : "AWAY";
@@ -1941,10 +1963,7 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
   }
 
   // Goal/exclusion/penalty: [time] then either (team)(cap)(action) or (action)(cap)(team)
-  const timePartRe = /^(\d*(\.\d{1,2})?)?/;
-  const timePartMatch = lower.match(timePartRe);
-  const timePart = timePartMatch ? timePartMatch[1] : undefined;
-  const rest = timePart != null ? lower.slice(timePart.length) : lower;
+  const { timePart, rest } = splitScoringTimePrefix(lower);
 
   // Standard order: team then cap then action — (b|d|w|l)(\d+)(g|e|p)
   const standardRe = /^([bdwl])(\d+)([gep])$/;
@@ -1970,7 +1989,7 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
       return {
         ok: false,
         error:
-          "Invalid command. Examples: sq, eq, 6.07w13g, 5.53b2e, 6:07d3g, g13w, 4.13tw or 4.13t3w.",
+          "Invalid command. Examples: sq, eq, w13g, g13w, 6.07w13g, 5.53b2e, tw, 4.13tw or 4.13t3w.",
       };
     }
   }
@@ -2108,9 +2127,7 @@ function buildTimeoutCommandPreview(
   }
   return {
     command: `${mid}${c}`,
-    note: isShort
-      ? "Main scoring entry normally includes the clock (e.g. 4.13t3w)."
-      : "Main scoring entry normally includes the clock (e.g. 4.13tw).",
+    note: "Time optional; uses current game clock if omitted.",
   };
 }
 
@@ -2143,13 +2160,13 @@ function buildInsertCommandPreview(
     if (prefix !== "") return { command: `${prefix}t3${c}`, note: clockNote };
     return {
       command: `t3${c}`,
-      note: clockNote ?? "Main scoring entry normally includes the clock (e.g. 4.13t3w).",
+      note: clockNote ?? "Time optional; uses current game clock if omitted.",
     };
   }
   if (prefix !== "") return { command: `${prefix}t${c}`, note: clockNote };
   return {
     command: `t${c}`,
-    note: clockNote ?? "Main scoring entry normally includes the clock (e.g. 4.13tw).",
+    note: clockNote ?? "Time optional; uses current game clock if omitted.",
   };
 }
 
@@ -2170,6 +2187,11 @@ function ScoringCommandPreviewBlock({
   );
 }
 
+function formatParsedTime(seconds?: number): string {
+  if (seconds != null) return formatSeconds(seconds);
+  return "current game clock";
+}
+
 function describeParsed(parsed: ParsedInput): string {
   switch (parsed.type) {
     case "START_QUARTER":
@@ -2177,15 +2199,15 @@ function describeParsed(parsed: ParsedInput): string {
     case "END_QUARTER":
       return "End quarter";
     case "TIMEOUT":
-      return `${parsed.side === "HOME" ? "Dark" : "Light"} timeout at ${formatSeconds(parsed.timeSeconds)}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} timeout at ${formatParsedTime(parsed.timeSeconds)}`;
     case "TIMEOUT_30":
-      return `${parsed.side === "HOME" ? "Dark" : "Light"} 30s timeout at ${formatSeconds(parsed.timeSeconds)}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} 30s timeout at ${formatParsedTime(parsed.timeSeconds)}`;
     case "GOAL":
-      return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} goal at ${formatSeconds(parsed.timeSeconds)}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} goal at ${formatParsedTime(parsed.timeSeconds)}`;
     case "EXCLUSION":
-      return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} exclusion at ${formatSeconds(parsed.timeSeconds)}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} exclusion at ${formatParsedTime(parsed.timeSeconds)}`;
     case "PENALTY":
-      return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} penalty at ${formatSeconds(parsed.timeSeconds)}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} penalty at ${formatParsedTime(parsed.timeSeconds)}`;
     default:
       return parsed.raw;
   }
