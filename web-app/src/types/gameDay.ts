@@ -5,6 +5,7 @@ export interface GameDay {
   defaultQuarterDurationMs: number;
   defaultBreakBetweenQuartersMs: number;
   defaultHalftimeDurationMs: number;
+  activeGameId: string | null;
   createdAt: string;
   updatedAt: string;
   games: GameOnDay[];
@@ -48,6 +49,7 @@ export interface UpdateGameDayInput {
   defaultQuarterDurationMs?: number;
   defaultBreakBetweenQuartersMs?: number;
   defaultHalftimeDurationMs?: number;
+  activeGameId?: string | null;
 }
 
 export interface CreateGameInput {

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type KioskDevice } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import { getOrCreateKioskClientId } from "../hooks/useKioskDeviceCheckIn";
+import { useKioskAssignmentSocket } from "../hooks/useKioskAssignmentSocket";
 import { KioskScoreboardDisplay } from "./KioskScoreboardDisplay";
 import { KioskShotClockDisplay } from "./KioskShotClockDisplay";
 import { KioskTimerDisplay } from "./KioskTimerDisplay";
@@ -16,9 +17,20 @@ function isReadyForDisplay(d: KioskDevice): boolean {
   return Boolean(d.gameId);
 }
 
+/** Poll often while assigned; retry quickly when server was down. */
+const ASSIGNED_POLL_MS = 3_000;
+const ERROR_POLL_MS = 3_000;
+
 export function KioskManaged() {
   const [device, setDevice] = useState<KioskDevice | null>(null);
   const [error, setError] = useState<unknown>(null);
+
+  const applyDevice = useCallback((d: KioskDevice) => {
+    setDevice(d);
+    setError(null);
+  }, []);
+
+  useKioskAssignmentSocket(applyDevice);
 
   useEffect(() => {
     const clientId = getOrCreateKioskClientId();
@@ -31,11 +43,15 @@ export function KioskManaged() {
       try {
         const res = await api.devices.checkIn({ clientId });
         if (cancelled) return;
-        setDevice(res.device);
-        setError(null);
-        nextMs = res.config.heartbeatIntervalMs;
+        applyDevice(res.device);
+        const assigned =
+          res.device.type !== "UNASSIGNED" && Boolean(res.device.gameId);
+        nextMs = assigned
+          ? Math.min(ASSIGNED_POLL_MS, res.config.heartbeatIntervalMs)
+          : res.config.heartbeatIntervalMs;
       } catch (e) {
         if (!cancelled) setError(e);
+        nextMs = ERROR_POLL_MS;
       }
       if (cancelled) return;
       timeoutId = window.setTimeout(loop, nextMs);
@@ -60,13 +76,13 @@ export function KioskManaged() {
   if (device && isReadyForDisplay(device) && device.gameId) {
     const gid = device.gameId;
     if (device.type === "SCOREBOARD") {
-      return <KioskScoreboardDisplay gameId={gid} />;
+      return <KioskScoreboardDisplay key={gid} gameId={gid} />;
     }
     if (device.type === "SHOT_CLOCK") {
-      return <KioskShotClockDisplay gameId={gid} />;
+      return <KioskShotClockDisplay key={gid} gameId={gid} />;
     }
     if (device.type === "TIMER") {
-      return <KioskTimerDisplay gameId={gid} />;
+      return <KioskTimerDisplay key={gid} gameId={gid} />;
     }
   }
 
@@ -77,8 +93,9 @@ export function KioskManaged() {
       <header className="kiosk-managed-waiting-header">
         <h1 className="kiosk-managed-waiting-title">Waiting for assignment</h1>
         <p className="kiosk-managed-waiting-sub">
-          This kiosk is connected. In the main PoloDeck app, open <strong>Kiosks</strong> (monitor icon
-          in the header) and assign a role and game for this device.
+          This kiosk is connected. On the game day page, choose which game is{" "}
+          <strong>live on displays</strong>, then open <strong>Manage kiosks</strong> (monitor icon in
+          the header) and <strong>Activate</strong> this device with a display role.
         </p>
         <p className="kiosk-managed-device-id" aria-label="Device identifier for matching in admin">
           <span className="kiosk-managed-device-id-label">Device ID</span>

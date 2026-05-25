@@ -109,6 +109,59 @@ export class GameService {
     };
   }
 
+  async resolveActiveGameId(): Promise<string | null> {
+    const gameDay = await this.prisma.gameDay.findFirst({
+      where: { activeGameId: { not: null } },
+      select: { activeGameId: true },
+    });
+    return gameDay?.activeGameId ?? null;
+  }
+
+  private emitDeviceUpdated(device: DeviceSummary): void {
+    this.io.to(`device:${device.clientId}`).emit("device:updated", { device });
+  }
+
+  private async notifyAssignedDevicesUpdated(): Promise<void> {
+    const devices = await this.prisma.device.findMany({
+      where: { type: { not: DeviceType.UNASSIGNED } },
+      include: { game: { select: { homeTeamName: true, awayTeamName: true } } },
+    });
+    for (const d of devices) {
+      this.emitDeviceUpdated(this.mapDeviceToSummary(d));
+    }
+  }
+
+  private async syncAssignedDevicesToActiveGame(gameId: string | null): Promise<void> {
+    await this.prisma.device.updateMany({
+      where: { type: { not: DeviceType.UNASSIGNED } },
+      data: { gameId },
+    });
+    await this.notifyAssignedDevicesUpdated();
+  }
+
+  async setActiveGame(gameDayId: string, gameId: string) {
+    const game = await this.prisma.game.findFirst({
+      where: { id: gameId, gameDayId },
+    });
+    if (!game) {
+      throw this.badRequest("Game does not belong to this game day");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.gameDay.updateMany({
+        where: { id: { not: gameDayId }, activeGameId: { not: null } },
+        data: { activeGameId: null },
+      }),
+      this.prisma.gameDay.update({
+        where: { id: gameDayId },
+        data: { activeGameId: gameId },
+      }),
+    ]);
+
+    await this.syncAssignedDevicesToActiveGame(gameId);
+    return this.getGameDay(gameDayId);
+  }
+
   async checkInDevice(input: { clientId: string; name?: string }): Promise<DeviceSummary> {
     const now = new Date();
     const gameInclude = { select: { homeTeamName: true, awayTeamName: true } as const };
@@ -117,16 +170,26 @@ export class GameService {
       where: { clientId: input.clientId },
     });
 
+    const activeGameId = await this.resolveActiveGameId();
+
     if (existing) {
+      const syncGameId =
+        existing.type !== DeviceType.UNASSIGNED && activeGameId && existing.gameId !== activeGameId
+          ? activeGameId
+          : undefined;
+
       const updated = await this.prisma.device.update({
         where: { id: existing.id },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           lastCheckInAt: now,
+          ...(syncGameId !== undefined ? { gameId: syncGameId } : {}),
         },
         include: { game: gameInclude },
       });
-      return this.mapDeviceToSummary(updated);
+      const summary = this.mapDeviceToSummary(updated);
+      this.emitDeviceUpdated(summary);
+      return summary;
     }
 
     const created = await this.prisma.device.create({
@@ -154,19 +217,18 @@ export class GameService {
     let nextType = input.type ?? existing.type;
     let nextGameId = existing.gameId;
 
-    if (input.gameId !== undefined) {
-      nextGameId = input.gameId;
-    }
-
     if (nextType === DeviceType.UNASSIGNED) {
       nextGameId = null;
+    } else {
+      const activeGameId = await this.resolveActiveGameId();
+      if (!activeGameId) {
+        throw this.badRequest("Set the live game on the game day page first");
+      }
+      nextGameId = activeGameId;
     }
 
     if (nextType !== DeviceType.UNASSIGNED) {
-      if (!nextGameId) {
-        throw this.badRequest("gameId is required for assigned display types");
-      }
-      const game = await this.prisma.game.findUnique({ where: { id: nextGameId } });
+      const game = await this.prisma.game.findUnique({ where: { id: nextGameId! } });
       if (!game) {
         throw this.badRequest("Game not found");
       }
@@ -178,7 +240,17 @@ export class GameService {
       include: { game: { select: { homeTeamName: true, awayTeamName: true } } },
     });
 
-    return this.mapDeviceToSummary(updated);
+    const summary = this.mapDeviceToSummary(updated);
+    this.emitDeviceUpdated(summary);
+    return summary;
+  }
+
+  async deleteDevice(deviceId: string): Promise<void> {
+    const existing = await this.prisma.device.findUnique({ where: { id: deviceId } });
+    if (!existing) {
+      throw this.notFound("Device not found");
+    }
+    await this.prisma.device.delete({ where: { id: deviceId } });
   }
 
   async listAllDevices(): Promise<DeviceSummary[]> {
@@ -197,6 +269,53 @@ export class GameService {
       devices,
       staleAfterMs: env.DEVICE_STALE_AFTER_MS,
     });
+  }
+
+  private formatGameDayRow(gd: {
+    id: string;
+    date: Date;
+    location: string;
+    defaultQuarterDurationMs: number;
+    defaultBreakBetweenQuartersMs: number;
+    defaultHalftimeDurationMs: number;
+    activeGameId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    games: Array<{
+      scheduledAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      score: { homeScore: number; awayScore: number } | null;
+      [key: string]: unknown;
+    }>;
+  }) {
+    type GameRow = (typeof gd.games)[number];
+    return {
+      ...gd,
+      date: gd.date.toISOString().slice(0, 10),
+      activeGameId: gd.activeGameId,
+      games: gd.games.map((g: GameRow) => ({
+        ...g,
+        scheduledAt: g.scheduledAt?.toISOString() ?? null,
+        createdAt: g.createdAt.toISOString(),
+        updatedAt: g.updatedAt.toISOString(),
+      })),
+    };
+  }
+
+  /** If exactly one game on the day and no live game set, default to that game. */
+  private async ensureActiveGameDefault(gameDayId: string): Promise<void> {
+    const gd = await this.prisma.gameDay.findUnique({
+      where: { id: gameDayId },
+      include: { games: { select: { id: true } } },
+    });
+    if (!gd || gd.activeGameId || gd.games.length !== 1) return;
+    const gameId = gd.games[0]!.id;
+    await this.prisma.gameDay.update({
+      where: { id: gameDayId },
+      data: { activeGameId: gameId },
+    });
+    await this.syncAssignedDevicesToActiveGame(gameId);
   }
 
   // --- Game day ---
@@ -229,21 +348,25 @@ export class GameService {
         },
       },
     });
-    type GameDayWithGames = (typeof list)[0];
-    type GameRow = GameDayWithGames["games"][0];
-    return list.map((gd: GameDayWithGames) => ({
-      ...gd,
-      date: gd.date.toISOString().slice(0, 10),
-      games: gd.games.map((g: GameRow) => ({
-        ...g,
-        scheduledAt: g.scheduledAt?.toISOString() ?? null,
-        createdAt: g.createdAt.toISOString(),
-        updatedAt: g.updatedAt.toISOString(),
-      })),
-    }));
+    for (const gd of list) {
+      if (!gd.activeGameId && gd.games.length === 1) {
+        await this.ensureActiveGameDefault(gd.id);
+      }
+    }
+    const refreshed = await this.prisma.gameDay.findMany({
+      orderBy: { date: "desc" },
+      include: {
+        games: {
+          orderBy: [{ orderInDay: "asc" }, { scheduledAt: "asc" }, { createdAt: "asc" }],
+          include: { score: true },
+        },
+      },
+    });
+    return refreshed.map((gd) => this.formatGameDayRow(gd));
   }
 
   async getGameDay(gameDayId: string) {
+    await this.ensureActiveGameDefault(gameDayId);
     const gameDay = await this.prisma.gameDay.findUnique({
       where: { id: gameDayId },
       include: {
@@ -254,17 +377,7 @@ export class GameService {
       },
     });
     if (!gameDay) throw this.notFound("Game day not found");
-    type GameRow = (typeof gameDay.games)[number];
-    return {
-      ...gameDay,
-      date: gameDay.date.toISOString().slice(0, 10),
-      games: gameDay.games.map((g: GameRow) => ({
-        ...g,
-        scheduledAt: g.scheduledAt?.toISOString() ?? null,
-        createdAt: g.createdAt.toISOString(),
-        updatedAt: g.updatedAt.toISOString(),
-      })),
-    };
+    return this.formatGameDayRow(gameDay);
   }
 
   async updateGameDay(
@@ -275,21 +388,41 @@ export class GameService {
       defaultQuarterDurationMs?: number;
       defaultBreakBetweenQuartersMs?: number;
       defaultHalftimeDurationMs?: number;
+      activeGameId?: string | null;
     }
   ) {
     const existing = await this.prisma.gameDay.findUnique({ where: { id: gameDayId } });
     if (!existing) throw this.notFound("Game day not found");
-    const data: { date?: Date; location?: string; defaultQuarterDurationMs?: number; defaultBreakBetweenQuartersMs?: number; defaultHalftimeDurationMs?: number } = {};
+
+    if (input.activeGameId !== undefined && input.activeGameId !== null) {
+      return this.setActiveGame(gameDayId, input.activeGameId);
+    }
+
+    const data: {
+      date?: Date;
+      location?: string;
+      defaultQuarterDurationMs?: number;
+      defaultBreakBetweenQuartersMs?: number;
+      defaultHalftimeDurationMs?: number;
+      activeGameId?: string | null;
+    } = {};
     if (input.date != null) data.date = new Date(input.date);
     if (input.location != null) data.location = input.location;
     if (input.defaultQuarterDurationMs != null) data.defaultQuarterDurationMs = input.defaultQuarterDurationMs;
     if (input.defaultBreakBetweenQuartersMs != null) data.defaultBreakBetweenQuartersMs = input.defaultBreakBetweenQuartersMs;
     if (input.defaultHalftimeDurationMs != null) data.defaultHalftimeDurationMs = input.defaultHalftimeDurationMs;
-    const gameDay = await this.prisma.gameDay.update({
+    if (input.activeGameId === null) {
+      data.activeGameId = null;
+      await this.prisma.gameDay.update({ where: { id: gameDayId }, data });
+      await this.syncAssignedDevicesToActiveGame(null);
+      return this.getGameDay(gameDayId);
+    }
+
+    await this.prisma.gameDay.update({
       where: { id: gameDayId },
       data,
     });
-    return gameDay;
+    return this.getGameDay(gameDayId);
   }
 
   async createGame(input: {
@@ -387,6 +520,17 @@ export class GameService {
       },
       "server"
     );
+
+    if (input.gameDayId) {
+      const gameCount = await this.prisma.game.count({ where: { gameDayId: input.gameDayId } });
+      if (gameCount === 1) {
+        await this.prisma.gameDay.update({
+          where: { id: input.gameDayId },
+          data: { activeGameId: game.id },
+        });
+        await this.syncAssignedDevicesToActiveGame(game.id);
+      }
+    }
 
     return this.emitState(game.id);
   }

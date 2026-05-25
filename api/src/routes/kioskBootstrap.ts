@@ -67,8 +67,7 @@ function buildKioskChromiumUrl(opts: {
     return `${origin}/kiosk/setup-screen.html`;
   }
   if (opts.role === "MANAGED") {
-    // Static page handles first-registration and redirects to assigned display.
-    return `${origin}/kiosk/setup-screen.html?managed=1`;
+    return `${origin}/kiosk/managed`;
   }
   const gid = opts.gameId;
   if (!gid) {

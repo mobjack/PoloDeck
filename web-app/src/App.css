@@ -1928,6 +1928,129 @@
   font-size: 1.2rem;
 }
 
+.games-section--cards .games-section-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.games-section-empty {
+  margin: 0 0 1rem;
+}
+
+.games-live-error {
+  margin: 0 0 0.75rem;
+  color: #e57373;
+  font-size: 0.9rem;
+}
+
+.game-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.game-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.game-card--live {
+  border-color: rgba(100, 108, 255, 0.65);
+  background: rgba(100, 108, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(100, 108, 255, 0.25);
+}
+
+.game-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.game-card-matchup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+}
+
+.game-card-teams {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.game-card-score {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
+.game-card-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.game-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.9rem;
+}
+
+.game-card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.game-card-meta-label {
+  opacity: 0.65;
+  font-size: 0.8rem;
+}
+
+.game-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.kiosks-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: light) {
+  .games-section--cards .games-section-hint {
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  .game-card {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: #fafafa;
+  }
+
+  .game-card--live {
+    border-color: rgba(63, 81, 181, 0.5);
+    background: rgba(63, 81, 181, 0.08);
+  }
+}
+
 .games-start-time-cell {
   vertical-align: middle;
   min-width: 7.5rem;

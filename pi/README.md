@@ -21,7 +21,7 @@ Once you have the server docker images up and running, you can then start buildi
 
 3. Once the Pi5 is up and running login with the user/password you created above either through the terminal or through ssh.
 
-4. On the Pi5 (Pi OS Lite, Bookworm or later), run the installer below. The deck server remembers each Pi’s role and which game it shows—you assign those in the main PoloDeck app, not in the `curl` URL.
+4. On the Pi5 (Pi OS Lite, Bookworm or later), run the installer below. The deck server remembers each Pi’s display role; the **live game** is chosen on the game day page, then you **Activate** each Pi under **Manage kiosks** in the main app—not in the `curl` URL.
 
    **Scoreboard, shot clock, and timer** (replace `192.168.1.10` with your deck LAN IP):
 
@@ -29,7 +29,7 @@ Once you have the server docker images up and running, you can then start buildi
    curl -fsSL 'http://192.168.1.10:3000/kb' | sudo bash
    ```
 
-   The installer asks what type of kiosk you are building (scoreboard, shot clock, or timer). Choose **Shot clock** to configure portrait mode (`display_rotate` in boot `config.txt` plus an X11 fallback); that takes effect after reboot. Role and game are still assigned in PoloDeck → **Kiosks** on the deck machine.
+   The installer asks what type of kiosk you are building (scoreboard, shot clock, or timer). Choose **Shot clock** to configure portrait mode (`display_rotate` in boot `config.txt` plus an X11 fallback); that takes effect after reboot. Set the live game on the game day page, then assign each Pi’s role under **Manage kiosks**.
 
    You will be prompted for the deckuser password to install the required packages.
 
@@ -64,3 +64,14 @@ sudo polodeck-wifi set-hostname pool-deck-1
 ## Verify without a full install
 
 Open in any browser: `http://<LAN-IP>:8080/kiosk/setup-screen.html` — you should see the static setup screen.
+
+### Kiosk already installed — point at managed mode
+
+If a Pi was registered via the old setup page (it may open a fixed `/kiosk/g/.../shot-clock` URL), update its start URL once over SSH:
+
+```bash
+echo 'http://<LAN-IP>:8080/kiosk/managed' | sudo tee /etc/polodeck-kiosk/url
+sudo reboot
+```
+
+After a **deck server restart**, run `./setup/setup.sh migrate` from the repo, ensure `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`, and rebuild containers. Pis recover automatically if they load `/kiosk/managed` (or any legacy kiosk URL, which now redirects there).

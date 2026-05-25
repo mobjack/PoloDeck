@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { ClipboardList, Monitor, Settings, Tally5, Timer, UserRoundCheck } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GameDay, GameOnDay } from "../types/gameDay";
@@ -36,6 +35,8 @@ export function GameDayDetail() {
   const [gameDay, setGameDay] = useState<GameDay | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [settingLiveId, setSettingLiveId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -77,13 +78,29 @@ export function GameDayDetail() {
     });
   };
 
+  const setLiveGame = async (gameId: string) => {
+    if (!id || gameDay.activeGameId === gameId) return;
+    setLiveError(null);
+    setSettingLiveId(gameId);
+    try {
+      const updated = await api.gameDays.setActiveGame(id, gameId);
+      setGameDay(updated);
+    } catch (e: unknown) {
+      setLiveError(formatApiErrorMessage(e));
+    } finally {
+      setSettingLiveId(null);
+    }
+  };
+
   return (
     <div className="game-day-detail-pane">
       <header className="page-header game-day-detail-header">
-        <h1>{gameDay.date} @ {gameDay.location}</h1>
+        <h1>
+          {gameDay.date} @ {gameDay.location}
+        </h1>
         <div className="game-day-detail-header-actions">
-          <Link to="/kiosk" className="btn secondary">
-            Kiosk displays
+          <Link to="/kiosks" className="btn secondary">
+            Manage kiosks
           </Link>
           <Link to={`/game-days/${gameDay.id}/edit`} className="btn secondary">
             Edit day
@@ -91,44 +108,33 @@ export function GameDayDetail() {
         </div>
       </header>
 
-      <section className="games-section">
+      <section className="games-section games-section--cards">
         <h2>Games</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Start time</th>
-              <th>Home (dark)</th>
-              <th>Away (light)</th>
-              <th>Score</th>
-              <th>Level</th>
-              <th>Type</th>
-              <th>Gender</th>
-              <th>Roster</th>
-              <th>Game sheet</th>
-              <th>Scoreboard</th>
-              <th>Timer</th>
-              <th>Kiosk</th>
-              <th>Settings</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gameDay.games.length === 0 ? (
-              <tr>
-              <td colSpan={13}>No games. Add one below.</td>
-              </tr>
-            ) : (
-              gameDay.games.map((g) => (
-                <GameRow
-                  key={g.id}
-                  game={g}
-                  gameDayId={gameDay.id}
-                  gameDayDate={gameDay.date}
-                  onStartTimeSaved={refreshGameDay}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
+        <p className="games-section-hint">
+          Choose which game is <strong>live on displays</strong>. All activated kiosks follow that game
+          (displays pick up the change within a few seconds).
+        </p>
+        {liveError ? <p className="games-live-error">{liveError}</p> : null}
+
+        {gameDay.games.length === 0 ? (
+          <p className="games-section-empty">No games. Add one below.</p>
+        ) : (
+          <ul className="game-card-list">
+            {gameDay.games.map((g) => (
+              <GameCard
+                key={g.id}
+                game={g}
+                gameDayId={gameDay.id}
+                gameDayDate={gameDay.date}
+                isLive={gameDay.activeGameId === g.id}
+                liveBusy={settingLiveId === g.id}
+                onSetLive={() => setLiveGame(g.id)}
+                onStartTimeSaved={refreshGameDay}
+              />
+            ))}
+          </ul>
+        )}
+
         <Link to={`/game-days/${gameDay.id}/games/new`} className="btn primary">
           Add game
         </Link>
@@ -137,15 +143,21 @@ export function GameDayDetail() {
   );
 }
 
-function GameRow({
+function GameCard({
   game,
   gameDayId,
   gameDayDate,
+  isLive,
+  liveBusy,
+  onSetLive,
   onStartTimeSaved,
 }: {
   game: GameOnDay;
   gameDayId: string;
   gameDayDate: string;
+  isLive: boolean;
+  liveBusy: boolean;
+  onSetLive: () => void;
   onStartTimeSaved: () => void;
 }) {
   const [timeValue, setTimeValue] = useState(() => isoToTimeInputValue(game.scheduledAt));
@@ -182,86 +194,91 @@ function GameRow({
 
   const score =
     game.score != null ? `${game.score.homeScore}-${game.score.awayScore}` : "—";
+
   return (
-    <tr>
-      <td className="games-start-time-cell">
-        <input
-          type="time"
-          className="games-start-time-input"
-          value={timeValue}
-          onChange={(e) => setTimeValue(e.target.value)}
-          onBlur={commitStartTime}
-          disabled={saving}
-          aria-label={`Start time for ${game.homeTeamName} vs ${game.awayTeamName}`}
-        />
+    <li className={`game-card${isLive ? " game-card--live" : ""}`}>
+      <div className="game-card-header">
+        <div className="game-card-matchup">
+          <span className="game-card-teams">
+            {game.homeTeamName} vs {game.awayTeamName}
+          </span>
+          <span className="game-card-score">{score}</span>
+        </div>
+        <label className="game-card-live">
+          <input
+            type="radio"
+            name={`live-game-${gameDayId}`}
+            checked={isLive}
+            disabled={liveBusy}
+            onChange={onSetLive}
+            aria-label={`Live on displays: ${game.homeTeamName} vs ${game.awayTeamName}`}
+          />
+          <span>Live on displays</span>
+        </label>
+      </div>
+
+      <div className="game-card-meta">
+        <label className="game-card-meta-item">
+          <span className="game-card-meta-label">Start</span>
+          <input
+            type="time"
+            className="games-start-time-input"
+            value={timeValue}
+            onChange={(e) => setTimeValue(e.target.value)}
+            onBlur={commitStartTime}
+            disabled={saving}
+          />
+        </label>
+        {game.level ? (
+          <span className="game-card-meta-item">
+            <span className="game-card-meta-label">Level</span> {game.level}
+          </span>
+        ) : null}
+        {game.gameType ? (
+          <span className="game-card-meta-item">
+            <span className="game-card-meta-label">Type</span> {game.gameType}
+          </span>
+        ) : null}
+        {game.gender ? (
+          <span className="game-card-meta-item">
+            <span className="game-card-meta-label">Gender</span> {game.gender}
+          </span>
+        ) : null}
         {saveError ? <span className="games-start-time-error">{saveError}</span> : null}
-      </td>
-      <td>{game.homeTeamName}</td>
-      <td>{game.awayTeamName}</td>
-      <td>{score}</td>
-      <td>{game.level ?? "—"}</td>
-      <td>{game.gameType ?? "—"}</td>
-      <td>{game.gender ?? "—"}</td>
-      <td className="games-action-cell">
+      </div>
+
+      <div className="game-card-actions">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/roster`}
-          className="btn btn-compact btn-games-row-action btn-roster-icon"
-          aria-label="Edit Roster"
-          title="Edit Roster"
+          className="btn btn-compact secondary"
         >
-          <UserRoundCheck size={16} strokeWidth={2} aria-hidden />
+          Roster
         </Link>
-      </td>
-      <td className="games-action-cell">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/sheet`}
-          className="btn primary game-sheet-button btn-compact btn-games-row-action"
-          aria-label="Edit Game Sheet"
-          title="Edit Game Sheet"
+          className="btn btn-compact primary"
         >
-          <ClipboardList size={16} strokeWidth={2} aria-hidden />
+          Game sheet
         </Link>
-      </td>
-      <td className="games-action-cell">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/scoreboard`}
-          className="btn btn-compact btn-games-row-action btn-scoreboard-tally"
-          aria-label="Scoreboard"
-          title="Scoreboard"
+          className="btn btn-compact secondary"
         >
-          <Tally5 size={16} strokeWidth={2} aria-hidden />
+          Scoreboard
         </Link>
-      </td>
-      <td className="games-action-cell">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/timer`}
-          className="btn btn-compact btn-games-row-action btn-timer"
-          aria-label="Timer"
-          title="Timer"
+          className="btn btn-compact secondary"
         >
-          <Timer size={16} strokeWidth={2} aria-hidden />
+          Timer
         </Link>
-      </td>
-      <td className="games-action-cell games-kiosk-cell">
-        <Link
-          to={`/kiosk/g/${game.id}/display`}
-          className="btn secondary btn-compact btn-games-row-action"
-          aria-label="Kiosk scoreboard display"
-          title="Kiosk scoreboard"
-        >
-          <Monitor size={16} strokeWidth={2} aria-hidden />
-        </Link>
-      </td>
-      <td className="games-action-cell">
         <Link
           to={`/game-days/${gameDayId}/games/${game.id}/edit`}
-          className="btn secondary btn-compact btn-games-row-action btn-settings-gear"
-          aria-label="Edit game"
-          title="Edit game"
+          className="btn btn-compact secondary"
         >
-          <Settings size={16} strokeWidth={2} aria-hidden />
+          Edit game
         </Link>
-      </td>
-    </tr>
+      </div>
+    </li>
   );
 }

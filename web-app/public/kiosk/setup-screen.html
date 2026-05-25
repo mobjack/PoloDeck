@@ -177,8 +177,8 @@
                 : 15000;
 
             if (target) {
-              statusEl.textContent = "Assigned. Opening display…";
-              window.location.replace(target);
+              statusEl.textContent = "Assigned. Opening managed display…";
+              window.location.replace("/kiosk/managed");
               return;
             }
             failedAttempts = 0;

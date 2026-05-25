@@ -16,6 +16,7 @@ import { KioskScoreboardDisplay } from "./pages/KioskScoreboardDisplay";
 import { KioskShotClockDisplay } from "./pages/KioskShotClockDisplay";
 import { KioskTimerDisplay } from "./pages/KioskTimerDisplay";
 import { KiosksAdmin } from "./pages/KiosksAdmin";
+import { LegacyKioskGate } from "./pages/RedirectKioskToManaged";
 import "./App.css";
 
 function App() {
@@ -25,9 +26,30 @@ function App() {
         <Routes>
           <Route path="/kiosk" element={<KioskHome />} />
           <Route path="/kiosk/managed" element={<KioskManaged />} />
-          <Route path="/kiosk/g/:gameId/display" element={<KioskScoreboardDisplay />} />
-          <Route path="/kiosk/g/:gameId/shot-clock" element={<KioskShotClockDisplay />} />
-          <Route path="/kiosk/g/:gameId/timer" element={<KioskTimerDisplay />} />
+          <Route
+            path="/kiosk/g/:gameId/display"
+            element={
+              <LegacyKioskGate>
+                <KioskScoreboardDisplay />
+              </LegacyKioskGate>
+            }
+          />
+          <Route
+            path="/kiosk/g/:gameId/shot-clock"
+            element={
+              <LegacyKioskGate>
+                <KioskShotClockDisplay />
+              </LegacyKioskGate>
+            }
+          />
+          <Route
+            path="/kiosk/g/:gameId/timer"
+            element={
+              <LegacyKioskGate>
+                <KioskTimerDisplay />
+              </LegacyKioskGate>
+            }
+          />
           <Route path="/game-days/new" element={<NewGameDay />} />
           <Route path="/game-days/:id/edit" element={<EditGameDay />} />
           <Route path="/game-days/:id/games/new" element={<AddGame />} />

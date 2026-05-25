@@ -191,8 +191,10 @@ export const api = {
         json: body,
       }),
     list: () => request<KioskDevice[]>("/devices"),
-    update: (id: string, body: { type?: KioskDeviceType; gameId?: string | null }) =>
+    update: (id: string, body: { type?: KioskDeviceType }) =>
       request<KioskDevice>(`/devices/${id}`, { method: "PATCH", json: body }),
+    delete: (id: string) =>
+      request<void>(`/devices/${id}`, { method: "DELETE" }),
   },
   capabilities: () =>
     request<DeviceCapabilities>("/capabilities"),
@@ -210,6 +212,11 @@ export const api = {
         method: "PATCH",
         json: body,
       }),
+    setActiveGame: (gameDayId: string, gameId: string) =>
+      request<import("../types/gameDay").GameDay>(
+        `/game-days/${gameDayId}/active-game`,
+        { method: "PUT", json: { gameId } }
+      ),
   },
   games: {
     list: () =>

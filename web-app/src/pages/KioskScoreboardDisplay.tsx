@@ -23,6 +23,9 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
   useEffect(() => {
     if (!gameId) return;
     let socket: Socket | null = null;
+    const joinGame = () => {
+      socket?.emit("game:join", { gameId });
+    };
     void Promise.resolve().then(() => setLoading(true));
 
     api.games
@@ -30,7 +33,8 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
       .then((agg) => {
         setAggregate(agg);
         socket = createGameSocket();
-        socket.emit("game:join", { gameId });
+        socket.on("connect", joinGame);
+        joinGame();
         socket.on("game:stateUpdated", (payload: { gameId: string; aggregate: GameAggregate }) => {
           if (payload.gameId === gameId) {
             setAggregate(payload.aggregate);
@@ -42,6 +46,7 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
 
     return () => {
       if (socket) {
+        socket.off("connect", joinGame);
         socket.emit("game:leave", { gameId });
         socket.disconnect();
       }

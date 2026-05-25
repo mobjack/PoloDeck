@@ -29,13 +29,17 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
     if (!gameId) return;
     void Promise.resolve().then(() => setLoading(true));
     let socket: Socket | null = null;
+    const joinGame = () => {
+      socket?.emit("game:join", { gameId });
+    };
 
     api.games
       .getAggregate(gameId)
       .then((agg) => {
         setAggregate(agg);
         socket = createGameSocket();
-        socket.emit("game:join", { gameId });
+        socket.on("connect", joinGame);
+        joinGame();
         socket.on("game:stateUpdated", (payload: { gameId: string; aggregate: GameAggregate }) => {
           if (payload.gameId === gameId) {
             setAggregate(payload.aggregate);
@@ -47,6 +51,7 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
 
     return () => {
       if (socket) {
+        socket.off("connect", joinGame);
         socket.emit("game:leave", { gameId });
         socket.disconnect();
       }
