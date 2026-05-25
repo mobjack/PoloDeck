@@ -3081,8 +3081,9 @@ body:has(.kiosk-shotclock-display) .app {
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 1.5vmin 1vmin;
+  padding: 2vmin 2vmin;
   box-sizing: border-box;
+  overflow: hidden;
   text-align: center;
   background: #000;
   color: #f1f5f9;
@@ -3121,7 +3122,7 @@ body:has(.kiosk-shotclock-display) .app {
 .kiosk-shotclock-game {
   flex: 0 0 auto;
   font-family: "DSEG14-Classic", monospace;
-  font-size: min(72vw, 28vh);
+  font-size: min(52vw, 20vh);
   color: #ffd700;
 }
 
@@ -3131,8 +3132,9 @@ body:has(.kiosk-shotclock-display) .app {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  max-height: 52vh;
   font-family: "DSEG7-Classic", monospace;
-  font-size: min(96vw, 68vh);
+  font-size: min(68vw, 46vh);
   color: #ff1a1a;
   letter-spacing: 0.02em;
 }
@@ -3140,11 +3142,12 @@ body:has(.kiosk-shotclock-display) .app {
 /* Landscape viewports (e.g. dev browser): height-limited — lean on vh for shot */
 @media (orientation: landscape) {
   .kiosk-shotclock-game {
-    font-size: min(48vw, 36vh);
+    font-size: min(38vw, 26vh);
   }
 
   .kiosk-shotclock-shot {
-    font-size: min(72vw, 86vh);
+    max-height: 62vh;
+    font-size: min(56vw, 58vh);
   }
 }
 
