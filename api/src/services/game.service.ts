@@ -1477,6 +1477,21 @@ export class GameService {
     return this.emitState(gameId);
   }
 
+  /** Game-clock remaining as integer seconds (for scoring when time is omitted). */
+  private async resolveGameClockTimeSeconds(gameId: string): Promise<number> {
+    const clock = await this.prisma.gameClock.findUnique({ where: { gameId } });
+    if (!clock) {
+      throw this.badRequest("Game clock is not available for this game.");
+    }
+    const remainingMs = getEffectiveRemainingMs({
+      durationMs: clock.durationMs,
+      remainingMs: clock.remainingMs,
+      running: clock.running,
+      lastStartedAt: clock.lastStartedAt,
+    });
+    return Math.floor(remainingMs / 1000);
+  }
+
   async applyScoreCommand(
     gameId: string,
     body: {
@@ -1488,6 +1503,7 @@ export class GameService {
     }
   ) {
     const side = body.side != null ? (body.side as TeamSide) : undefined;
+    const explicitTimeSeconds = body.timeSeconds;
 
     switch (body.type) {
       case "START_QUARTER": {
@@ -1502,9 +1518,15 @@ export class GameService {
             data: { scheduledAt: new Date() },
           });
         }
-        const quarterMs = game.quarterDurationMs ?? game.gameClock.durationMs;
-        await this.setGameClock(gameId, quarterMs, { skipEvent: true });
-        return this.startGameClock(gameId);
+        if (!(await this.quarterStartAlreadyLogged(gameId))) {
+          await this.createEvent(
+            gameId,
+            GameEventType.GAME_CLOCK_STARTED,
+            { period: game.currentPeriod },
+            "operator"
+          );
+        }
+        return this.emitState(gameId);
       }
       case "END_QUARTER": {
         await this.stopGameClock(gameId);
@@ -1527,19 +1549,21 @@ export class GameService {
           );
         }
         await this.assertPlayerNotRolled(gameId, side, body.capNumber);
-        if (body.timeSeconds != null) {
-          await this.setGameClock(gameId, body.timeSeconds * 1000, { skipEvent: true });
-        }
-        return this.adjustScore(gameId, side, 1, body.capNumber, body.timeSeconds);
+        const goalTimeSeconds =
+          explicitTimeSeconds != null
+            ? explicitTimeSeconds
+            : await this.resolveGameClockTimeSeconds(gameId);
+        return this.adjustScore(gameId, side, 1, body.capNumber, goalTimeSeconds);
       }
       case "EXCLUSION":
       case "PENALTY": {
         if (side == null || body.capNumber == null) {
           throw this.badRequest("Exclusion/penalty requires side and capNumber");
         }
-        if (body.timeSeconds != null) {
-          await this.setGameClock(gameId, body.timeSeconds * 1000, { skipEvent: true });
-        }
+        const exclusionTimeSeconds =
+          explicitTimeSeconds != null
+            ? explicitTimeSeconds
+            : await this.resolveGameClockTimeSeconds(gameId);
         const player = await this.prisma.player.findFirst({
           where: { gameId, teamSide: side, capNumber: body.capNumber },
         });
@@ -1548,17 +1572,25 @@ export class GameService {
         const isPenalty = body.type === "PENALTY";
         return this.createExclusion(gameId, {
           playerId: player.id,
-          timeSeconds: body.timeSeconds,
+          timeSeconds: exclusionTimeSeconds,
           isPenalty,
         });
       }
       case "TIMEOUT": {
         if (side == null) throw this.badRequest("TIMEOUT requires side");
-        return this.useTimeout(gameId, side, "full", body.timeSeconds);
+        const timeoutTimeSeconds =
+          explicitTimeSeconds != null
+            ? explicitTimeSeconds
+            : await this.resolveGameClockTimeSeconds(gameId);
+        return this.useTimeout(gameId, side, "full", timeoutTimeSeconds);
       }
       case "TIMEOUT_30": {
         if (side == null) throw this.badRequest("TIMEOUT_30 requires side");
-        return this.useTimeout(gameId, side, "short", body.timeSeconds);
+        const timeout30TimeSeconds =
+          explicitTimeSeconds != null
+            ? explicitTimeSeconds
+            : await this.resolveGameClockTimeSeconds(gameId);
+        return this.useTimeout(gameId, side, "short", timeout30TimeSeconds);
       }
       default:
         throw this.badRequest(`Unknown score command type: ${(body as { type: string }).type}`);
