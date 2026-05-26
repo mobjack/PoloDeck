@@ -2,12 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Socket } from "socket.io-client";
 import {
+  formatBreakCountdownDisplay,
+  formatGamePeriodFooter,
   formatGameTimeDisplay,
   formatShotClockDisplay,
+  formatShotClockDuringBreak,
+  getBreakDisplayLabel,
+  getBreakRemainingMs,
   getEffectiveRemainingMs,
-  isHalftimeActive,
+  getPendingBreakLabel,
+  isBreakPending,
+  isOnBreak,
 } from "../lib/clockDisplay";
-import { eventsForGameProgressDisplay } from "../lib/gameProgressDisplay";
+import {
+  eventsForGameProgressDisplay,
+  formatQuarterEndedRemark,
+  formatQuarterStartedRemark,
+} from "../lib/gameProgressDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
@@ -71,7 +82,17 @@ function goalEventDelta(payload: Record<string, unknown> | undefined): number {
 
 interface ParsedInput {
   raw: string;
-  type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
+  type:
+    | "START_QUARTER"
+    | "END_QUARTER"
+    | "START_BREAK"
+    | "TOGGLE_GAME_CLOCK"
+    | "RESET_SHOT_CLOCK"
+    | "GOAL"
+    | "EXCLUSION"
+    | "PENALTY"
+    | "TIMEOUT"
+    | "TIMEOUT_30";
   timeSeconds?: number;
   side?: TeamSide;
   capNumber?: string;
@@ -359,9 +380,8 @@ export function GameSheet() {
 
   const homeScore = aggregate.score?.homeScore ?? 0;
   const awayScore = aggregate.score?.awayScore ?? 0;
-  const isGameOver =
-    aggregate.status === "FINAL" ||
-    (aggregate.currentPeriod >= aggregate.totalPeriods && !aggregate.gameClock?.running);
+  /** Only block scoring when the game is officially final — not when the clock is simply stopped. */
+  const isGameOver = aggregate.status === "FINAL";
   const homeTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "HOME");
   const awayTimeouts = aggregate.timeoutStates?.find((t) => t.teamSide === "AWAY");
 
@@ -467,7 +487,10 @@ export function GameSheet() {
         }
         break;
       case "GAME_CLOCK_STARTED":
-        remark = "Quarter started";
+        remark = formatQuarterStartedRemark(p);
+        break;
+      case "QUARTER_ENDED":
+        remark = formatQuarterEndedRemark(p);
         break;
       case "HORN_TRIGGERED":
         remark = "Horn";
@@ -479,7 +502,8 @@ export function GameSheet() {
         remark = ev.eventType.replace(/_/g, " ").toLowerCase();
     }
     const isQuarterStart = ev.eventType === "GAME_CLOCK_STARTED";
-    const isQuarterEnd = ev.eventType === "PERIOD_ADVANCED";
+    const isQuarterEnd =
+      ev.eventType === "PERIOD_ADVANCED" || ev.eventType === "QUARTER_ENDED";
     const foulCount =
       ev.eventType === "EXCLUSION_STARTED" && side && cap
         ? (foulsByPlayer[(side as TeamSide)]?.[cap]?.length ?? 0)
@@ -786,13 +810,23 @@ export function GameSheet() {
 
   void tick;
   const now = Date.now();
-  const halftimeActive = isHalftimeActive(aggregate);
-  const gameClockDisplay = aggregate.gameClock
-    ? formatGameTimeDisplay(getEffectiveRemainingMs(aggregate.gameClock, now))
-    : "—";
-  const shotClockDisplay = aggregate.shotClock
-    ? formatShotClockDisplay(getEffectiveRemainingMs(aggregate.shotClock, now))
-    : "—";
+  const breakPending = isBreakPending(aggregate);
+  const pendingBreakLabel = getPendingBreakLabel(aggregate);
+  const onBreak = isOnBreak(aggregate);
+  const breakLabel = getBreakDisplayLabel(aggregate);
+  const breakMs = onBreak ? getBreakRemainingMs(aggregate, now) : 0;
+  const gameClockDisplay = onBreak
+    ? formatBreakCountdownDisplay(breakMs)
+    : aggregate.gameClock
+      ? formatGameTimeDisplay(getEffectiveRemainingMs(aggregate.gameClock, now))
+      : "—";
+  const shotClockDisplay = onBreak
+    ? formatShotClockDuringBreak()
+    : aggregate.shotClock
+      ? formatShotClockDisplay(getEffectiveRemainingMs(aggregate.shotClock, now))
+      : "—";
+  const gameClockLabel = onBreak && breakLabel ? breakLabel : "Game";
+  const shotClockLabel = "Shot";
 
   return (
     <div className="page game-sheet-page">
@@ -881,10 +915,14 @@ export function GameSheet() {
                   </div>
                 </div>
               </div>
+              {breakPending && pendingBreakLabel ? (
+                <p className="scoreboard-break-pending-hint" role="status">
+                  {pendingBreakLabel} — type <strong>sb</strong> or use Timer to start break clock.
+                </p>
+              ) : null}
               <div className="scoreboard-footer">
                 <div className="scoreboard-footer-period">
-                  Period: Q{aggregate.currentPeriod}
-                  {halftimeActive ? " · HT" : null}
+                  {formatGamePeriodFooter(aggregate)}
                 </div>
                 <div className="scoreboard-footer-clocks" aria-live="polite">
                   <div
@@ -894,7 +932,7 @@ export function GameSheet() {
                         : "scoreboard-clock"
                     }
                   >
-                    <span className="scoreboard-clock-label">Game</span>
+                    <span className="scoreboard-clock-label">{gameClockLabel}</span>
                     <span className="scoreboard-clock-value">{gameClockDisplay}</span>
                   </div>
                   <div
@@ -904,7 +942,7 @@ export function GameSheet() {
                         : "scoreboard-clock"
                     }
                   >
-                    <span className="scoreboard-clock-label">Shot</span>
+                    <span className="scoreboard-clock-label">{shotClockLabel}</span>
                     <span className="scoreboard-clock-value">{shotClockDisplay}</span>
                   </div>
                 </div>
@@ -962,7 +1000,7 @@ export function GameSheet() {
             </form>
             {lastParsed && (
               <p className="parsed-preview">
-                Parsed: {describeParsed(lastParsed)}
+                Parsed: {describeParsed(lastParsed, aggregate)}
               </p>
             )}
           </section>
@@ -993,16 +1031,26 @@ export function GameSheet() {
                 <div className="scoring-command-help-body">
                   <h3>Quarter</h3>
                   <ul>
-                    <li><strong>sq</strong> — Start quarter (log only; use Timer for clock)</li>
-                    <li><strong>eq</strong> — End quarter</li>
+                    <li><strong>sq</strong> — Start next quarter (after break, ends break and advances period)</li>
+                    <li><strong>eq</strong> — End quarter (stops clocks; does not start break countdown)</li>
+                    <li><strong>sb</strong> or <strong>startbreak</strong> — Start break/halftime countdown (after <strong>eq</strong>)</li>
                   </ul>
+
+                  <h3>Clock</h3>
+                  <ul>
+                    <li><strong>c</strong> or <strong>clock</strong> — Start or stop the game clock</li>
+                    <li><strong>r</strong> or <strong>reset</strong> — Reset shot clock to full shot time (from game settings)</li>
+                  </ul>
+                  <p>
+                    After <strong>eq</strong>, use <strong>sb</strong> before <strong>c</strong> or <strong>r</strong> while break is pending.
+                  </p>
 
                   <h3>Time</h3>
                   <p>
                     Use a dot or colon: <strong>6.07</strong> or <strong>6:07</strong> = 6 min 7 sec.
                     Optional at the start of goals, exclusions, penalties, and timeouts. If omitted, the
-                    current <strong>game clock</strong> on the scoreboard is recorded. Does not change the
-                    live clock (use <strong>Timer</strong>).
+                    current <strong>game clock</strong> on the scoreboard is recorded. Scoring entries do not
+                    start or stop the live clock (use <strong>c</strong> or the Timer page).
                   </p>
 
                   <h3>Team</h3>
@@ -1027,8 +1075,11 @@ export function GameSheet() {
 
                   <h3>Examples</h3>
                   <ul className="scoring-command-help-examples">
-                    <li><code>sq</code> — start quarter (does not change clock)</li>
+                    <li><code>sq</code> — start next quarter</li>
                     <li><code>eq</code> — end quarter</li>
+                    <li><code>sb</code> — start break/halftime clock</li>
+                    <li><code>c</code> — toggle game clock (start/stop)</li>
+                    <li><code>r</code> — reset shot clock to full shot time</li>
                     <li><code>w13g</code> — Light cap 13 goal (current game clock)</li>
                     <li><code>6:50w13g</code> — Light cap 13 goal at 6:50</li>
                     <li><code>5.53b2e</code> — Dark cap 2 exclusion at 5:53</li>
@@ -1944,6 +1995,15 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
   if (lower === "eq") {
     return { ok: true, value: { raw, type: "END_QUARTER" } };
   }
+  if (lower === "sb" || lower === "startbreak") {
+    return { ok: true, value: { raw, type: "START_BREAK" } };
+  }
+  if (lower === "c" || lower === "clock") {
+    return { ok: true, value: { raw, type: "TOGGLE_GAME_CLOCK" } };
+  }
+  if (lower === "r" || lower === "reset") {
+    return { ok: true, value: { raw, type: "RESET_SHOT_CLOCK" } };
+  }
 
   // b and d both mean dark; w and l both mean light
   const darkChars = "bd";
@@ -1989,7 +2049,7 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
       return {
         ok: false,
         error:
-          "Invalid command. Examples: sq, eq, w13g, g13w, 6.07w13g, 5.53b2e, tw, 4.13tw or 4.13t3w.",
+          "Invalid command. Examples: sq, eq, sb, c, r, w13g, g13w, 6.07w13g, 5.53b2e, tw, 4.13tw or 4.13t3w.",
       };
     }
   }
@@ -2192,12 +2252,25 @@ function formatParsedTime(seconds?: number): string {
   return "current game clock";
 }
 
-function describeParsed(parsed: ParsedInput): string {
+function describeParsed(parsed: ParsedInput, aggregate: GameAggregate): string {
   switch (parsed.type) {
-    case "START_QUARTER":
-      return "Start quarter";
+    case "START_QUARTER": {
+      const cp = aggregate.currentPeriod;
+      const tp = aggregate.totalPeriods;
+      if (isOnBreak(aggregate) || isBreakPending(aggregate)) {
+        const next = Math.min(tp, cp + 1);
+        return next >= 5 ? "Start OT" : `Start Q${next}`;
+      }
+      return cp >= 5 ? "Start OT game clock" : `Start Q${cp} game clock`;
+    }
     case "END_QUARTER":
       return "End quarter";
+    case "START_BREAK":
+      return "Start break / halftime clock";
+    case "TOGGLE_GAME_CLOCK":
+      return aggregate.gameClock?.running ? "Stop game clock" : "Start game clock";
+    case "RESET_SHOT_CLOCK":
+      return "Reset shot clock to full shot time";
     case "TIMEOUT":
       return `${parsed.side === "HOME" ? "Dark" : "Light"} timeout at ${formatParsedTime(parsed.timeSeconds)}`;
     case "TIMEOUT_30":

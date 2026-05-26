@@ -6,6 +6,7 @@ ENV NODE_ENV=production
 
 COPY package.json tsconfig.json tsconfig.build.json ./
 COPY prisma ./prisma
+COPY scripts ./scripts
 COPY src ./src
 
 RUN npm install && npx prisma generate && npm run build

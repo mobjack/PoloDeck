@@ -6,7 +6,10 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && npm run copy:prisma-client",
+    "copy:prisma-client": "node scripts/copy-prisma-client.mjs",
+    "postinstall": "prisma generate",
+    "prestart": "npm run copy:prisma-client",
     "start": "node dist/server.js",
     "lint": "echo \"no linter configured\"",
     "prisma:migrate": "prisma migrate dev",

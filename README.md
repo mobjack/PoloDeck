@@ -4,6 +4,8 @@
 
 Everything runs on the pool deck over local WiFi—no internet required.
 
+**Operator commands:** [Command list](COMMAND_LIST.md) — scoring shortcuts for the game sheet (`sq`, `eq`, goals, timeouts, etc.).
+
 ## Overview
 
 - **Central server** is the single source of truth for game state; clients send commands and never run their own timers.
@@ -27,7 +29,7 @@ Updates are pushed to clients in real time via **Socket.IO** (`game:stateUpdated
 
 ## Tech stack
 
-| Layer       | Choices                                                                 |
+| Layer      | Choices                                                                  |
 |------------|--------------------------------------------------------------------------|
 | Backend    | Node.js, TypeScript, Fastify, Socket.IO, Prisma, PostgreSQL, Zod, dotenv |
 | Frontend   | Vite, React, TypeScript                                                  |
@@ -55,6 +57,7 @@ PoloDeck/
 │   ├── docker-compose.yml
 │   ├── setup.sh
 │   └── .env.example
+├── COMMAND_LIST.md   # Game sheet scoring commands (printable reference)
 └── README.md
 ```
 
@@ -133,4 +136,3 @@ Early MVP scaffold:
 - Backend: game model, timing, rosters, exclusions, timeouts, device check-in, event log.
 - Game-day planning and game metadata APIs are in place.
 - UI: first pass game-day admin UI built with React (no auth, no production hardening yet).
-

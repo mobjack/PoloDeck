@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -30,6 +31,12 @@ enum DeviceType {
   TIMER
 }
 
+enum BreakPhase {
+  NONE
+  QUARTER_BREAK
+  HALFTIME
+}
+
 enum GameEventType {
   GAME_CREATED
   GOAL_HOME
@@ -43,6 +50,9 @@ enum GameEventType {
   SHOT_CLOCK_RESET_UNDONE
   SHOT_CLOCK_SET
   PERIOD_ADVANCED
+  QUARTER_ENDED
+  BREAK_STARTED
+  BREAK_ENDED
   EXCLUSION_STARTED
   EXCLUSION_CLEARED
   TIMEOUT_USED
@@ -80,6 +90,9 @@ model Game {
   quarterDurationMs             Int       @default(480000)   // 8 min per quarter
   breakBetweenQuartersDurationMs Int       @default(120000)  // 2 min
   halftimeDurationMs            Int       @default(300000)   // 5 min
+  shotClockDurationMs           Int       @default(30000)    // regulation shot length
+  breakPhase                    BreakPhase @default(NONE)
+  breakAfterPeriod              Int?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

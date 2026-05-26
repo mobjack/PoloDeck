@@ -20,6 +20,7 @@ PoloDeck setup (Docker)
   ./setup/setup.sh migrate      Run prisma migrate deploy in the API container
   ./setup/setup.sh build        docker compose build
   ./setup/setup.sh logs         docker compose logs -f
+  ./setup/setup.sh restart-api  Rebuild and restart the API container (after api code changes)
 
 Environment (non-interactive / CI):
 
@@ -227,6 +228,11 @@ main() {
       ;;
     logs)
       (cd "${SETUP_DIR}" && "${COMPOSE[@]}" logs -f)
+      ;;
+    restart-api)
+      ensure_env_file
+      echo "Rebuilding and restarting polodeck-api…"
+      (cd "${SETUP_DIR}" && "${COMPOSE[@]}" up -d --build polodeck-api)
       ;;
     *)
       echo "error: unknown command: ${cmd}" >&2

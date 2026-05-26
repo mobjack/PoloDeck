@@ -8,6 +8,7 @@ import {
   formatGameTimeDisplay,
   formatShotClockDisplay,
   getEffectiveRemainingMs,
+  getGamePeriodSubtitle,
 } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
@@ -101,8 +102,7 @@ export function KioskTimerDisplay(props: KioskTimerDisplayProps) {
       <header className="kiosk-display-header">
         <h1 className="kiosk-display-title kiosk-timer-title">Timer</h1>
         <p className="kiosk-display-meta">
-          {aggregate.homeTeamName} vs {aggregate.awayTeamName} — Period {aggregate.currentPeriod} of{" "}
-          {aggregate.totalPeriods}
+          {aggregate.homeTeamName} vs {aggregate.awayTeamName} — {getGamePeriodSubtitle(aggregate)}
         </p>
       </header>
       <div className="kiosk-timer-blocks" aria-live="polite">

@@ -6,9 +6,17 @@ import { Settings } from "lucide-react";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay, formatApiErrorMessage } from "../components/DatabaseUnavailable";
 import {
+  formatBreakCountdownDisplay,
   formatGameTimeDisplay,
   formatShotClockDisplay,
+  formatShotClockDuringBreak,
+  getBreakDisplayLabel,
+  getBreakRemainingMs,
   getEffectiveRemainingMs,
+  getGamePeriodSubtitle,
+  getStartBreakButtonLabel,
+  isBreakPending,
+  isOnBreak,
 } from "../lib/clockDisplay";
 import {
   formatGameTimeForInput,
@@ -163,12 +171,22 @@ export function GameTimer() {
 
   void tick; // re-render on interval while clocks run
   const now = Date.now();
-  const gameMs = aggregate.gameClock
-    ? getEffectiveRemainingMs(aggregate.gameClock, now)
-    : 0;
+  const breakPending = isBreakPending(aggregate);
+  const onBreak = isOnBreak(aggregate);
+  const breakLabel = getBreakDisplayLabel(aggregate);
+  const startBreakLabel = getStartBreakButtonLabel(aggregate);
+  const breakMs = onBreak ? getBreakRemainingMs(aggregate, now) : 0;
+  const gameMs = onBreak
+    ? breakMs
+    : aggregate.gameClock
+      ? getEffectiveRemainingMs(aggregate.gameClock, now)
+      : 0;
   const shotMs = aggregate.shotClock
     ? getEffectiveRemainingMs(aggregate.shotClock, now)
     : 0;
+  const shotDisplay = onBreak
+    ? formatShotClockDuringBreak()
+    : formatShotClockDisplay(shotMs);
 
   const toggleGameClock = () => {
     if (gameRunning) {
@@ -205,8 +223,7 @@ export function GameTimer() {
           </button>
         </div>
         <p className="game-timer-sub">
-          {aggregate.homeTeamName} vs {aggregate.awayTeamName} — Period {aggregate.currentPeriod} of{" "}
-          {aggregate.totalPeriods}
+          {aggregate.homeTeamName} vs {aggregate.awayTeamName} — {getGamePeriodSubtitle(aggregate)}
         </p>
         {error ? (
           <div className="game-timer-error" role="alert">
@@ -216,50 +233,68 @@ export function GameTimer() {
       </header>
 
       <div className="game-timer-displays" aria-live="polite">
-        <section className="game-timer-block" aria-label="Game time">
-          <h2 className="game-timer-block-label">Game time</h2>
+        <section
+          className="game-timer-block"
+          aria-label={onBreak && breakLabel ? breakLabel : "Game time"}
+        >
+          <h2 className="game-timer-block-label">
+            {onBreak && breakLabel ? breakLabel : "Game time"}
+          </h2>
           <div className="game-timer-digits game-timer-digits--game">
-            {formatGameTimeDisplay(gameMs)}
+            {onBreak ? formatBreakCountdownDisplay(gameMs) : formatGameTimeDisplay(gameMs)}
           </div>
         </section>
-        <section className="game-timer-block" aria-label="Shot clock">
+        <section className="game-timer-block" aria-label={onBreak ? "Shot clock off" : "Shot clock"}>
           <h2 className="game-timer-block-label">Shot clock</h2>
-          <div className="game-timer-digits game-timer-digits--shot">
-            {formatShotClockDisplay(shotMs)}
-          </div>
+          <div className="game-timer-digits game-timer-digits--shot">{shotDisplay}</div>
         </section>
       </div>
 
       <div className="game-timer-actions">
-        <button
-          type="button"
-          className={
-            "btn game-timer-startstop " +
-            (gameRunning ? "game-timer-startstop--running" : "game-timer-startstop--stopped")
-          }
-          disabled={busy}
-          onClick={toggleGameClock}
-        >
-          {gameRunning ? "Running" : "Start Clock"}
-        </button>
-        <div className="game-timer-shot-row">
+        {breakPending && startBreakLabel ? (
           <button
             type="button"
-            className="btn secondary game-timer-reset"
+            className="btn primary game-timer-start-break"
             disabled={busy}
-            onClick={() => void run(() => api.games.shotClockReset(gameId))}
+            onClick={() =>
+              void run(() => api.games.applyScoreCommand(gameId, { type: "START_BREAK" }))
+            }
           >
-            Reset shot clock
+            {startBreakLabel}
           </button>
+        ) : (
           <button
             type="button"
-            className="btn game-timer-undo"
-            disabled={busy}
-            onClick={() => void run(() => api.games.shotClockUndoReset(gameId))}
+            className={
+              "btn game-timer-startstop " +
+              (gameRunning ? "game-timer-startstop--running" : "game-timer-startstop--stopped")
+            }
+            disabled={busy || breakPending}
+            onClick={toggleGameClock}
           >
-            Undo
+            {gameRunning ? "Running" : "Start Clock"}
           </button>
-        </div>
+        )}
+        {!onBreak && !breakPending ? (
+          <div className="game-timer-shot-row">
+            <button
+              type="button"
+              className="btn secondary game-timer-reset"
+              disabled={busy}
+              onClick={() => void run(() => api.games.shotClockReset(gameId))}
+            >
+              Reset shot clock
+            </button>
+            <button
+              type="button"
+              className="btn game-timer-undo"
+              disabled={busy}
+              onClick={() => void run(() => api.games.shotClockUndoReset(gameId))}
+            >
+              Undo
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {settingsOpen ? (

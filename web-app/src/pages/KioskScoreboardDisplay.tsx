@@ -4,7 +4,13 @@ import type { Socket } from "socket.io-client";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import { useKioskDeviceCheckIn } from "../hooks/useKioskDeviceCheckIn";
-import { isHalftimeActive } from "../lib/clockDisplay";
+import {
+  formatBreakCountdownDisplay,
+  getBreakDisplayLabel,
+  getBreakRemainingMs,
+  isGameFinal,
+  isOnBreak,
+} from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
 type KioskScoreboardDisplayProps = {
@@ -18,6 +24,7 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
   const [aggregate, setAggregate] = useState<GameAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
+  const [now, setNow] = useState(() => Date.now());
   useKioskDeviceCheckIn();
 
   useEffect(() => {
@@ -53,6 +60,15 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
     };
   }, [gameId]);
 
+  const gameRunning = aggregate?.gameClock?.running ?? false;
+  const onBreak = aggregate != null && isOnBreak(aggregate);
+
+  useEffect(() => {
+    if (!onBreak && !gameRunning) return;
+    const id = window.setInterval(() => setNow(Date.now()), 100);
+    return () => window.clearInterval(id);
+  }, [onBreak, gameRunning]);
+
   if (loading) {
     return (
       <div className="kiosk-display-page kiosk-scoreboard-display">
@@ -79,26 +95,29 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
   const awayScore = aggregate.score?.awayScore ?? 0;
   const tp = aggregate.totalPeriods;
   const cp = aggregate.currentPeriod;
-  const isFinal = aggregate.status === "FINAL";
+  const isFinal = isGameFinal(aggregate);
 
+  const halfTimeActive = aggregate.breakPhase === "HALFTIME";
   const inP3 = !isFinal && cp === 3;
-  const halfTimeActive = isHalftimeActive(aggregate);
-  const q3Active = inP3 && !halfTimeActive;
+  const q3Active = inP3 && !halfTimeActive && !onBreak;
 
   const phaseActive = {
-    q1: !isFinal && cp === 1,
-    q2: !isFinal && cp === 2,
+    q1: !isFinal && cp === 1 && !onBreak,
+    q2: !isFinal && cp === 2 && !onBreak,
     ht: halfTimeActive,
     q3: q3Active,
-    q4: !isFinal && cp === 4 && tp >= 4,
+    q4: !isFinal && cp === 4 && tp >= 4 && !onBreak,
     ot: !isFinal && cp === 5 && tp >= 5,
     final: isFinal,
   };
 
+  const breakLabel = getBreakDisplayLabel(aggregate);
+  const breakMs = onBreak ? getBreakRemainingMs(aggregate, now) : 0;
+
   return (
     <div
       className="kiosk-display-page kiosk-scoreboard-display"
-      aria-label={`${aggregate.homeTeamName} vs ${aggregate.awayTeamName}, period ${cp} of ${tp}`}
+      aria-label={`${aggregate.homeTeamName} vs ${aggregate.awayTeamName}, ${isFinal ? "final" : `period ${cp} of ${tp}`}`}
     >
       <div className="kiosk-display-columns">
         <section className="kiosk-display-side kiosk-display-side--dark" aria-label="Home">
@@ -115,15 +134,35 @@ export function KioskScoreboardDisplay(props: KioskScoreboardDisplayProps) {
 
       <section className="kiosk-display-periods" aria-label="Period">
         <div className="kiosk-display-period-row">
-          <span className={`kiosk-phase${phaseActive.q1 ? " is-active" : ""}`}>Q1</span>
-          <span className={`kiosk-phase${phaseActive.q2 ? " is-active" : ""}`}>Q2</span>
-          <span className={`kiosk-phase${phaseActive.ht ? " is-active" : ""}`}>HT</span>
-          <span className={`kiosk-phase${phaseActive.q3 ? " is-active" : ""}`}>Q3</span>
-          <span className={`kiosk-phase${phaseActive.q4 ? " is-active" : ""}`}>Q4</span>
-          <span className={`kiosk-phase${phaseActive.ot ? " is-active" : ""}`}>OT</span>
-          <span className={`kiosk-phase${phaseActive.final ? " is-active" : ""}`}>Final</span>
+          {isFinal ? (
+            <span className="kiosk-phase is-active">Final</span>
+          ) : (
+            <>
+              <span className={`kiosk-phase${phaseActive.q1 ? " is-active" : ""}`}>Q1</span>
+              <span className={`kiosk-phase${phaseActive.q2 ? " is-active" : ""}`}>Q2</span>
+              <span className={`kiosk-phase${phaseActive.ht ? " is-active" : ""}`}>HT</span>
+              <span className={`kiosk-phase${phaseActive.q3 ? " is-active" : ""}`}>Q3</span>
+              <span className={`kiosk-phase${phaseActive.q4 ? " is-active" : ""}`}>Q4</span>
+              <span className={`kiosk-phase${phaseActive.ot ? " is-active" : ""}`}>OT</span>
+            </>
+          )}
         </div>
       </section>
+
+      {onBreak && breakLabel ? (
+        <section className="kiosk-scoreboard-break" aria-live="polite">
+          <div className="kiosk-scoreboard-break-label">{breakLabel}</div>
+          <div
+            className={
+              gameRunning
+                ? "kiosk-scoreboard-break-time kiosk-scoreboard-break-time--running"
+                : "kiosk-scoreboard-break-time"
+            }
+          >
+            {formatBreakCountdownDisplay(breakMs)}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

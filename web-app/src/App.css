@@ -816,6 +816,16 @@
   opacity: 0.85;
 }
 
+.scoreboard-break-pending-hint {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.12);
+  color: inherit;
+}
+
 .scoreboard-footer {
   display: flex;
   flex-wrap: wrap;
@@ -2899,6 +2909,13 @@
   gap: 1rem;
 }
 
+.game-timer-start-break {
+  width: 100%;
+  min-height: 3rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
 .game-timer-startstop {
   width: 100%;
   min-height: 3rem;
@@ -3260,6 +3277,41 @@ body:has(.kiosk-scoreboard-display) .app {
   color: #ff1a1a;
   letter-spacing: 0;
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
+.kiosk-scoreboard-break {
+  text-align: center;
+  margin-top: clamp(0.75rem, 3vmin, 1.5rem);
+  padding: clamp(0.5rem, 2vmin, 1rem) 0 0;
+  border-top: 2px solid rgba(241, 245, 249, 0.25);
+}
+
+.kiosk-scoreboard-break-label {
+  font-size: clamp(1.25rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fbbf24;
+  margin-bottom: 0.35em;
+}
+
+.kiosk-scoreboard-break-time {
+  font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.5rem, 10vw, 5rem);
+  font-weight: 700;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+
+.kiosk-scoreboard-break-time--running {
+  color: #4ade80;
+}
+
+.kiosk-shotclock-break-label {
+  font-size: clamp(1.5rem, 6vmin, 3rem) !important;
+  color: #fbbf24 !important;
+  text-align: center;
+  letter-spacing: 0.05em;
 }
 
 /* Stretch root chain for portrait shot clock kiosk */

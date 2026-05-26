@@ -7,8 +7,11 @@ import { useKioskDeviceCheckIn } from "../hooks/useKioskDeviceCheckIn";
 import {
   formatGameTimeDisplay,
   formatShotClockDisplay,
+  formatShotClockDuringBreak,
+  getBreakDisplayLabel,
+  getBreakRemainingMs,
   getEffectiveRemainingMs,
-  isHalftimeActive,
+  isOnBreak,
 } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
@@ -60,6 +63,7 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
 
   const gameRunning = aggregate?.gameClock?.running ?? false;
   const shotRunning = aggregate?.shotClock?.running ?? false;
+  const onBreak = aggregate != null && isOnBreak(aggregate);
   const anyRunning = gameRunning || shotRunning;
 
   useEffect(() => {
@@ -90,25 +94,35 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
     );
   }
 
-  const halftime = isHalftimeActive(aggregate);
+  const breakLabel = getBreakDisplayLabel(aggregate);
+  const breakMs = onBreak ? getBreakRemainingMs(aggregate, now) : 0;
   const gameMs = aggregate.gameClock
     ? getEffectiveRemainingMs(aggregate.gameClock, now)
     : 0;
   const shotMs = aggregate.shotClock
     ? getEffectiveRemainingMs(aggregate.shotClock, now)
     : 0;
-  const mainDisplayMs = halftime ? gameMs : shotMs;
+
+  if (onBreak && breakLabel) {
+    return (
+      <div className="kiosk-display-page kiosk-shotclock-display" aria-live="polite">
+        <div className="kiosk-shotclock-game" aria-label={`${breakLabel} remaining`}>
+          {formatGameTimeDisplay(breakMs)}
+        </div>
+        <div className="kiosk-shotclock-shot kiosk-shotclock-break-label" aria-label="Shot clock">
+          {formatShotClockDuringBreak()}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="kiosk-display-page kiosk-shotclock-display" aria-live="polite">
       <div className="kiosk-shotclock-game" aria-label="Game time">
         {formatGameTimeDisplay(gameMs)}
       </div>
-      <div
-        className="kiosk-shotclock-shot"
-        aria-label={halftime ? "Halftime remaining" : "Shot clock"}
-      >
-        {formatShotClockDisplay(mainDisplayMs)}
+      <div className="kiosk-shotclock-shot" aria-label="Shot clock">
+        {formatShotClockDisplay(shotMs)}
       </div>
     </div>
   );

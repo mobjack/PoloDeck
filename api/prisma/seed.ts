@@ -1,4 +1,4 @@
-import { PrismaClient, TeamSide } from "@prisma/client";
+import { PrismaClient, TeamSide } from "../src/generated/prisma";
 
 const prisma = new PrismaClient();
 

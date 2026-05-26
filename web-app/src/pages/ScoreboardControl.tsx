@@ -4,6 +4,7 @@ import type { Socket } from "socket.io-client";
 import { createGameSocket } from "../lib/socketUrl";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
+import { isOnBreak } from "../lib/clockDisplay";
 
 export function ScoreboardControl() {
   const { id: gameDayId, gameId } = useParams<{ id: string; gameId: string }>();
@@ -12,8 +13,6 @@ export function ScoreboardControl() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  /** Server only has currentPeriod 3 for both; track which label the operator last chose. */
-  const [period3Choice, setPeriod3Choice] = useState<"half" | "q3" | null>(null);
 
   useEffect(() => {
     if (!gameId) return;
@@ -42,12 +41,6 @@ export function ScoreboardControl() {
       }
     };
   }, [gameId]);
-
-  useEffect(() => {
-    if (aggregate?.currentPeriod !== 3) {
-      setPeriod3Choice(null);
-    }
-  }, [aggregate?.currentPeriod]);
 
   const run = useCallback(async (fn: () => Promise<GameAggregate>) => {
     if (!gameId || busyRef.current) return;
@@ -92,15 +85,17 @@ export function ScoreboardControl() {
   const tp = aggregate.totalPeriods;
   const cp = aggregate.currentPeriod;
   const isFinal = aggregate.status === "FINAL";
+  const periodHeading = isFinal ? "Final" : "Period";
+  const onBreak = isOnBreak(aggregate);
 
+  const halfTimeActive = aggregate.breakPhase === "HALFTIME";
   const inP3 = !isFinal && cp === 3;
-  const halfTimeActive = inP3 && period3Choice === "half";
-  const q3Active = inP3 && (period3Choice === "q3" || period3Choice === null);
+  const q3Active = inP3 && !halfTimeActive && !onBreak;
 
   const phaseActive = {
-    q1: !isFinal && cp === 1,
-    q2: !isFinal && cp === 2,
-    q4: !isFinal && cp === 4 && tp >= 4,
+    q1: !isFinal && cp === 1 && !onBreak,
+    q2: !isFinal && cp === 2 && !onBreak,
+    q4: !isFinal && cp === 4 && tp >= 4 && !onBreak,
     ot: !isFinal && cp === 5 && tp >= 5,
     final: isFinal,
   };
@@ -184,86 +179,93 @@ export function ScoreboardControl() {
       </div>
 
       <section className="scoreboard-control-period" aria-label="Quarter or game phase">
-        <h2 className="scoreboard-control-period-heading">Period</h2>
+        <h2 className="scoreboard-control-period-heading">{periodHeading}</h2>
         <div className="scoreboard-control-period-grid">
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${phaseActive.q1 ? " is-active" : ""}`}
-            disabled={busy || tp < 1}
-            onClick={() => run(() => api.games.setPeriod(gameId, 1))}
-          >
-            Q1
-          </button>
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${phaseActive.q2 ? " is-active" : ""}`}
-            disabled={busy || tp < 2}
-            onClick={() => run(() => api.games.setPeriod(gameId, 2))}
-          >
-            Q2
-          </button>
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${halfTimeActive ? " is-active" : ""}`}
-            disabled={busy || tp < 3}
-            onClick={() =>
-              run(async () => {
-                const next = await api.games.setPeriod(gameId, 3);
-                setPeriod3Choice("half");
-                return next;
-              })
-            }
-          >
-            Half time
-          </button>
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${q3Active ? " is-active" : ""}`}
-            disabled={busy || tp < 3}
-            onClick={() =>
-              run(async () => {
-                const next = await api.games.setPeriod(gameId, 3);
-                setPeriod3Choice("q3");
-                return next;
-              })
-            }
-          >
-            Q3
-          </button>
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${phaseActive.q4 ? " is-active" : ""}`}
-            disabled={busy || tp < 4}
-            onClick={() => run(() => api.games.setPeriod(gameId, 4))}
-          >
-            Q4
-          </button>
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${phaseActive.ot ? " is-active" : ""}`}
-            disabled={busy || isFinal || tp < 4}
-            onClick={() => run(() => api.games.setPeriod(gameId, 5))}
-            title="Overtime (expands to a 5th period if still in regulation)"
-          >
-            OT
-          </button>
-          <button
-            type="button"
-            className={`btn scoreboard-control-phase-btn${phaseActive.final ? " is-active" : ""}`}
-            disabled={busy}
-            onClick={() =>
-              run(async () => {
-                await api.games.setPeriod(gameId, tp);
-                return api.games.update(gameId, { status: "FINAL" });
-              })
-            }
-          >
-            Final
-          </button>
+          {isFinal ? (
+            <button
+              type="button"
+              className="btn scoreboard-control-phase-btn is-active"
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await api.games.setPeriod(gameId, tp);
+                  return api.games.update(gameId, { status: "FINAL" });
+                })
+              }
+            >
+              Final
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${phaseActive.q1 ? " is-active" : ""}`}
+                disabled={busy || tp < 1}
+                onClick={() => run(() => api.games.setPeriod(gameId, 1))}
+              >
+                Q1
+              </button>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${phaseActive.q2 ? " is-active" : ""}`}
+                disabled={busy || tp < 2}
+                onClick={() => run(() => api.games.setPeriod(gameId, 2))}
+              >
+                Q2
+              </button>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${halfTimeActive ? " is-active" : ""}`}
+                disabled={busy || tp < 3}
+                onClick={() => run(() => api.games.setPeriod(gameId, 2, { halftime: true }))}
+              >
+                Half time
+              </button>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${q3Active ? " is-active" : ""}`}
+                disabled={busy || tp < 3}
+                onClick={() => run(() => api.games.setPeriod(gameId, 3))}
+              >
+                Q3
+              </button>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${phaseActive.q4 ? " is-active" : ""}`}
+                disabled={busy || tp < 4}
+                onClick={() => run(() => api.games.setPeriod(gameId, 4))}
+              >
+                Q4
+              </button>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${phaseActive.ot ? " is-active" : ""}`}
+                disabled={busy || tp < 4}
+                onClick={() => run(() => api.games.setPeriod(gameId, 5))}
+                title="Overtime (expands to a 5th period if still in regulation)"
+              >
+                OT
+              </button>
+              <button
+                type="button"
+                className={`btn scoreboard-control-phase-btn${phaseActive.final ? " is-active" : ""}`}
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    await api.games.setPeriod(gameId, tp);
+                    return api.games.update(gameId, { status: "FINAL" });
+                  })
+                }
+              >
+                Final
+              </button>
+            </>
+          )}
         </div>
         <p className="scoreboard-control-period-note">
-          Half time and Q3 both set period 3. Q4 is the last regulation quarter. OT adds period 5 (or
-          selects it if already in overtime). Final ends the game.
+          Half time starts the halftime break after Q2 (scores stay on the board). Q3 clears halftime
+          and selects the third quarter. On the game sheet, <strong>eq</strong> ends a quarter;{" "}
+          <strong>sb</strong> or the Timer starts the break clock. Q4 is the last regulation quarter.
         </p>
       </section>
     </div>
