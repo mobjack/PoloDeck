@@ -103,10 +103,14 @@ export interface GameAggregate {
   currentPeriod: number;
   totalPeriods: number;
   status: "PENDING" | "IN_PROGRESS" | "FINAL";
+  breakPhase?: "NONE" | "QUARTER_BREAK" | "HALFTIME";
+  /** Quarter that just ended when on a break (for "End Q1" labels). */
+  breakAfterPeriod?: number | null;
   /** Per-period length; mirrors game clock duration. */
   quarterDurationMs?: number;
   breakBetweenQuartersDurationMs?: number;
   halftimeDurationMs?: number;
+  shotClockDurationMs?: number;
   score: {
     homeScore: number;
     awayScore: number;
@@ -258,7 +262,17 @@ export const api = {
     applyScoreCommand: (
       id: string,
       body: {
-        type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
+        type:
+          | "START_QUARTER"
+          | "END_QUARTER"
+          | "START_BREAK"
+          | "TOGGLE_GAME_CLOCK"
+          | "RESET_SHOT_CLOCK"
+          | "GOAL"
+          | "EXCLUSION"
+          | "PENALTY"
+          | "TIMEOUT"
+          | "TIMEOUT_30";
         timeSeconds?: number;
         side?: "HOME" | "AWAY";
         capNumber?: string;
@@ -269,11 +283,11 @@ export const api = {
         method: "POST",
         json: body,
       }),
-    setPeriod: async (id: string, period: number) => {
+    setPeriod: async (id: string, period: number, options?: { halftime?: boolean }) => {
       try {
         return await request<GameAggregate>(`/games/${id}/period/set`, {
           method: "POST",
-          json: { period },
+          json: { period, ...(options?.halftime === true ? { halftime: true } : {}) },
         });
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) {

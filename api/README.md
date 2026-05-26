@@ -35,7 +35,7 @@ The backend is designed to run entirely on a local network without internet acce
 cp .env.example .env
 ```
 
-2. Adjust values as needed, especially `DATABASE_URL` if you are not using the provided [`setup/docker-compose.yml`](../setup/docker-compose.yml).
+1. Adjust values as needed, especially `DATABASE_URL` if you are not using the provided [`setup/docker-compose.yml`](../setup/docker-compose.yml).
 
 ---
 
@@ -85,26 +85,38 @@ cd ../setup && docker compose exec polodeck-api npm run db:seed
 npm install
 ```
 
-4. Apply Prisma migrations and generate the client:
+1. Apply Prisma migrations and generate the client:
 
 ```bash
 npx prisma migrate dev --name init
 npx prisma generate
 ```
 
-5. (Optional) Seed example data:
+1. (Optional) Seed example data:
 
 ```bash
 npm run db:seed
 ```
 
-6. Start the development server:
+1. Start the development server:
 
 ```bash
 npm run dev
 ```
 
 The server will listen on `http://localhost:3000`.
+
+### Restart / production vs dev
+
+| How you run | Command |
+| ------------- | --------- |
+| **Local dev** (recommended while coding) | `npm run dev` — runs TypeScript via `tsx watch` |
+| **Compiled** | `npm run build` then `npm start` — needs `copy:prisma-client` (included in `build`) |
+| **Docker** | `./setup/setup.sh restart-api` from repo root — rebuilds the API image |
+
+`npm run dev` works even when `npm start` or the Docker API container fails, because dev loads `src/` directly. If restart fails with `Cannot find module '../generated/prisma'`, run `npm run build` (or rebuild the Docker API).
+
+**Port 3000 already in use:** stop the other process (`lsof -i :3000`) or stop Docker API (`docker stop polodeck-api`) before starting dev again.
 
 ---
 
@@ -131,11 +143,15 @@ Key models:
 npx prisma migrate dev --name init
 ```
 
-- **Generate Prisma client**:
+- **Generate Prisma client** (writes to `src/generated/prisma`; also runs on `npm install` via `postinstall`):
 
 ```bash
 npx prisma generate
 ```
+
+Application code imports enums and `PrismaClient` from `@lib/prisma` (not `@prisma/client` directly), so the IDE uses the same generated types as the compiler.
+
+If TypeScript still shows missing `BreakPhase` or break fields after schema changes, run `npx prisma generate` again, then **TypeScript: Restart TS Server** in the editor.
 
 - **Open Prisma Studio**:
 
@@ -397,5 +413,3 @@ socket.on("game:hornTriggered", ({ gameId, reason }) => {
 - This scaffold focuses on core game operations and event logging, not authentication or multi-tenant concerns.
 - Player exclusion and timeout rules may be refined further to match detailed competition regulations.
 - Additional event types can be added to `GameEventType` as the system evolves.
-
-

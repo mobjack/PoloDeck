@@ -1,5 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { DeviceType, GameEventType, GameStatus, TeamSide, type Prisma } from ".prisma/client";
+import {
+  BreakPhase,
+  DeviceType,
+  GameEventType,
+  GameStatus,
+  TeamSide,
+  type Prisma,
+} from "../lib/prisma";
 import {
   startClock,
   stopClock,
@@ -527,6 +534,7 @@ export class GameService {
         quarterDurationMs,
         breakBetweenQuartersDurationMs,
         halftimeDurationMs,
+        shotClockDurationMs,
         score: { create: {} },
         gameClock: {
           create: {
@@ -626,7 +634,11 @@ export class GameService {
         where: { id: gameId },
         data,
       });
-      if (input.quarterDurationMs !== undefined && existing.gameClock) {
+      if (
+        input.quarterDurationMs !== undefined &&
+        existing.gameClock &&
+        existing.breakPhase === BreakPhase.NONE
+      ) {
         const g = existing.gameClock;
         const d = input.quarterDurationMs;
         const eff = getEffectiveRemainingMs(
@@ -649,28 +661,34 @@ export class GameService {
           },
         });
       }
-      if (input.shotClockDurationMs !== undefined && existing.shotClock) {
-        const s = existing.shotClock;
-        const d = input.shotClockDurationMs;
-        const eff = getEffectiveRemainingMs(
-          {
-            durationMs: s.durationMs,
-            remainingMs: s.remainingMs,
-            running: s.running,
-            lastStartedAt: s.lastStartedAt,
-          },
-          now
-        );
-        const newRem = s.running ? Math.min(eff, d) : d;
-        await tx.shotClock.update({
-          where: { id: s.id },
-          data: {
-            durationMs: d,
-            remainingMs: newRem,
-            lastStartedAt: s.running ? new Date(now) : null,
-            running: s.running,
-          },
+      if (input.shotClockDurationMs !== undefined) {
+        await tx.game.update({
+          where: { id: gameId },
+          data: { shotClockDurationMs: input.shotClockDurationMs },
         });
+        if (existing.shotClock && existing.breakPhase === BreakPhase.NONE) {
+          const s = existing.shotClock;
+          const d = input.shotClockDurationMs;
+          const eff = getEffectiveRemainingMs(
+            {
+              durationMs: s.durationMs,
+              remainingMs: s.remainingMs,
+              running: s.running,
+              lastStartedAt: s.lastStartedAt,
+            },
+            now
+          );
+          const newRem = s.running ? Math.min(eff, d) : d;
+          await tx.shotClock.update({
+            where: { id: s.id },
+            data: {
+              durationMs: d,
+              remainingMs: newRem,
+              lastStartedAt: s.running ? new Date(now) : null,
+              running: s.running,
+            },
+          });
+        }
       }
     });
     return this.emitState(gameId);
@@ -755,7 +773,7 @@ export class GameService {
   async startGameClock(gameId: string) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
-      select: { currentPeriod: true },
+      select: { currentPeriod: true, breakPhase: true },
     });
     if (!game) {
       throw this.notFound("Game not found");
@@ -795,9 +813,10 @@ export class GameService {
         "operator"
       );
     }
-    // Always resync the shot: materialize then start (repairs "running" without lastStartedAt, or
-    // a stale pre-coupling shot-while-game-stopped state).
-    await this.resyncShotClockWithGameStart(gameId);
+    // During breaks the shot clock stays at 00 — do not resync with game start.
+    if (game.breakPhase === BreakPhase.NONE) {
+      await this.resyncShotClockWithGameStart(gameId);
+    }
     return this.emitState(gameId);
   }
 
@@ -957,6 +976,15 @@ export class GameService {
       );
     }
     return this.emitState(gameId);
+  }
+
+  private assertClockCommandsAllowed(game: {
+    breakAfterPeriod: number | null;
+    breakPhase: BreakPhase;
+  }) {
+    if (game.breakAfterPeriod != null && game.breakPhase === BreakPhase.NONE) {
+      throw this.badRequest("Start break with sb before using clock commands.");
+    }
   }
 
   async startShotClock(gameId: string) {
@@ -1169,6 +1197,263 @@ export class GameService {
     return this.emitState(gameId);
   }
 
+  /** Regulation shot length while not in a break (break overwrites clock rows). */
+  private getRegulationShotDurationMs(game: { shotClockDurationMs: number }): number {
+    return game.shotClockDurationMs;
+  }
+
+  private getBreakConfig(
+    game: {
+      currentPeriod: number;
+      totalPeriods: number;
+      breakBetweenQuartersDurationMs: number;
+      halftimeDurationMs: number;
+    },
+    afterPeriod: number
+  ): { kind: BreakPhase; durationMs: number } | null {
+    if (afterPeriod >= game.totalPeriods) return null;
+    if (afterPeriod === 2) {
+      if (game.halftimeDurationMs <= 0) return null;
+      return { kind: BreakPhase.HALFTIME, durationMs: game.halftimeDurationMs };
+    }
+    if (game.breakBetweenQuartersDurationMs <= 0) return null;
+    return {
+      kind: BreakPhase.QUARTER_BREAK,
+      durationMs: game.breakBetweenQuartersDurationMs,
+    };
+  }
+
+  private async setClocksToBreakDuration(
+    gameId: string,
+    durationMs: number,
+    running: boolean
+  ): Promise<void> {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gameClock: true, shotClock: true },
+    });
+    if (!game?.gameClock || !game.shotClock) {
+      throw this.notFound("Game clocks not found");
+    }
+    await this.prisma.gameClock.update({
+      where: { id: game.gameClock.id },
+      data: {
+        durationMs,
+        remainingMs: durationMs,
+        running,
+        lastStartedAt: running ? new Date() : null,
+      },
+    });
+    await this.prisma.shotClock.update({
+      where: { id: game.shotClock.id },
+      data: {
+        durationMs: 0,
+        remainingMs: 0,
+        running: false,
+        lastStartedAt: null,
+      },
+    });
+  }
+
+  /** After eq: mark break pending or finalize/skip when no break applies. */
+  private async afterQuarterEnded(gameId: string, afterPeriod: number) {
+    const game = await this.prisma.game.findUnique({ where: { id: gameId } });
+    if (!game) throw this.notFound("Game not found");
+
+    if (afterPeriod >= game.totalPeriods) {
+      await this.prisma.game.update({
+        where: { id: gameId },
+        data: { status: GameStatus.FINAL, breakAfterPeriod: null },
+      });
+      return this.emitState(gameId);
+    }
+
+    const config = this.getBreakConfig(game, afterPeriod);
+    if (!config) {
+      return this.advancePeriod(gameId);
+    }
+
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        breakAfterPeriod: afterPeriod,
+        breakPhase: BreakPhase.NONE,
+        status: GameStatus.IN_PROGRESS,
+      },
+    });
+    await this.createEvent(
+      gameId,
+      GameEventType.QUARTER_ENDED,
+      { afterPeriod } as Prisma.InputJsonValue,
+      "operator"
+    );
+    return this.emitState(gameId);
+  }
+
+  /** sq while break pending: skip break and advance to next period. */
+  private async skipPendingBreakAndAdvancePeriod(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { score: true },
+    });
+    if (!game) throw this.notFound("Game not found");
+
+    const from = game.currentPeriod;
+    const nextPeriod = Math.min(game.totalPeriods, from + 1);
+
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        breakAfterPeriod: null,
+        breakPhase: BreakPhase.NONE,
+        currentPeriod: nextPeriod,
+        status: GameStatus.IN_PROGRESS,
+      },
+    });
+
+    const payload: Record<string, unknown> = {
+      from,
+      to: nextPeriod,
+      skippedBreak: true,
+    };
+    if (game.score) {
+      payload.homeScore = game.score.homeScore;
+      payload.awayScore = game.score.awayScore;
+    }
+    await this.createEvent(
+      gameId,
+      GameEventType.PERIOD_ADVANCED,
+      payload as Prisma.InputJsonValue,
+      "operator"
+    );
+    await this.resetClocksForQuarterPlay(gameId);
+    return this.emitState(gameId);
+  }
+
+  private async resetClocksForQuarterPlay(gameId: string): Promise<void> {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gameClock: true, shotClock: true },
+    });
+    if (!game?.gameClock || !game.shotClock) {
+      throw this.notFound("Game clocks not found");
+    }
+    const quarterMs = game.quarterDurationMs;
+    const shotMs = this.getRegulationShotDurationMs(game);
+    await this.prisma.gameClock.update({
+      where: { id: game.gameClock.id },
+      data: {
+        durationMs: quarterMs,
+        remainingMs: quarterMs,
+        running: false,
+        lastStartedAt: null,
+      },
+    });
+    await this.prisma.shotClock.update({
+      where: { id: game.shotClock.id },
+      data: {
+        durationMs: shotMs,
+        remainingMs: shotMs,
+        running: false,
+        lastStartedAt: null,
+      },
+    });
+  }
+
+  async startBreak(gameId: string, afterPeriod: number) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gameClock: true, shotClock: true },
+    });
+    if (!game) throw this.notFound("Game not found");
+
+    if (game.breakPhase !== BreakPhase.NONE) {
+      return this.emitState(gameId);
+    }
+
+    const config = this.getBreakConfig(game, afterPeriod);
+    if (!config) {
+      if (afterPeriod >= game.totalPeriods) {
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { status: GameStatus.FINAL },
+        });
+        return this.emitState(gameId);
+      }
+      return this.advancePeriod(gameId);
+    }
+
+    await this.setClocksToBreakDuration(gameId, config.durationMs, false);
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        breakPhase: config.kind,
+        breakAfterPeriod: afterPeriod,
+        status: GameStatus.IN_PROGRESS,
+      },
+    });
+
+    await this.createEvent(
+      gameId,
+      GameEventType.BREAK_STARTED,
+      {
+        kind: config.kind,
+        afterPeriod,
+        durationMs: config.durationMs,
+      } as Prisma.InputJsonValue,
+      "operator"
+    );
+    return this.emitState(gameId);
+  }
+
+  async endBreakAndAdvancePeriod(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: { score: true },
+    });
+    if (!game) throw this.notFound("Game not found");
+
+    if (game.breakPhase === BreakPhase.NONE) {
+      return this.emitState(gameId);
+    }
+
+    const afterPeriod = game.breakAfterPeriod ?? game.currentPeriod;
+    const from = game.currentPeriod;
+    const nextPeriod = Math.min(game.totalPeriods, from + 1);
+
+    await this.prisma.game.update({
+      where: { id: gameId },
+      data: {
+        breakPhase: BreakPhase.NONE,
+        breakAfterPeriod: null,
+        currentPeriod: nextPeriod,
+        status: GameStatus.IN_PROGRESS,
+      },
+    });
+
+    await this.createEvent(
+      gameId,
+      GameEventType.BREAK_ENDED,
+      { afterPeriod } as Prisma.InputJsonValue,
+      "operator"
+    );
+
+    const payload: Record<string, unknown> = { from, to: nextPeriod, fromBreak: true };
+    if (game.score) {
+      payload.homeScore = game.score.homeScore;
+      payload.awayScore = game.score.awayScore;
+    }
+    await this.createEvent(
+      gameId,
+      GameEventType.PERIOD_ADVANCED,
+      payload as Prisma.InputJsonValue,
+      "operator"
+    );
+
+    await this.resetClocksForQuarterPlay(gameId);
+    return this.emitState(gameId);
+  }
+
   async advancePeriod(gameId: string) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
@@ -1178,19 +1463,17 @@ export class GameService {
       throw this.notFound("Game not found");
     }
 
-    const nextPeriod = Math.min(game.totalPeriods, game.currentPeriod + 1);
+    const from = game.currentPeriod;
+    const nextPeriod = Math.min(game.totalPeriods, from + 1);
 
     const data: { currentPeriod: number; status?: GameStatus } = { currentPeriod: nextPeriod };
-    if (game.totalPeriods === 4 && nextPeriod === 4) {
-      data.status = GameStatus.FINAL;
-    }
     await this.prisma.game.update({
       where: { id: gameId },
       data,
     });
 
     const payload: Record<string, unknown> = {
-      from: game.currentPeriod,
+      from,
       to: nextPeriod,
     };
     if (game.score) {
@@ -1206,13 +1489,32 @@ export class GameService {
     return this.emitState(gameId);
   }
 
-  async setGamePeriod(gameId: string, targetPeriod: number) {
+  async setGamePeriod(
+    gameId: string,
+    targetPeriod: number,
+    options?: { halftime?: boolean }
+  ) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
       include: { score: true, gameClock: true, shotClock: true },
     });
     if (!game) {
       throw this.notFound("Game not found");
+    }
+
+    if (options?.halftime === true) {
+      if (game.gameClock?.running) {
+        await this.stopGameClock(gameId);
+      } else if (game.shotClock?.running) {
+        await this.stopShotClock(gameId);
+      }
+      if (game.currentPeriod !== 2) {
+        await this.prisma.game.update({
+          where: { id: gameId },
+          data: { currentPeriod: 2, status: GameStatus.IN_PROGRESS },
+        });
+      }
+      return this.startBreak(gameId, 2);
     }
 
     const expandToOvertime = game.totalPeriods === 4 && targetPeriod === 5;
@@ -1256,32 +1558,53 @@ export class GameService {
     }
 
     const from = game.currentPeriod;
-    if (from !== targetPeriod) {
-      // Scoreboard distinguishes Q4 (last quarter in progress) from game ended; FINAL is PATCH only.
-      const data: { currentPeriod: number; status: GameStatus } = {
+    const clearBreak = game.breakPhase !== BreakPhase.NONE;
+    if (from !== targetPeriod || clearBreak) {
+      const data: {
+        currentPeriod: number;
+        status: GameStatus;
+        breakPhase?: BreakPhase;
+        breakAfterPeriod?: number | null;
+      } = {
         currentPeriod: targetPeriod,
         status: GameStatus.IN_PROGRESS,
       };
+      if (clearBreak) {
+        data.breakPhase = BreakPhase.NONE;
+        data.breakAfterPeriod = null;
+      }
       await this.prisma.game.update({
         where: { id: gameId },
         data,
       });
 
-      const payload: Record<string, unknown> = {
-        from,
-        to: targetPeriod,
-        directSet: true,
-      };
-      if (game.score) {
-        payload.homeScore = game.score.homeScore;
-        payload.awayScore = game.score.awayScore;
+      if (clearBreak) {
+        await this.createEvent(
+          gameId,
+          GameEventType.BREAK_ENDED,
+          { afterPeriod: game.breakAfterPeriod ?? from, directSet: true } as Prisma.InputJsonValue,
+          "operator"
+        );
+        await this.resetClocksForQuarterPlay(gameId);
       }
-      await this.createEvent(
-        gameId,
-        GameEventType.PERIOD_ADVANCED,
-        payload as Prisma.InputJsonValue,
-        "operator"
-      );
+
+      if (from !== targetPeriod) {
+        const payload: Record<string, unknown> = {
+          from,
+          to: targetPeriod,
+          directSet: true,
+        };
+        if (game.score) {
+          payload.homeScore = game.score.homeScore;
+          payload.awayScore = game.score.awayScore;
+        }
+        await this.createEvent(
+          gameId,
+          GameEventType.PERIOD_ADVANCED,
+          payload as Prisma.InputJsonValue,
+          "operator"
+        );
+      }
     }
 
     return this.emitState(gameId);
@@ -1298,8 +1621,14 @@ export class GameService {
     }
     await this.prisma.game.update({
       where: { id: gameId },
-      data: { currentPeriod: 5, totalPeriods: 5 },
+      data: {
+        currentPeriod: 5,
+        totalPeriods: 5,
+        breakPhase: BreakPhase.NONE,
+        breakAfterPeriod: null,
+      },
     });
+    await this.resetClocksForQuarterPlay(gameId);
     const payload: Record<string, unknown> = { from: 4, to: 5 };
     if (game.score) {
       payload.homeScore = game.score.homeScore;
@@ -1495,7 +1824,17 @@ export class GameService {
   async applyScoreCommand(
     gameId: string,
     body: {
-      type: "START_QUARTER" | "END_QUARTER" | "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30";
+      type:
+        | "START_QUARTER"
+        | "END_QUARTER"
+        | "START_BREAK"
+        | "TOGGLE_GAME_CLOCK"
+        | "RESET_SHOT_CLOCK"
+        | "GOAL"
+        | "EXCLUSION"
+        | "PENALTY"
+        | "TIMEOUT"
+        | "TIMEOUT_30";
       timeSeconds?: number;
       side?: "HOME" | "AWAY";
       capNumber?: string;
@@ -1512,6 +1851,31 @@ export class GameService {
           include: { gameClock: true },
         });
         if (!game?.gameClock) throw this.notFound("Game not found");
+        if (game.breakPhase !== BreakPhase.NONE) {
+          return this.endBreakAndAdvancePeriod(gameId);
+        }
+        if (game.breakAfterPeriod != null) {
+          await this.skipPendingBreakAndAdvancePeriod(gameId);
+          const after = await this.prisma.game.findUnique({
+            where: { id: gameId },
+            select: { currentPeriod: true, scheduledAt: true },
+          });
+          if (after?.currentPeriod === 1 && after.scheduledAt == null) {
+            await this.prisma.game.update({
+              where: { id: gameId },
+              data: { scheduledAt: new Date() },
+            });
+          }
+          if (after && !(await this.quarterStartAlreadyLogged(gameId))) {
+            await this.createEvent(
+              gameId,
+              GameEventType.GAME_CLOCK_STARTED,
+              { period: after.currentPeriod },
+              "operator"
+            );
+          }
+          return this.emitState(gameId);
+        }
         if (game.currentPeriod === 1 && game.scheduledAt == null) {
           await this.prisma.game.update({
             where: { id: gameId },
@@ -1533,7 +1897,33 @@ export class GameService {
         if (body.overtime === true) {
           return this.startOvertime(gameId);
         }
-        return this.advancePeriod(gameId);
+        const gameAfterStop = await this.prisma.game.findUnique({ where: { id: gameId } });
+        if (!gameAfterStop) throw this.notFound("Game not found");
+        return this.afterQuarterEnded(gameId, gameAfterStop.currentPeriod);
+      }
+      case "START_BREAK": {
+        const game = await this.prisma.game.findUnique({ where: { id: gameId } });
+        if (!game) throw this.notFound("Game not found");
+        const afterPeriod = game.breakAfterPeriod ?? game.currentPeriod;
+        return this.startBreak(gameId, afterPeriod);
+      }
+      case "TOGGLE_GAME_CLOCK": {
+        const game = await this.prisma.game.findUnique({
+          where: { id: gameId },
+          include: { gameClock: true },
+        });
+        if (!game?.gameClock) throw this.notFound("Game not found");
+        this.assertClockCommandsAllowed(game);
+        if (game.gameClock.running) {
+          return this.stopGameClock(gameId);
+        }
+        return this.startGameClock(gameId);
+      }
+      case "RESET_SHOT_CLOCK": {
+        const game = await this.prisma.game.findUnique({ where: { id: gameId } });
+        if (!game) throw this.notFound("Game not found");
+        this.assertClockCommandsAllowed(game);
+        return this.resetShotClock(gameId);
       }
       case "GOAL": {
         if (side == null || body.capNumber == null) {

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { DeviceType, TeamSide } from ".prisma/client";
+import { DeviceType, TeamSide } from "../lib/prisma";
 import { env } from "../config/env";
 import {
   addPlayerBodySchema,
@@ -208,7 +208,9 @@ export async function registerGameRoutes(app: FastifyInstance) {
   app.post("/games/:id/period/set", async (request) => {
     const params = gameIdParamSchema.parse(request.params);
     const body = setGamePeriodBodySchema.parse(request.body);
-    return service.setGamePeriod(params.id, body.period);
+    return service.setGamePeriod(params.id, body.period, {
+      halftime: body.halftime,
+    });
   });
 
   // Roster

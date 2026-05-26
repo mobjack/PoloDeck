@@ -1,10 +1,11 @@
 import {
+  type Prisma,
+  BreakPhase,
+  ExclusionStatus,
   GameEventType,
   GameStatus,
   TeamSide,
-  ExclusionStatus,
-} from ".prisma/client";
-import type { Prisma } from "@prisma/client";
+} from "../lib/prisma";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
 
 export type RebuildEventInput = {
@@ -103,6 +104,8 @@ export async function rerunGameEventLog(
       status: GameStatus.PENDING,
       totalPeriods: initialTotalPeriods,
       scheduledAt: null,
+      breakPhase: BreakPhase.NONE,
+      breakAfterPeriod: null,
     },
   });
 
@@ -379,6 +382,76 @@ export async function rerunGameEventLog(
         break;
       }
 
+      case GameEventType.QUARTER_ENDED: {
+        const p = asPayload(ev.payload);
+        const afterPeriod = typeof p.afterPeriod === "number" ? p.afterPeriod : 1;
+        await tx.game.update({
+          where: { id: gameId },
+          data: {
+            breakAfterPeriod: afterPeriod,
+            breakPhase: BreakPhase.NONE,
+            status: GameStatus.IN_PROGRESS,
+          },
+        });
+        payloadOut = { afterPeriod } as Prisma.InputJsonValue;
+        break;
+      }
+
+      case GameEventType.BREAK_STARTED: {
+        const p = asPayload(ev.payload);
+        const kind =
+          p.kind === BreakPhase.HALFTIME
+            ? BreakPhase.HALFTIME
+            : BreakPhase.QUARTER_BREAK;
+        const afterPeriod = typeof p.afterPeriod === "number" ? p.afterPeriod : 1;
+        const durationMs =
+          typeof p.durationMs === "number" && p.durationMs >= 0 ? p.durationMs : 0;
+        const gClock = await tx.gameClock.findUnique({ where: { gameId } });
+        const sClock = await tx.shotClock.findUnique({ where: { gameId } });
+        if (!gClock || !sClock) throw new Error("Clocks missing for BREAK_STARTED");
+        await tx.gameClock.update({
+          where: { id: gClock.id },
+          data: {
+            durationMs,
+            remainingMs: durationMs,
+            running: false,
+            lastStartedAt: null,
+          },
+        });
+        await tx.shotClock.update({
+          where: { id: sClock.id },
+          data: {
+            durationMs: 0,
+            remainingMs: 0,
+            running: false,
+            lastStartedAt: null,
+          },
+        });
+        await tx.game.update({
+          where: { id: gameId },
+          data: {
+            breakPhase: kind,
+            breakAfterPeriod: afterPeriod,
+            status: GameStatus.IN_PROGRESS,
+          },
+        });
+        payloadOut = { ...p, kind, afterPeriod, durationMs } as Prisma.InputJsonValue;
+        break;
+      }
+
+      case GameEventType.BREAK_ENDED: {
+        const p = asPayload(ev.payload);
+        await tx.game.update({
+          where: { id: gameId },
+          data: {
+            breakPhase: BreakPhase.NONE,
+            breakAfterPeriod: null,
+          },
+        });
+        payloadOut = p as Prisma.InputJsonValue;
+        break;
+      }
+
       case GameEventType.PERIOD_ADVANCED: {
         const p = asPayload(ev.payload);
         const from = typeof p.from === "number" ? p.from : 1;
@@ -392,16 +465,39 @@ export async function rerunGameEventLog(
             data: { currentPeriod: 5, totalPeriods: 5 },
           });
         } else {
-          const data: { currentPeriod: number; status?: GameStatus } = {
-            currentPeriod: to,
-          };
-          if (g.totalPeriods === 4 && to === 4) {
-            data.status = GameStatus.FINAL;
-          }
           await tx.game.update({
             where: { id: gameId },
-            data,
+            data: {
+              currentPeriod: to,
+              status: GameStatus.IN_PROGRESS,
+            },
           });
+          if (p.fromBreak === true || p.skippedBreak === true) {
+            const quarterMs = g.quarterDurationMs;
+            const shotMs = g.shotClockDurationMs;
+            const gClock = await tx.gameClock.findUnique({ where: { gameId } });
+            const sClock = await tx.shotClock.findUnique({ where: { gameId } });
+            if (gClock && sClock) {
+              await tx.gameClock.update({
+                where: { id: gClock.id },
+                data: {
+                  durationMs: quarterMs,
+                  remainingMs: quarterMs,
+                  running: false,
+                  lastStartedAt: null,
+                },
+              });
+              await tx.shotClock.update({
+                where: { id: sClock.id },
+                data: {
+                  durationMs: shotMs,
+                  remainingMs: shotMs,
+                  running: false,
+                  lastStartedAt: null,
+                },
+              });
+            }
+          }
         }
         const scoreRow = await tx.score.findUnique({ where: { gameId } });
         payloadOut = {

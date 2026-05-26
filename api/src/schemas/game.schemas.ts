@@ -1,4 +1,4 @@
-import { GameEventType } from ".prisma/client";
+import { GameEventType } from "../lib/prisma";
 import { z } from "zod";
 
 // Game day
@@ -67,6 +67,8 @@ export const setClockBodySchema = z.object({
 
 export const setGamePeriodBodySchema = z.object({
   period: z.number().int().min(1),
+  /** Scoreboard "Half time" — enter halftime break after Q2 (period stays 2 until sq). */
+  halftime: z.boolean().optional(),
 });
 
 export const addPlayerBodySchema = z.object({
@@ -92,6 +94,9 @@ export const scoreCommandBodySchema = z.object({
   type: z.enum([
     "START_QUARTER",
     "END_QUARTER",
+    "START_BREAK",
+    "TOGGLE_GAME_CLOCK",
+    "RESET_SHOT_CLOCK",
     "GOAL",
     "EXCLUSION",
     "PENALTY",
