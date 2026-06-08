@@ -3,10 +3,17 @@ import type { Server as IOServer, Socket } from "socket.io";
 
 import type { DeviceSummary } from "../services/deviceCapabilities";
 
+export interface ActiveGameSummary {
+  gameId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+}
+
 export interface ServerToClientEvents {
   "game:stateUpdated": (payload: { gameId: string; aggregate: any }) => void;
   "game:hornTriggered": (payload: { gameId: string; reason?: string }) => void;
   "device:updated": (payload: { device: DeviceSummary }) => void;
+  "active-game:changed": (payload: { activeGame: ActiveGameSummary | null }) => void;
 }
 
 export interface ClientToServerEvents {

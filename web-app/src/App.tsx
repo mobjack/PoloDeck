@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GameDayShell } from "./pages/GameDayShell";
 import { GameDayHomeEmpty } from "./pages/GameDayHomeEmpty";
 import { GameDayDetail } from "./pages/GameDayDetail";
@@ -9,7 +9,7 @@ import { EditGame } from "./pages/EditGame";
 import { GameRoster } from "./pages/GameRoster";
 import { GameSheet } from "./pages/GameSheet";
 import { ScoreboardControl } from "./pages/ScoreboardControl";
-import { GameTimer } from "./pages/GameTimer";
+import { TimerController } from "./pages/TimerController";
 import { KioskHome } from "./pages/KioskHome";
 import { KioskManaged } from "./pages/KioskManaged";
 import { KioskScoreboardDisplay } from "./pages/KioskScoreboardDisplay";
@@ -57,7 +57,11 @@ function App() {
           <Route path="/game-days/:id/games/:gameId/roster" element={<GameRoster />} />
           <Route path="/game-days/:id/games/:gameId/sheet" element={<GameSheet />} />
           <Route path="/game-days/:id/games/:gameId/scoreboard" element={<ScoreboardControl />} />
-          <Route path="/game-days/:id/games/:gameId/timer" element={<GameTimer />} />
+          <Route path="/timer" element={<TimerController />} />
+          <Route
+            path="/game-days/:id/games/:gameId/timer"
+            element={<Navigate to="/timer" replace />}
+          />
           <Route path="/" element={<GameDayShell />}>
             <Route index element={<GameDayHomeEmpty />} />
             <Route path="game-days/:id" element={<GameDayDetail />} />

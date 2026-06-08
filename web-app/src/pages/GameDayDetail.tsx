@@ -266,10 +266,7 @@ function GameCard({
         >
           Scoreboard
         </Link>
-        <Link
-          to={`/game-days/${gameDayId}/games/${game.id}/timer`}
-          className="btn btn-compact secondary"
-        >
+        <Link to="/timer" className="btn btn-compact secondary">
           Timer
         </Link>
         <Link

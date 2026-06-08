@@ -155,6 +155,32 @@ export class GameService {
     return gameDay?.activeGameId ?? null;
   }
 
+  /** The single globally-active game (server-authoritative selection), or null. */
+  async getActiveGameSummary(): Promise<{
+    gameId: string;
+    homeTeamName: string;
+    awayTeamName: string;
+  } | null> {
+    const activeGameId = await this.resolveActiveGameId();
+    if (!activeGameId) return null;
+    const game = await this.prisma.game.findUnique({
+      where: { id: activeGameId },
+      select: { id: true, homeTeamName: true, awayTeamName: true },
+    });
+    if (!game) return null;
+    return {
+      gameId: game.id,
+      homeTeamName: game.homeTeamName,
+      awayTeamName: game.awayTeamName,
+    };
+  }
+
+  /** Broadcast the current active game to all clients so timer controllers can follow it. */
+  private async emitActiveGameChanged(): Promise<void> {
+    const activeGame = await this.getActiveGameSummary();
+    this.io.emit("active-game:changed", { activeGame });
+  }
+
   private emitDeviceUpdated(device: DeviceSummary): void {
     this.io.to(`device:${device.clientId}`).emit("device:updated", { device });
   }
@@ -197,10 +223,15 @@ export class GameService {
     ]);
 
     await this.syncAssignedDevicesToActiveGame(gameId);
+    await this.emitActiveGameChanged();
     return this.getGameDay(gameDayId);
   }
 
-  async checkInDevice(input: { clientId: string; name?: string }): Promise<DeviceSummary> {
+  async checkInDevice(input: {
+    clientId: string;
+    name?: string;
+    role?: "TIMER";
+  }): Promise<DeviceSummary> {
     const now = new Date();
     const gameInclude = { select: { homeTeamName: true, awayTeamName: true } as const };
 
@@ -210,9 +241,18 @@ export class GameService {
 
     const activeGameId = await this.resolveActiveGameId();
 
+    // A browser controller can self-assign its role (e.g. the mobile timer operator page),
+    // promoting a new or still-unassigned device so it counts toward capabilities.
+    const selfAssignType =
+      input.role === "TIMER" &&
+      (!existing || existing.type === DeviceType.UNASSIGNED)
+        ? DeviceType.TIMER
+        : undefined;
+
     if (existing) {
+      const nextType = selfAssignType ?? existing.type;
       const syncGameId =
-        existing.type !== DeviceType.UNASSIGNED && activeGameId && existing.gameId !== activeGameId
+        nextType !== DeviceType.UNASSIGNED && activeGameId && existing.gameId !== activeGameId
           ? activeGameId
           : undefined;
 
@@ -220,6 +260,7 @@ export class GameService {
         where: { id: existing.id },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(selfAssignType !== undefined ? { type: selfAssignType } : {}),
           lastCheckInAt: now,
           ...(syncGameId !== undefined ? { gameId: syncGameId } : {}),
         },
@@ -233,14 +274,17 @@ export class GameService {
     const created = await this.prisma.device.create({
       data: {
         clientId: input.clientId,
-        type: DeviceType.UNASSIGNED,
+        type: selfAssignType ?? DeviceType.UNASSIGNED,
         name: input.name,
         lastCheckInAt: now,
+        ...(selfAssignType !== undefined && activeGameId ? { gameId: activeGameId } : {}),
       },
       include: { game: gameInclude },
     });
 
-    return this.mapDeviceToSummary(created);
+    const summary = this.mapDeviceToSummary(created);
+    if (selfAssignType !== undefined) this.emitDeviceUpdated(summary);
+    return summary;
   }
 
   async patchDevice(
@@ -310,11 +354,12 @@ export class GameService {
 
   async getGlobalDeviceCapabilities(): Promise<DeviceCapabilities> {
     const devices = await this.listAllDevices();
-    return buildDeviceCapabilities({
+    const caps = buildDeviceCapabilities({
       now: new Date(),
       devices,
       staleAfterMs: env.DEVICE_STALE_AFTER_MS,
     });
+    return caps;
   }
 
   private formatGameDayRow(gd: {
@@ -461,6 +506,7 @@ export class GameService {
       data.activeGameId = null;
       await this.prisma.gameDay.update({ where: { id: gameDayId }, data });
       await this.syncAssignedDevicesToActiveGame(null);
+      await this.emitActiveGameChanged();
       return this.getGameDay(gameDayId);
     }
 
