@@ -3455,3 +3455,554 @@ body:has(.kiosk-shotclock-display) .app {
 .kiosk-timer-digits--shot {
   color: #38bdf8;
 }
+
+/* ===================== Mobile-first Timer Controller (/timer) ===================== */
+
+.timer-ctrl-page {
+  max-width: 56rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 100dvh;
+  padding: 0.85rem 0.85rem 1.5rem;
+  /* Reduce accidental browser gestures on the controller surface. */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: contain;
+}
+
+.timer-ctrl-page--message {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.timer-ctrl-message {
+  font-size: 1.1rem;
+  opacity: 0.85;
+}
+
+.timer-ctrl-waiting {
+  max-width: 28rem;
+}
+
+.timer-ctrl-waiting-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.timer-ctrl-waiting-sub {
+  margin: 0;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+/* --- Header --- */
+.timer-ctrl-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.timer-ctrl-header-top,
+.timer-ctrl-header-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.timer-ctrl-brand {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.timer-ctrl-phase {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 0.1rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.timer-ctrl-gamename {
+  font-size: 0.95rem;
+  opacity: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timer-ctrl-runstate {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.timer-ctrl-runstate--running {
+  background: rgba(21, 128, 61, 0.25);
+  color: #4ade80;
+}
+
+.timer-ctrl-runstate--stopped {
+  background: rgba(185, 28, 28, 0.22);
+  color: #f87171;
+}
+
+.timer-ctrl-runstate--final {
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 0.9;
+}
+
+.timer-ctrl-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.timer-ctrl-conn-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.timer-ctrl-conn--ok {
+  color: #4ade80;
+}
+
+.timer-ctrl-conn--off {
+  color: #f87171;
+}
+
+.timer-ctrl-conn--wait {
+  color: #fbbf24;
+}
+
+/* --- Banners --- */
+.timer-ctrl-banner {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.timer-ctrl-banner--warn {
+  background: rgba(185, 28, 28, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.timer-ctrl-banner--info {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.32);
+}
+
+/* --- Clocks --- */
+.timer-ctrl-clocks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+.timer-ctrl-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.timer-ctrl-clock-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+.timer-ctrl-clock-digits {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.timer-ctrl-clock-digits--game {
+  font-size: clamp(3.5rem, 18vw, 6rem);
+}
+
+.timer-ctrl-clock-digits--shot {
+  font-size: clamp(3.5rem, 18vw, 6rem);
+  color: #38bdf8;
+}
+
+/* --- Primary controls --- */
+.timer-ctrl-primary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+.timer-ctrl-startstop,
+.timer-ctrl-reset {
+  width: 100%;
+  min-height: 4.5rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  border-radius: 14px;
+  letter-spacing: 0.01em;
+  color: #fff;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+
+.timer-ctrl-startstop:disabled,
+.timer-ctrl-reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.timer-ctrl-startstop--stopped {
+  background: #15803d;
+}
+.timer-ctrl-startstop--stopped:active:not(:disabled) {
+  background: #166534;
+}
+
+.timer-ctrl-startstop--running {
+  background: #b91c1c;
+}
+.timer-ctrl-startstop--running:active:not(:disabled) {
+  background: #991b1b;
+}
+
+.timer-ctrl-reset {
+  background: #1d4ed8;
+}
+.timer-ctrl-reset:active:not(:disabled) {
+  background: #1e40af;
+}
+
+/* --- Protected actions --- */
+.timer-ctrl-protected {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-top: 0.6rem;
+  margin-top: 0.2rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.timer-ctrl-horn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 3.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 12px;
+  color: #fde68a;
+  background: rgba(217, 119, 6, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  touch-action: none;
+}
+
+.timer-ctrl-horn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.timer-ctrl-horn--holding {
+  color: #fff;
+}
+
+.timer-ctrl-horn-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: rgba(245, 158, 11, 0.55);
+  pointer-events: none;
+}
+
+.timer-ctrl-horn-label {
+  position: relative;
+  z-index: 1;
+}
+
+.timer-ctrl-protected-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+}
+
+.timer-ctrl-stage {
+  min-height: 3.25rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.timer-ctrl-stage:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.timer-ctrl-stage:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.timer-ctrl-undo {
+  min-height: 3.25rem;
+  min-width: 6rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 12px;
+  background: transparent;
+  color: #e57373;
+  border: 1px solid rgba(229, 115, 115, 0.55);
+}
+
+.timer-ctrl-undo:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Command feedback --- */
+.timer-ctrl-feedback {
+  min-height: 1.4rem;
+  font-size: 0.85rem;
+}
+
+.timer-ctrl-feedback-line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  justify-content: center;
+  opacity: 0.9;
+}
+
+.timer-ctrl-feedback-line--idle {
+  opacity: 0.5;
+}
+
+.timer-ctrl-feedback-line--success .timer-ctrl-feedback-status {
+  color: #4ade80;
+}
+
+.timer-ctrl-feedback-line--failed .timer-ctrl-feedback-status {
+  color: #f87171;
+}
+
+.timer-ctrl-feedback-line--pending .timer-ctrl-feedback-status {
+  color: #fbbf24;
+}
+
+.timer-ctrl-footer {
+  margin-top: auto;
+  text-align: center;
+  padding-top: 0.5rem;
+}
+
+.timer-ctrl-footer-link {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+/* --- Landscape / tablet: two-up clocks and side-by-side primaries --- */
+@media (min-width: 560px) {
+  .timer-ctrl-clocks {
+    grid-template-columns: 1fr 1fr;
+  }
+  .timer-ctrl-primary {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Short landscape phones: keep everything visible without large clocks. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .timer-ctrl-page {
+    gap: 0.6rem;
+    padding-top: 0.5rem;
+  }
+  .timer-ctrl-clock-digits--game,
+  .timer-ctrl-clock-digits--shot {
+    font-size: clamp(2.5rem, 12vh, 4rem);
+  }
+  .timer-ctrl-startstop,
+  .timer-ctrl-reset {
+    min-height: 3.5rem;
+    font-size: 1.15rem;
+  }
+}
+
+/* --- Confirmation dialog --- */
+.timer-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.timer-confirm-dialog {
+  width: 100%;
+  max-width: 26rem;
+  border-radius: 14px;
+  padding: 1.25rem;
+  background: #1f2430;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.timer-confirm-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.timer-confirm-message {
+  margin: 0 0 1.1rem;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.timer-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.timer-confirm-cancel,
+.timer-confirm-ok {
+  min-height: 2.9rem;
+  min-width: 6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.timer-confirm-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.timer-confirm-ok {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.timer-confirm-ok--danger {
+  background: #b91c1c;
+}
+
+.timer-confirm-cancel:disabled,
+.timer-confirm-ok:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- Game Day: Timer Controller access (QR) --- */
+.timer-access-section {
+  margin-top: 1.75rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.timer-access-section h2 {
+  margin: 0 0 0.35rem;
+}
+
+.timer-access-hint {
+  margin: 0 0 1rem;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.timer-access-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.timer-access-qr {
+  flex: 0 0 auto;
+  padding: 0.5rem;
+  background: #fff;
+  border-radius: 10px;
+  line-height: 0;
+}
+
+.timer-access-text {
+  flex: 1 1 14rem;
+}
+
+.timer-access-steps {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+  line-height: 1.6;
+}
+
+.timer-access-url {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95rem;
+  word-break: break-all;
+}
+
+@media (prefers-color-scheme: light) {
+  .timer-access-section {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.03);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .timer-ctrl-clock,
+  .timer-ctrl-phase {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.04);
+  }
+  .timer-ctrl-stage {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.14);
+  }
+  .timer-ctrl-protected {
+    border-top-color: rgba(0, 0, 0, 0.16);
+  }
+  .timer-confirm-dialog {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+  .timer-ctrl-clock-digits--shot {
+    color: #0284c7;
+  }
+}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { api, ApiError, type KioskDevice, type KioskDeviceType } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 
@@ -127,7 +128,39 @@ export function KiosksAdmin() {
           </table>
         </div>
       )}
+
+      <TimerControllerSection />
     </div>
+  );
+}
+
+function TimerControllerSection() {
+  const timerUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/timer` : "/timer";
+
+  return (
+    <section className="timer-access-section">
+      <h2>Timer Controller</h2>
+      <p className="timer-access-hint">
+        Run the game clock from a phone or tablet browser — no app install. The timer
+        automatically follows whichever game is <strong>live on displays</strong>.
+      </p>
+      <div className="timer-access-body">
+        <div className="timer-access-qr">
+          <QRCodeSVG value={timerUrl} size={168} includeMargin marginSize={2} />
+        </div>
+        <div className="timer-access-text">
+          <ol className="timer-access-steps">
+            <li>Join the PoloDeck Wi-Fi.</li>
+            <li>Scan this QR code.</li>
+            <li>Open the timer controller in your browser.</li>
+          </ol>
+          <a className="timer-access-url" href={timerUrl}>
+            {timerUrl}
+          </a>
+        </div>
+      </div>
+    </section>
   );
 }
 

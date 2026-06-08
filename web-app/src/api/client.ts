@@ -4,7 +4,14 @@ function resolveApiBase(): string {
     return v.trim().replace(/\/$/, "");
   }
   if (import.meta.env.DEV) {
-    return "http://localhost:3000/api";
+    // Derive the API host from the page so LAN devices (e.g. a phone hitting
+    // 172.16.x.x:5173) reach the API at the same host on :3000 instead of their
+    // own localhost. Production is served same-origin and falls through to "/api".
+    const host =
+      typeof window !== "undefined" && window.location.hostname
+        ? window.location.hostname
+        : "localhost";
+    return `http://${host}:3000/api`;
   }
   return "/api";
 }
@@ -89,6 +96,12 @@ export interface KioskDevice {
 export interface DeviceCheckInResponse {
   device: KioskDevice;
   config: { heartbeatIntervalMs: number; staleAfterMs: number };
+}
+
+export interface ActiveGameSummary {
+  gameId: string;
+  homeTeamName: string;
+  awayTeamName: string;
 }
 
 export interface GameAggregate {
@@ -189,7 +202,7 @@ async function setPeriodFallback(id: string, targetPeriod: number): Promise<Game
 
 export const api = {
   devices: {
-    checkIn: (body: { clientId: string; name?: string }) =>
+    checkIn: (body: { clientId: string; name?: string; role?: "TIMER" }) =>
       request<DeviceCheckInResponse>("/devices/check-in", {
         method: "POST",
         json: body,
@@ -202,6 +215,8 @@ export const api = {
   },
   capabilities: () =>
     request<DeviceCapabilities>("/capabilities"),
+  activeGame: () =>
+    request<ActiveGameSummary | null>("/active-game"),
   gameDays: {
     list: () => request<import("../types/gameDay").GameDay[]>("/game-days"),
     get: (id: string) =>
@@ -337,6 +352,11 @@ export const api = {
       request<GameAggregate>(`/games/${id}/shot-clock/set`, {
         method: "POST",
         json: { remainingMs },
+      }),
+    hornTrigger: (id: string, reason?: string) =>
+      request<GameAggregate>(`/games/${id}/horn/trigger`, {
+        method: "POST",
+        json: reason !== undefined ? { reason } : {},
       }),
   },
 };

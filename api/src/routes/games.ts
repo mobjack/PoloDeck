@@ -90,6 +90,7 @@ export async function registerGameRoutes(app: FastifyInstance) {
     const device = await service.checkInDevice({
       clientId: body.clientId,
       name: body.name,
+      role: body.role,
     });
 
     return {
@@ -120,6 +121,11 @@ export async function registerGameRoutes(app: FastifyInstance) {
 
   app.get("/capabilities", async () => {
     return service.getGlobalDeviceCapabilities();
+  });
+
+  // Server-authoritative active game (timer controller follows this).
+  app.get("/active-game", async () => {
+    return service.getActiveGameSummary();
   });
 
   // Score commands

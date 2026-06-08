@@ -124,6 +124,8 @@ export const eventLogRebuildBodySchema = z.object({
 export const deviceCheckInBodySchema = z.object({
   clientId: z.string().min(1),
   name: z.string().optional(),
+  /** Self-assigning role for browser controllers (e.g. the mobile timer operator page). */
+  role: z.enum(["TIMER"]).optional(),
 });
 
 export const deviceIdParamSchema = z.object({
