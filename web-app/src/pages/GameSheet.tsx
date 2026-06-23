@@ -15,70 +15,21 @@ import {
   isOnBreak,
 } from "../lib/clockDisplay";
 import {
-  eventsForGameProgressDisplay,
-  formatQuarterEndedRemark,
-  formatQuarterStartedRemark,
-} from "../lib/gameProgressDisplay";
+  buildProgressRows,
+  capSortKey,
+  computeFoulsByPlayer,
+  computeGoalsByPlayerAndPeriod,
+  computeScoreByQuarter,
+  computeTimeoutCalls,
+  formatSeconds,
+  sortGameEventsAsc,
+} from "../lib/scoresheetData";
 import { createGameSocket } from "../lib/socketUrl";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import type { GameDay } from "../types/gameDay";
 
 type TeamSide = "HOME" | "AWAY";
-
-const CAP_ORDER: string[] = [
-  "1",
-  "1A",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "11",
-  "12",
-  "13",
-  "14",
-  "15",
-  "16",
-  "17",
-  "18",
-  "19",
-  "20",
-  "21",
-  "22",
-  "23",
-  "24",
-  "25",
-];
-
-function capSortKey(cap: string): number {
-  const idx = CAP_ORDER.indexOf(cap);
-  if (idx !== -1) return idx;
-  // Fallback: try numeric, then string order at the end
-  const numeric = Number(cap.replace(/\D+/g, ""));
-  if (!Number.isNaN(numeric)) {
-    return CAP_ORDER.length + numeric;
-  }
-  return Number.MAX_SAFE_INTEGER;
-}
-
-/** API returns events in descending order; reducers need chronological replay. Tie-break on id for same-ms events. */
-function sortGameEventsAsc(events: { createdAt: string; id: string }[]) {
-  events.sort((a, b) => {
-    const ta = new Date(a.createdAt).getTime();
-    const tb = new Date(b.createdAt).getTime();
-    if (ta !== tb) return ta - tb;
-    return a.id.localeCompare(b.id);
-  });
-}
-
-function goalEventDelta(payload: Record<string, unknown> | undefined): number {
-  return typeof payload?.delta === "number" ? payload.delta : 1;
-}
 
 interface ParsedInput {
   raw: string;
@@ -229,150 +180,30 @@ export function GameSheet() {
     };
   }, [gameDayId, gameId]);
 
-  const { goalsByPlayerAndPeriod, closedPeriods } = useMemo(() => {
-    const raw = aggregate?.events;
-    const events = Array.isArray(raw) ? [...raw] : [];
-    sortGameEventsAsc(events);
-    type Side = "HOME" | "AWAY";
-    const goals: Record<Side, Record<string, Record<number, number>>> = {
-      HOME: {},
-      AWAY: {},
-    };
-    const closedPeriods = new Set<number>();
-    let currentPeriod = 1;
+  const { goalsByPlayerAndPeriod, closedPeriods } = useMemo(
+    () => computeGoalsByPlayerAndPeriod(aggregate?.events ?? []),
+    [aggregate?.events]
+  );
 
-    for (const ev of events) {
-      const p = ev.payload as Record<string, unknown> | undefined;
-      if (ev.eventType === "PERIOD_ADVANCED") {
-        const from = (p?.from as number) ?? 0;
-        const to = (p?.to as number) ?? 1;
-        if (from >= 1) closedPeriods.add(from);
-        currentPeriod = to;
-        continue;
-      }
-      if (ev.eventType === "GOAL_HOME" && p?.capNumber) {
-        const cap = String(p.capNumber);
-        const d = goalEventDelta(p);
-        if (!goals.HOME[cap]) goals.HOME[cap] = {};
-        goals.HOME[cap][currentPeriod] = Math.max(0, (goals.HOME[cap][currentPeriod] ?? 0) + d);
-      }
-      if (ev.eventType === "GOAL_AWAY" && p?.capNumber) {
-        const cap = String(p.capNumber);
-        const d = goalEventDelta(p);
-        if (!goals.AWAY[cap]) goals.AWAY[cap] = {};
-        goals.AWAY[cap][currentPeriod] = Math.max(0, (goals.AWAY[cap][currentPeriod] ?? 0) + d);
-      }
-    }
+  const foulsByPlayer = useMemo(
+    () => computeFoulsByPlayer(aggregate?.events ?? []),
+    [aggregate?.events]
+  );
 
-    return {
-      goalsByPlayerAndPeriod: goals,
-      closedPeriods,
-    };
-  }, [aggregate?.events]);
+  const timeoutCalls = useMemo(
+    () => computeTimeoutCalls(aggregate?.events ?? []),
+    [aggregate?.events]
+  );
 
-  const foulsByPlayer = useMemo(() => {
-    const raw = aggregate?.events;
-    const eventList = Array.isArray(raw) ? [...raw] : [];
-    sortGameEventsAsc(eventList);
-    type Side = "HOME" | "AWAY";
-    const bySideCap: Record<Side, Record<string, string[]>> = {
-      HOME: {},
-      AWAY: {},
-    };
-    let currentPeriod = 1;
-    for (const ev of eventList) {
-      const p = ev.payload as Record<string, unknown> | undefined;
-      if (ev.eventType === "PERIOD_ADVANCED") {
-        const to = (p?.to as number) ?? 1;
-        currentPeriod = to;
-        continue;
-      }
-      if (ev.eventType !== "EXCLUSION_STARTED") continue;
-      const side = (p?.teamSide as Side) ?? (p?.side as Side);
-      const cap = p?.capNumber as string;
-      if (!side || !cap) continue;
-      if (!bySideCap[side][cap]) bySideCap[side][cap] = [];
-      if (bySideCap[side][cap].length >= 3) continue;
-      const period = (typeof p?.period === "number" ? p.period : currentPeriod) as number;
-      const letter = p?.isPenalty === true ? "P" : "E";
-      bySideCap[side][cap].push(`${letter}${period}`);
-    }
-    return bySideCap;
-  }, [aggregate?.events]);
-
-  const timeoutCalls = useMemo(() => {
-    const raw = aggregate?.events;
-    const events = Array.isArray(raw) ? [...raw] : [];
-    sortGameEventsAsc(events);
-    const bySide = {
-      HOME: { full: [] as string[], short: [] as string[] },
-      AWAY: { full: [] as string[], short: [] as string[] },
-    };
-    let currentPeriod = 1;
-    for (const ev of events) {
-      const p = ev.payload as Record<string, unknown> | undefined;
-      if (ev.eventType === "PERIOD_ADVANCED") {
-        const to = (p?.to as number) ?? 1;
-        currentPeriod = to;
-        continue;
-      }
-      if (ev.eventType !== "TIMEOUT_USED") continue;
-      const side = (p?.teamSide as TeamSide) ?? (p?.side as TeamSide);
-      if (!side) continue;
-      const calledAt =
-        typeof p?.timeSeconds === "number" ? formatSeconds(p.timeSeconds) : "—";
-      const slotValue = `${calledAt}/${currentPeriod}`;
-      const timeoutType = (p?.type as string) ?? "full";
-      if (timeoutType === "short") {
-        bySide[side].short.push(slotValue);
-      } else {
-        bySide[side].full.push(slotValue);
-      }
-    }
-    return bySide;
-  }, [aggregate?.events]);
-
-  const scoreByQuarter = useMemo(() => {
-    const raw = aggregate?.events;
-    const events = Array.isArray(raw) ? [...raw] : [];
-    sortGameEventsAsc(events);
-    const home: Record<number, number> = {};
-    const away: Record<number, number> = {};
-    let currentPeriod = 1;
-    for (const ev of events) {
-      const p = ev.payload as Record<string, unknown> | undefined;
-      if (ev.eventType === "PERIOD_ADVANCED") {
-        const to = (p?.to as number) ?? currentPeriod + 1;
-        currentPeriod = to;
-        continue;
-      }
-      if (ev.eventType === "GOAL_HOME") {
-        const d = goalEventDelta(p);
-        home[currentPeriod] = Math.max(0, (home[currentPeriod] ?? 0) + d);
-      } else if (ev.eventType === "GOAL_AWAY") {
-        const d = goalEventDelta(p);
-        away[currentPeriod] = Math.max(0, (away[currentPeriod] ?? 0) + d);
-      }
-    }
-    const q = (side: "HOME" | "AWAY", period: number) =>
-      side === "HOME" ? (home[period] ?? 0) : (away[period] ?? 0);
-    const otHome = Object.entries(home)
-      .filter(([period]) => Number(period) >= 5)
-      .reduce((sum, [, value]) => sum + value, 0);
-    const otAway = Object.entries(away)
-      .filter(([period]) => Number(period) >= 5)
-      .reduce((sum, [, value]) => sum + value, 0);
-    const finalHome = aggregate?.score?.homeScore ?? 0;
-    const finalAway = aggregate?.score?.awayScore ?? 0;
-    return {
-      q1: { home: q("HOME", 1), away: q("AWAY", 1) },
-      q2: { home: q("HOME", 2), away: q("AWAY", 2) },
-      q3: { home: q("HOME", 3), away: q("AWAY", 3) },
-      q4: { home: q("HOME", 4), away: q("AWAY", 4) },
-      ot: { home: otHome, away: otAway },
-      final: { home: finalHome, away: finalAway },
-    };
-  }, [aggregate?.events, aggregate?.score?.homeScore, aggregate?.score?.awayScore]);
+  const scoreByQuarter = useMemo(
+    () =>
+      computeScoreByQuarter(
+        aggregate?.events ?? [],
+        aggregate?.score?.homeScore ?? 0,
+        aggregate?.score?.awayScore ?? 0
+      ),
+    [aggregate?.events, aggregate?.score?.homeScore, aggregate?.score?.awayScore]
+  );
 
   if (loading) return <div className="page"><p>Loading…</p></div>;
   if (error) return <ApiErrorDisplay error={error} />;
@@ -443,84 +274,10 @@ export function GameSheet() {
     return [arr[0] ?? "—", arr[1] ?? "—", arr[2] ?? "—"];
   };
 
-  const progressRows = eventsForGameProgressDisplay(
-    Array.isArray(aggregate.events) ? aggregate.events : []
-  ).map((ev) => {
-    const p = ev.payload as Record<string, unknown> | undefined;
-    const side = (p?.side ?? p?.teamSide) as string | undefined;
-    const team = side === "HOME" ? "Dark" : side === "AWAY" ? "Light" : "—";
-    const cap = (p?.capNumber as string) ?? "—";
-    const timeStr =
-      typeof p?.timeSeconds === "number"
-        ? `${Math.floor(p.timeSeconds / 60)}:${String(p.timeSeconds % 60).padStart(2, "0")}`
-        : ev.createdAt
-          ? new Date(ev.createdAt).toLocaleTimeString(undefined, {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: false,
-            })
-          : "—";
-    let remark = "—";
-    let score = "—";
-    switch (ev.eventType) {
-      case "GOAL_HOME":
-      case "GOAL_AWAY":
-        remark = "Goal";
-        if (typeof p?.homeScore === "number" && typeof p?.awayScore === "number") {
-          score = `${p.homeScore}-${p.awayScore}`;
-        }
-        break;
-      case "EXCLUSION_STARTED":
-        remark = p?.isPenalty === true ? "Penalty" : "Exclusion";
-        break;
-      case "EXCLUSION_CLEARED":
-        remark = "Exclusion cleared";
-        break;
-      case "TIMEOUT_USED":
-        remark = (p?.type as string) === "short" ? "Timeout (30s)" : "Timeout (full)";
-        break;
-      case "PERIOD_ADVANCED":
-        remark = `End Q${(p?.from as number) ?? "?"} → Q${(p?.to as number) ?? "?"}`;
-        if (typeof p?.homeScore === "number" && typeof p?.awayScore === "number") {
-          score = `${p.homeScore}-${p.awayScore}`;
-        }
-        break;
-      case "GAME_CLOCK_STARTED":
-        remark = formatQuarterStartedRemark(p);
-        break;
-      case "QUARTER_ENDED":
-        remark = formatQuarterEndedRemark(p);
-        break;
-      case "HORN_TRIGGERED":
-        remark = "Horn";
-        break;
-      case "GAME_CREATED":
-        remark = "Game created";
-        break;
-      default:
-        remark = ev.eventType.replace(/_/g, " ").toLowerCase();
-    }
-    const isQuarterStart = ev.eventType === "GAME_CLOCK_STARTED";
-    const isQuarterEnd =
-      ev.eventType === "PERIOD_ADVANCED" || ev.eventType === "QUARTER_ENDED";
-    const foulCount =
-      ev.eventType === "EXCLUSION_STARTED" && side && cap
-        ? (foulsByPlayer[(side as TeamSide)]?.[cap]?.length ?? 0)
-        : undefined;
-    return {
-      id: ev.id,
-      time: timeStr,
-      cap,
-      team,
-      remark,
-      score,
-      isQuarterStart,
-      isQuarterEnd,
-      foulCount,
-      editable: ev.eventType !== "GAME_CREATED",
-    };
-  });
+  const progressRows = buildProgressRows(
+    Array.isArray(aggregate.events) ? aggregate.events : [],
+    foulsByPlayer
+  );
 
   const openProgressEditForRow = (rowId: string) => {
     const full = [...(aggregate.events ?? [])];
@@ -839,6 +596,8 @@ export function GameSheet() {
               <Link to={`/game-days/${gameDayId}/games/${gameId}/scoreboard`}>Scoreboard only</Link>
               {" · "}
               <Link to="/timer">Timer</Link>
+              {" · "}
+              <Link to={`/game-days/${gameDayId}/games/${gameId}/scoresheet`}>Print scoresheet</Link>
             </>
           ) : null}
         </div>
@@ -2284,12 +2043,5 @@ function describeParsed(parsed: ParsedInput, aggregate: GameAggregate): string {
     default:
       return parsed.raw;
   }
-}
-
-function formatSeconds(seconds?: number): string {
-  if (seconds == null) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 

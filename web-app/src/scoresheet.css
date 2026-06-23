@@ -1,0 +1,384 @@
+/* Traditional water polo scoresheet — black & white, landscape, single page. */
+
+@page {
+  size: letter landscape;
+  margin: 0.35in;
+}
+
+/* Printable landscape area at 0.35in margins ≈ 10.3in x 7.8in (96px/in). */
+:root {
+  --ss-page-w: 988px;
+  --ss-page-h: 748px;
+}
+
+.ss-screen {
+  min-height: 100vh;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #4b5563;
+}
+
+.ss-toolbar {
+  width: 100%;
+  max-width: var(--ss-page-w);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ss-toolbar a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.ss-toolbar a:hover {
+  text-decoration: underline;
+}
+
+/* Wrapper sized (via inline style) to the scaled paper so the screen has no dead space. */
+.ss-fit {
+  position: relative;
+  overflow: hidden;
+}
+
+/* The "paper": fixed printable width, scaled to fit one page; forced black on white. */
+.ss-paper {
+  width: var(--ss-page-w);
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  padding: 0;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 10px;
+  line-height: 1.15;
+  transform-origin: top left;
+}
+
+.ss-paper h1,
+.ss-paper h2 {
+  margin: 0;
+  color: #000;
+}
+
+/* ---- Header band ---- */
+.ss-header {
+  border: 1.5px solid #000;
+  padding: 4px 8px;
+  margin-bottom: 5px;
+}
+
+.ss-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.ss-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ss-final {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid #000;
+  padding: 1px 8px;
+}
+
+.ss-final-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ss-final-score {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ss-header-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 18px;
+  margin-top: 2px;
+}
+
+.ss-field {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 130px;
+  flex: 1 1 auto;
+}
+
+.ss-field-wide {
+  min-width: 240px;
+}
+
+.ss-field-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #000;
+  white-space: nowrap;
+}
+
+.ss-field-value {
+  font-weight: 600;
+}
+
+.ss-field-line {
+  flex: 1 1 auto;
+  min-width: 60px;
+  border-bottom: 1px solid #000;
+  align-self: flex-end;
+  height: 11px;
+}
+
+/* ---- Tables (shared) ---- */
+.ss-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ss-table th,
+.ss-table td {
+  border: 1px solid #000;
+  padding: 0 2px;
+  text-align: center;
+  font-size: 9px;
+  height: 13px;
+}
+
+.ss-table th {
+  background: #e5e5e5;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 8px;
+}
+
+.ss-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+/* ---- Team blocks (rosters / matrix) ---- */
+.ss-teams {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.ss-team-block {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.ss-team-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border: 1px solid #000;
+  border-bottom: none;
+  padding: 1px 6px;
+}
+
+.ss-team-name {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.ss-team-color {
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.ss-matrix .ss-col-cap {
+  width: 26px;
+}
+
+.ss-matrix .ss-col-name {
+  text-align: left;
+  width: auto;
+}
+
+.ss-cell-foul {
+  width: 24px;
+}
+
+.ss-cell-tot {
+  font-weight: 700;
+}
+
+.ss-row-fouled-out .ss-col-name {
+  font-weight: 700;
+  text-decoration: line-through;
+}
+
+/* ---- Summary: results + timeouts ---- */
+.ss-summary {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 5px;
+  align-items: flex-start;
+}
+
+.ss-results {
+  flex: 0 0 140px;
+}
+
+.ss-results-table .ss-results-final td {
+  font-weight: 700;
+  border-top: 1.5px solid #000;
+}
+
+.ss-timeouts {
+  flex: 1 1 auto;
+}
+
+.ss-to-team {
+  text-align: left;
+  font-weight: 700;
+}
+
+.ss-timeouts-remaining {
+  margin: 2px 0 0;
+  font-size: 9px;
+}
+
+/* ---- Progress of game (chronology) ---- */
+.ss-progress {
+  margin-bottom: 6px;
+}
+
+.ss-legend {
+  font-size: 9px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ss-chron {
+  display: flex;
+  gap: 0;
+}
+
+.ss-chron-table {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-left: -1px;
+}
+
+.ss-chron-table:first-child {
+  margin-left: 0;
+}
+
+/* Thick separator between column groups (previous Score | next Time). */
+.ss-chron-table:not(:first-child) th:first-child,
+.ss-chron-table:not(:first-child) td:first-child {
+  border-left: 2.5px solid #000;
+}
+
+.ss-chron-time {
+  width: 32px;
+}
+
+.ss-chron-cap {
+  width: 28px;
+}
+
+.ss-chron-score {
+  width: 32px;
+}
+
+.ss-chron-event {
+  font-weight: 700;
+}
+
+/* Scoped to the event cell so these beat the shared `.ss-table td` centering. */
+.ss-chron-event.ss-just-left {
+  text-align: left;
+}
+
+.ss-chron-event.ss-just-center {
+  text-align: center;
+}
+
+.ss-chron-event.ss-just-right {
+  text-align: right;
+}
+
+/* End-of-period marker: solid blacked-out row (replaces the squiggly line). */
+.ss-chron-blackout td {
+  background: #000;
+  height: 13px;
+}
+
+/* ---- Signatures ---- */
+.ss-signatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1.5px solid #000;
+}
+
+.ss-signatures .ss-field {
+  min-width: 210px;
+  flex: 1 1 30%;
+}
+
+/* ---- Avoid awkward breaks ---- */
+.ss-team-block,
+.ss-summary,
+.ss-results,
+.ss-timeouts,
+.ss-progress,
+.ss-signatures,
+.ss-table tr {
+  break-inside: avoid;
+}
+
+/* ---- Print: single page, scaled paper anchored to the page origin ---- */
+@media print {
+  .ss-screen {
+    background: #fff;
+    padding: 0;
+    display: block;
+  }
+
+  .ss-toolbar {
+    display: none !important;
+  }
+
+  .ss-fit {
+    overflow: visible;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .ss-paper {
+    box-shadow: none;
+  }
+
+  /* Keep greys/blacks when printing. */
+  .ss-paper,
+  .ss-table th,
+  .ss-chron-blackout td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

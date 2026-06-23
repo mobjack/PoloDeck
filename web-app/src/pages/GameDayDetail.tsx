@@ -261,6 +261,12 @@ function GameCard({
           Game sheet
         </Link>
         <Link
+          to={`/game-days/${gameDayId}/games/${game.id}/scoresheet`}
+          className="btn btn-compact secondary"
+        >
+          Scoresheet
+        </Link>
+        <Link
           to={`/game-days/${gameDayId}/games/${game.id}/scoreboard`}
           className="btn btn-compact secondary"
         >
