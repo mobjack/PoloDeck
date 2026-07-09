@@ -19,7 +19,7 @@ Everything runs on the pool deck over local WiFi—no internet required.
 - Score tracking
 - Game clock and shot clock (drift-free: `remainingMs` + `lastStartedAt`, clients compute display time)
 - Period management
-- Horn triggers (event + WebSocket for clients to play sound)
+- Horn triggers (event + WebSocket for clients to play sound, to be coded eta unknown)
 - Player rosters (per-game snapshot, string cap numbers like `1`, `10`, `A`, `B`)
 - Player exclusions (20s, ACTIVE / ROLLED)
 - Team timeouts (2 full + 1 short per team)
@@ -53,9 +53,12 @@ PoloDeck/
 │   └── Dockerfile
 ├── web-app/       # Browser UI (game-day admin, operator views)
 ├── pi/            # Raspberry Pi kiosk scripts (served under /kiosk/ from the web-app image)
-├── setup/         # Docker Compose + install helper (Postgres, API, web-app)
+├── setup/         # Docker Compose + install helpers (Postgres, API, web-app)
 │   ├── docker-compose.yml
-│   ├── setup.sh
+│   ├── setup.sh            # Linux/macOS install helper
+│   ├── setup.ps1           # Windows (PowerShell) install helper
+│   ├── SETUP-WINDOWS.md    # Windows setup guide
+│   ├── SETUP-LINUX-MAC.md  # Linux/macOS setup guide
 │   └── .env.example
 ├── COMMAND_LIST.md   # Game sheet scoring commands (printable reference)
 └── README.md
@@ -101,13 +104,24 @@ The UI currently focuses on **game-day setup**:
 
 ## Docker (full stack)
 
+Everything runs in Docker, so the only prerequisite is a working Docker install. Platform-specific setup guides:
+
+- **Windows:** [`setup/SETUP-WINDOWS.md`](setup/SETUP-WINDOWS.md) (uses `setup/setup.ps1`)
+- **Linux / macOS:** [`setup/SETUP-LINUX-MAC.md`](setup/SETUP-LINUX-MAC.md) (uses `setup/setup.sh`)
+
 From the repo root, one command creates `setup/.env` (if missing), prompts for LAN binding when your terminal is interactive, starts Postgres + API + web-app, and applies Prisma migrations:
 
 ```bash
+# Linux / macOS
 ./setup/setup.sh
 ```
 
-Other useful commands:
+```powershell
+# Windows (PowerShell)
+.\setup\setup.ps1
+```
+
+Other useful commands (Linux/macOS shown; on Windows use `.\setup\setup.ps1 <command>`):
 
 ```bash
 ./setup/setup.sh config    # only write/update setup/.env
@@ -117,7 +131,7 @@ Other useful commands:
 ./setup/setup.sh help
 ```
 
-Manual compose (equivalent to what the script uses):
+Manual compose (equivalent to what the scripts use):
 
 ```bash
 cd setup && docker compose up -d --build
