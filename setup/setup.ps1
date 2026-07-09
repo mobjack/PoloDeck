@@ -79,7 +79,7 @@ function Set-EnvValue {
   $found = $false
   if (Test-Path -LiteralPath $File) {
     foreach ($line in Get-Content -LiteralPath $File) {
-      if ($line -match "^$([regex]::Escape($Key))=") {
+      if ($line -cmatch "^$([regex]::Escape($Key))=") {
         $lines += "$Key=$Value"
         $found = $true
       } else {
