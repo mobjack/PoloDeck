@@ -1,0 +1,22 @@
+[Unit]
+Description=PoloDeck private PostgreSQL
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=polodeck
+Group=polodeck
+Environment=POLODECK_ROOT=/opt/polodeck
+Environment=POLODECK_PGDATA=/var/lib/polodeck/postgres
+Environment=POLODECK_SECRETS_ENV=/etc/polodeck/secrets.env
+Environment=POLODECK_PG_LOG=/var/log/polodeck/postgres.log
+EnvironmentFile=-/etc/polodeck/secrets.env
+ExecStart=/opt/polodeck/bin/polodeck-db.sh
+ExecStop=/opt/polodeck/runtime/postgres/bin/pg_ctl -D /var/lib/polodeck/postgres stop -m fast
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PoloDeck
+Comment=Open PoloDeck in your browser
+Exec=/opt/polodeck/bin/polodeck-open.sh
+Icon=applications-internet
+Terminal=false
+Categories=Utility;Sports;
+StartupNotify=false

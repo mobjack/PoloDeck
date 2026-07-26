@@ -1,0 +1,30 @@
+name: Native package build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "api/**"
+      - "web-app/**"
+      - "packaging/**"
+      - "pi/**"
+
+jobs:
+  build-app:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web-app/package-lock.json
+      - name: Build app tree
+        run: ./packaging/scripts/build-app.sh
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: polodeck-app
+          path: packaging/dist/app

@@ -26,7 +26,11 @@ Once you have the server docker images up and running, you can then start buildi
    **Scoreboard, shot clock, and timer** (replace `192.168.1.10` with your deck LAN IP):
 
    ```bash
+   # Docker Compose Core (API on :3000):
    curl -fsSL 'http://192.168.1.10:3000/kb' | sudo bash
+
+   # Native Core package (single port :8080):
+   curl -fsSL 'http://192.168.1.10:8080/kb' | sudo bash
    ```
 
    The installer asks what type of kiosk you are building (scoreboard, shot clock, or timer). Choose **Shot clock** to configure portrait mode (`display_rotate` in boot `config.txt` plus an X11 fallback); that takes effect after reboot. Set the live game on the game day page, then assign each Pi’s role under **Manage kiosks**.

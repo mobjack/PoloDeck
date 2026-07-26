@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircleQuestionMark, Monitor } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
-import { api, type DeviceCapabilities } from "../api/client";
+import { LogOut, MessageCircleQuestionMark, Monitor } from "lucide-react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { api, type AuthUser, type DeviceCapabilities } from "../api/client";
 import type { GameDay } from "../types/gameDay";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 
 export function GameDayShell() {
+  const navigate = useNavigate();
   const [list, setList] = useState<GameDay[]>([]);
   const [capabilities, setCapabilities] = useState<DeviceCapabilities | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.gameDays.list(), api.capabilities()])
-      .then(([gameDays, caps]) => {
+    Promise.all([api.gameDays.list(), api.capabilities(), api.auth.me()])
+      .then(([gameDays, caps, me]) => {
         setList(gameDays);
         setCapabilities(caps);
+        setUser(me.user);
       })
       .catch((e) => setError(e))
       .finally(() => setLoading(false));
@@ -142,6 +145,19 @@ export function GameDayShell() {
           >
             <MessageCircleQuestionMark size={22} strokeWidth={2} aria-hidden />
           </button>
+          {user ? (
+            <button
+              type="button"
+              className="game-day-shell-icon-btn"
+              onClick={() => {
+                void api.auth.logout().finally(() => navigate("/login", { replace: true }));
+              }}
+              aria-label={`Sign out ${user.username}`}
+              title={`Sign out (${user.username})`}
+            >
+              <LogOut size={22} strokeWidth={2} aria-hidden />
+            </button>
+          ) : null}
         </div>
       </header>
 

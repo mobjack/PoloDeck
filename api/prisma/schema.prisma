@@ -213,4 +213,50 @@ model Device {
   game          Game?      @relation(fields: [gameId], references: [id], onDelete: SetNull)
 }
 
+enum UserRole {
+  ADMINISTRATOR
+  OPERATOR
+  READ_ONLY
+}
+
+enum NetworkAccessMode {
+  LOCAL_ONLY
+  LAN
+}
+
+/// Singleton row (id = "default") for first-run and install settings.
+model InstallSettings {
+  id                   String            @id @default("default")
+  setupComplete        Boolean           @default(false)
+  installName          String?
+  networkAccess        NetworkAccessMode @default(LOCAL_ONLY)
+  recoveryCodeHash     String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         UserRole @default(OPERATOR)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 

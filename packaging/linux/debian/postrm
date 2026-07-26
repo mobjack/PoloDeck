@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+remove)
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl disable polodeck.service polodeck-db.service 2>/dev/null || true
+    systemctl daemon-reload || true
+  fi
+  # Preserve /var/lib/polodeck and /etc/polodeck by default
+  echo "PoloDeck removed. Game data kept under /var/lib/polodeck (use apt purge to delete)." >&2
+  ;;
+purge)
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl disable polodeck.service polodeck-db.service 2>/dev/null || true
+    systemctl daemon-reload || true
+  fi
+  rm -rf /var/lib/polodeck /etc/polodeck /var/log/polodeck
+  if getent passwd polodeck >/dev/null; then
+    deluser --system polodeck 2>/dev/null || true
+  fi
+  if getent group polodeck >/dev/null; then
+    delgroup --system polodeck 2>/dev/null || true
+  fi
+  ;;
+esac
+
+exit 0

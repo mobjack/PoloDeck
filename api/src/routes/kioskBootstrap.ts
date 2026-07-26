@@ -2,8 +2,9 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { env } from "../config/env.js";
 
-/** Published UI port (docker compose maps host 8080 → nginx in web-app). */
-const UI_PORT = 8080;
+function uiPort(): number {
+  return env.POLODECK_UI_PORT ?? 8080;
+}
 
 function shellSingleQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
@@ -61,8 +62,9 @@ function buildKioskChromiumUrl(opts: {
   host: string;
   role: KioskRole;
   gameId?: string;
+  port: number;
 }): string {
-  const origin = `http://${opts.host}:${UI_PORT}`;
+  const origin = `http://${opts.host}:${opts.port}`;
   if (opts.role === "SETUP") {
     return `${origin}/kiosk/setup-screen.html`;
   }
@@ -87,10 +89,7 @@ function buildKioskChromiumUrl(opts: {
  *   gameId=<id>        with board|clock|timer only, open that game’s display route
  *   aptProxy=<url>     Apt-Cacher NG base URL (http://cache:3142); overrides POLODECK_PI_APT_PROXY
  *
- * Examples:
- *   curl -fsSL 'http://LAN:3000/kb' | sudo bash
- *   curl -fsSL 'http://LAN:3000/kb?kiosk=board&gameId=...' | sudo bash
- *   curl -fsSL 'http://LAN:3000/kb?aptProxy=http://192.168.1.5:3142' | sudo bash
+ * Docker: API :3000, UI :8080. Native single-port: both on PORT (set POLODECK_UI_PORT=PORT).
  */
 export async function registerKioskBootstrapRoutes(app: FastifyInstance) {
   app.get("/kb", async (request, reply) => {
@@ -102,16 +101,17 @@ export async function registerKioskBootstrapRoutes(app: FastifyInstance) {
     const host = publicHost(request, q);
     const gameId = validateGameId(q.gameId);
     const role = parsed.role;
+    const port = uiPort();
 
-    const webOrigin = `http://${host}:${UI_PORT}`;
+    const webOrigin = `http://${host}:${port}`;
     const artifactsBase = `${webOrigin.replace(/\/$/, "")}/kiosk`;
-    const kioskUrl = buildKioskChromiumUrl({ host, role, gameId });
+    const kioskUrl = buildKioskChromiumUrl({ host, role, gameId, port });
     const bootUrl = `${artifactsBase}/bootstrap-kiosk.sh`;
     const aptProxy = validateAptProxyUrl(q.aptProxy) ?? env.POLODECK_PI_APT_PROXY;
 
     const lines = [
       "#!/usr/bin/env bash",
-      "# PoloDeck Pi kiosk — from GET /kb (web UI :8080; API :3000)",
+      `# PoloDeck Pi kiosk — from GET /kb (UI :${port})`,
       "set -euo pipefail",
       `curl -fsSL ${shellSingleQuote(bootUrl)} -o /tmp/polodeck-bootstrap.sh`,
       `exec bash /tmp/polodeck-bootstrap.sh -- \\`,

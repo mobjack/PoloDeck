@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.polodeck.core</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Library/Application Support/PoloDeck/bin/polodeck-supervisor.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>POLODECK_ROOT</key>
+    <string>/Library/Application Support/PoloDeck</string>
+    <key>POLODECK_CONFIG_ENV</key>
+    <string>/Library/Application Support/PoloDeck/config/polodeck.env</string>
+    <key>POLODECK_SECRETS_ENV</key>
+    <string>/Library/Application Support/PoloDeck/secrets/secrets.env</string>
+    <key>POLODECK_PGDATA</key>
+    <string>/Library/Application Support/PoloDeck/data/postgres</string>
+    <key>POLODECK_BACKUP_DIR</key>
+    <string>/Library/Application Support/PoloDeck/backups</string>
+    <key>POLODECK_PG_LOG</key>
+    <string>/Library/Logs/PoloDeck/postgres.log</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Library/Logs/PoloDeck/core.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Library/Logs/PoloDeck/core.err.log</string>
+  <key>UserName</key>
+  <string>_polodeck</string>
+  <key>GroupName</key>
+  <string>_polodeck</string>
+</dict>
+</plist>

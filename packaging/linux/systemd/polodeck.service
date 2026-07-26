@@ -1,0 +1,36 @@
+[Unit]
+Description=PoloDeck Core
+After=network-online.target polodeck-db.service
+Requires=polodeck-db.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=polodeck
+Group=polodeck
+Environment=POLODECK_ROOT=/opt/polodeck
+Environment=POLODECK_API_DIR=/opt/polodeck/app/api
+Environment=POLODECK_WEB_ROOT=/opt/polodeck/app/web
+Environment=POLODECK_CONFIG_ENV=/etc/polodeck/polodeck.env
+Environment=POLODECK_CONFIG_ENV_PATH=/etc/polodeck/polodeck.env
+Environment=POLODECK_SECRETS_ENV=/etc/polodeck/secrets.env
+Environment=POLODECK_BACKUP_DIR=/var/lib/polodeck/backups
+Environment=POLODECK_PGDATA=/var/lib/polodeck/postgres
+Environment=POLODECK_SKIP_LOCAL_PG=1
+EnvironmentFile=-/etc/polodeck/polodeck.env
+EnvironmentFile=-/etc/polodeck/secrets.env
+WorkingDirectory=/opt/polodeck/app/api
+ExecStartPre=/opt/polodeck/bin/polodeck-migrate.sh
+ExecStart=/opt/polodeck/runtime/node/bin/node /opt/polodeck/app/api/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=180
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=polodeck
+
+# Readiness-friendly: give migrate time; fail closed if ExecStartPre fails
+SuccessExitStatus=0
+
+[Install]
+WantedBy=multi-user.target

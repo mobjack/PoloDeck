@@ -1,0 +1,60 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+configure)
+  if ! getent group polodeck >/dev/null; then
+    addgroup --system polodeck
+  fi
+  if ! getent passwd polodeck >/dev/null; then
+    adduser --system --ingroup --home /var/lib/polodeck --shell /usr/sbin/nologin \
+      --gecos "PoloDeck Core" polodeck
+  fi
+
+  mkdir -p /var/lib/polodeck/postgres /var/lib/polodeck/backups /var/log/polodeck /etc/polodeck
+  chown -R polodeck:polodeck /var/lib/polodeck /var/log/polodeck
+  chown root:polodeck /etc/polodeck
+  chmod 750 /etc/polodeck
+
+  if [ ! -f /etc/polodeck/secrets.env ]; then
+    PW="$(openssl rand -base64 32 | tr -d '\n' | tr '/+' 'ab')"
+    SECRET="$(openssl rand -base64 48 | tr -d '\n')"
+    umask 077
+    cat >/etc/polodeck/secrets.env <<EOF
+POSTGRES_USER=polodeck
+POSTGRES_PASSWORD=${PW}
+POSTGRES_DB=polodeck
+DATABASE_URL=postgresql://polodeck:${PW}@127.0.0.1:5432/polodeck?schema=public
+POLODECK_SESSION_SECRET=${SECRET}
+EOF
+    chown root:polodeck /etc/polodeck/secrets.env
+    chmod 640 /etc/polodeck/secrets.env
+  fi
+
+  if [ ! -s /etc/polodeck/polodeck.env ]; then
+    cat >/etc/polodeck/polodeck.env <<EOF
+NODE_ENV=production
+PORT=8080
+HOST=127.0.0.1
+POLODECK_UI_PORT=8080
+POLODECK_REQUIRE_SETUP=true
+POLODECK_VERSION=$(cat /opt/polodeck/app/VERSION 2>/dev/null || echo 0.1.0)
+POLODECK_WEB_ROOT=/opt/polodeck/app/web
+POLODECK_CONFIG_ENV_PATH=/etc/polodeck/polodeck.env
+EOF
+    chown root:polodeck /etc/polodeck/polodeck.env
+    chmod 640 /etc/polodeck/polodeck.env
+  fi
+
+  chown -R polodeck:polodeck /opt/polodeck
+
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+    systemctl enable polodeck-db.service polodeck.service
+    systemctl restart polodeck-db.service || true
+    systemctl restart polodeck.service || true
+  fi
+  ;;
+esac
+
+exit 0

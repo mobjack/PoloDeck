@@ -5,12 +5,23 @@ async function start() {
   const app = await buildApp();
 
   try {
-    await app.listen({ port: env.PORT, host: "0.0.0.0" });
+    await app.listen({ port: env.PORT, host: env.HOST });
+    app.log.info(
+      { host: env.HOST, port: env.PORT, webRoot: env.POLODECK_WEB_ROOT ?? null },
+      "PoloDeck Core listening"
+    );
   } catch (err) {
-    app.log.error(err);
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code === "EADDRINUSE") {
+      app.log.error(
+        { port: env.PORT },
+        "Another program is using PoloDeck’s network port. Stop that program or change PORT, then try again."
+      );
+    } else {
+      app.log.error(err);
+    }
     process.exit(1);
   }
 }
 
 start();
-

@@ -11,5 +11,7 @@ export {
   ExclusionStatus,
   GameEventType,
   GameStatus,
+  NetworkAccessMode,
   TeamSide,
+  UserRole,
 } from "../generated/prisma";

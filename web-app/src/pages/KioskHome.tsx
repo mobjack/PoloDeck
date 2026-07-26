@@ -56,7 +56,9 @@ export function KioskHome() {
         <p className="kiosk-home-install">
           Install a Pi with:{" "}
           <code className="kiosk-home-code">{`curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash`}</code>{" "}
-          (opens <code className="kiosk-home-code">/kiosk/managed</code>)
+          (Docker). Native Core uses the same path on port <strong>8080</strong>:{" "}
+          <code className="kiosk-home-code">{`curl -fsSL 'http://<LAN-IP>:8080/kb' | sudo bash`}</code>.
+          Opens <code className="kiosk-home-code">/kiosk/managed</code>.
         </p>
       </header>
       {games.length === 0 ? (

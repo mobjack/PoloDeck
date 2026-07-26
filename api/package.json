@@ -16,14 +16,16 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/services/gameEventRerun.sort.test.ts"
+    "test": "tsx --test src/services/gameEventRerun.sort.test.ts src/lib/password.test.ts"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^10.0.0",
     "@fastify/helmet": "^13.0.0",
+    "@fastify/static": "^10.1.2",
     "@prisma/client": "^6.0.0",
     "dotenv": "^16.4.0",
     "fastify": "^5.0.0",
@@ -33,10 +35,9 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^22.20.1",
     "@types/socket.io": "^3.0.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
 }
-

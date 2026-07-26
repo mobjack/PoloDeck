@@ -1,0 +1,59 @@
+#!/bin/bash
+set -euo pipefail
+
+ROOT="/Library/Application Support/PoloDeck"
+LOGS="/Library/Logs/PoloDeck"
+
+mkdir -p "${ROOT}/data/postgres" "${ROOT}/backups" "${ROOT}/config" "${ROOT}/secrets" "${LOGS}"
+
+# Dedicated service user (LaunchDaemon)
+if ! id -u _polodeck >/dev/null 2>&1; then
+  # Find a free UID in 200–400 range
+  UID_N=280
+  while id -u "${UID_N}" >/dev/null 2>&1; do UID_N=$((UID_N + 1)); done
+  dscl . -create /Users/_polodeck
+  dscl . -create /Users/_polodeck UserShell /usr/bin/false
+  dscl . -create /Users/_polodeck RealName "PoloDeck Core"
+  dscl . -create /Users/_polodeck UniqueID "${UID_N}"
+  dscl . -create /Users/_polodeck PrimaryGroupID 20
+  dscl . -create /Users/_polodeck NFSHomeDirectory "${ROOT}"
+fi
+
+if [[ ! -f "${ROOT}/secrets/secrets.env" ]]; then
+  PW="$(/usr/bin/openssl rand -base64 32 | tr -d '\n' | tr '/+' 'ab')"
+  SECRET="$(/usr/bin/openssl rand -base64 48 | tr -d '\n')"
+  umask 077
+  cat >"${ROOT}/secrets/secrets.env" <<EOF
+POSTGRES_USER=polodeck
+POSTGRES_PASSWORD=${PW}
+POSTGRES_DB=polodeck
+DATABASE_URL=postgresql://polodeck:${PW}@127.0.0.1:5432/polodeck?schema=public
+POLODECK_SESSION_SECRET=${SECRET}
+EOF
+fi
+
+if [[ ! -s "${ROOT}/config/polodeck.env" ]] || ! grep -q '^PORT=' "${ROOT}/config/polodeck.env" 2>/dev/null; then
+  VERSION="$(cat "${ROOT}/app/VERSION" 2>/dev/null || echo 0.1.0)"
+  cat >"${ROOT}/config/polodeck.env" <<EOF
+NODE_ENV=production
+PORT=8080
+HOST=127.0.0.1
+POLODECK_UI_PORT=8080
+POLODECK_REQUIRE_SETUP=true
+POLODECK_VERSION=${VERSION}
+POLODECK_WEB_ROOT=${ROOT}/app/web
+POLODECK_CONFIG_ENV_PATH=${ROOT}/config/polodeck.env
+EOF
+fi
+
+chown -R _polodeck:staff "${ROOT}" "${LOGS}"
+chmod 750 "${ROOT}/secrets" "${ROOT}/config"
+chmod 640 "${ROOT}/secrets/secrets.env" "${ROOT}/config/polodeck.env"
+chmod 755 "${ROOT}/bin/"*.sh
+
+launchctl bootout system/com.polodeck.core 2>/dev/null || true
+launchctl bootstrap system /Library/LaunchDaemons/com.polodeck.core.plist
+launchctl enable system/com.polodeck.core
+launchctl kickstart -k system/com.polodeck.core
+
+exit 0

@@ -44,6 +44,7 @@ async function request<T>(
   const res = await fetch(`${API_BASE}${path}`, {
     ...rest,
     method,
+    credentials: "include",
     headers: {
       ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
       ...rest.headers,
@@ -359,4 +360,55 @@ export const api = {
         json: reason !== undefined ? { reason } : {},
       }),
   },
+  setup: {
+    status: () => request<SetupStatus>("/setup/status"),
+    complete: (body: {
+      username: string;
+      password: string;
+      installName: string;
+      networkAccess: "LOCAL_ONLY" | "LAN";
+    }) =>
+      request<{ recoveryCode: string; status: SetupStatus }>("/setup/complete", {
+        method: "POST",
+        json: body,
+      }),
+  },
+  auth: {
+    me: () => request<{ user: AuthUser | null }>("/auth/me"),
+    login: (username: string, password: string) =>
+      request<{ user: AuthUser }>("/auth/login", {
+        method: "POST",
+        json: { username, password },
+      }),
+    logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+    recoveryReset: (body: {
+      recoveryCode: string;
+      username: string;
+      newPassword: string;
+    }) =>
+      request<{ ok: boolean }>("/auth/recovery-reset", {
+        method: "POST",
+        json: body,
+      }),
+  },
 };
+
+export interface SetupStatus {
+  setupComplete: boolean;
+  requireSetup: boolean;
+  installName: string | null;
+  networkAccess: "LOCAL_ONLY" | "LAN" | null;
+  version: string;
+  listenPort: number;
+  uiPort: number;
+  bindHost: string;
+  lanAddresses: string[];
+  primaryLanAddress: string | null;
+  authEnabled: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: "ADMINISTRATOR" | "OPERATOR" | "READ_ONLY";
+}

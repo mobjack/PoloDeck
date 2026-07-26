@@ -49,3 +49,6 @@ coverage/
 # Optional: local overrides
 *.local
 prompt.md
+
+# Native packaging build output
+packaging/dist/

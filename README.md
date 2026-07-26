@@ -60,6 +60,7 @@ PoloDeck/
 │   ├── SETUP-WINDOWS.md    # Windows setup guide
 │   ├── SETUP-LINUX-MAC.md  # Linux/macOS setup guide
 │   └── .env.example
+├── packaging/     # Native Core service (.deb / macOS .pkg) — coaches/volunteers
 ├── COMMAND_LIST.md   # Game sheet scoring commands (printable reference)
 └── README.md
 ```
@@ -143,10 +144,21 @@ cd setup && docker compose up -d --build
 
 **LAN / Raspberry Pi:** By default, published ports bind to `127.0.0.1` only. Run `./setup/setup.sh` and choose LAN binding, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`, so other machines on the pool network can reach the stack. The **web-app** nginx container proxies `/api/` and `/socket.io/` to the API, so browsers and kiosk Pis usually use port **8080** only (same-origin). Install a Pi with `curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash` (optional query `?host=<LAN-IP>` if the `Host` header would be wrong). See [`pi/README.md`](pi/README.md). Only expose `0.0.0.0` on networks you trust.
 
+## Native Core (macOS / Linux packages)
+
+For coaches and volunteers who should not install Docker, Node, or PostgreSQL, see [`packaging/README.md`](packaging/README.md). Native Core runs as a background service (LaunchDaemon / systemd), serves the browser UI on **port 8080**, and uses a first-run setup wizard. Pi install against native Core:
+
+```bash
+curl -fsSL 'http://<LAN-IP>:8080/kb' | sudo bash
+```
+
+The Docker workflow above remains the supported developer path.
+
 ## Status
 
 Early MVP scaffold:
 
 - Backend: game model, timing, rosters, exclusions, timeouts, device check-in, event log.
 - Game-day planning and game metadata APIs are in place.
-- UI: first pass game-day admin UI built with React (no auth, no production hardening yet).
+- UI: game-day admin UI; optional local login after native first-run setup.
+- Packaging: native macOS/Linux service scaffolding under `packaging/`.
