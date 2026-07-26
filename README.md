@@ -146,7 +146,13 @@ cd setup && docker compose up -d --build
 
 ## Native Core (macOS / Linux packages)
 
-For coaches and volunteers who should not install Docker, Node, or PostgreSQL, see [`packaging/README.md`](packaging/README.md). Native Core runs as a background service (LaunchDaemon / systemd), serves the browser UI on **port 8080**, and uses a first-run setup wizard. Pi install against native Core:
+For coaches and volunteers who should not install Docker, Node, or PostgreSQL:
+
+- **macOS install:** [`packaging/INSTALL-MAC.md`](packaging/INSTALL-MAC.md)
+- **Linux (Ubuntu) install:** [`packaging/INSTALL-LINUX.md`](packaging/INSTALL-LINUX.md)
+- Packaging / build notes: [`packaging/README.md`](packaging/README.md)
+
+Native Core runs as a background service, serves the browser UI on **port 8080**, and uses a first-run setup wizard. Pi install against native Core:
 
 ```bash
 curl -fsSL 'http://<LAN-IP>:8080/kb' | sudo bash

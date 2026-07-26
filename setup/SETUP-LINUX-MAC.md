@@ -1,6 +1,9 @@
 # PoloDeck setup on Linux and macOS
 
-This guide is the **Docker** developer / lab install. For a coach-facing native background service (no Docker), see [`../packaging/README.md`](../packaging/README.md).
+This guide is the **Docker** developer / lab install. For a coach-facing native background service (no Docker):
+
+- macOS: [`../packaging/INSTALL-MAC.md`](../packaging/INSTALL-MAC.md)
+- Linux (Ubuntu): [`../packaging/INSTALL-LINUX.md`](../packaging/INSTALL-LINUX.md)
 
 PoloDeck’s Docker stack runs entirely in containers. Whatever Docker supports on your machine is what this path supports.
 

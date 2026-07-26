@@ -2,6 +2,11 @@
 
 Coach-facing distribution for **macOS (Apple Silicon)** and **Ubuntu 22.04/24.04 amd64**.
 
+## Install guides (coaches / volunteers)
+
+- **macOS:** [INSTALL-MAC.md](INSTALL-MAC.md)
+- **Linux (Ubuntu):** [INSTALL-LINUX.md](INSTALL-LINUX.md)
+
 Developers continue to use Docker via [`../setup/setup.sh`](../setup/setup.sh). This tree builds an additional native Core that bundles Node + PostgreSQL and runs as a background service.
 
 ## Quick build
@@ -41,10 +46,7 @@ Artifacts land in `packaging/dist/` with `.sha256` checksums.
 
 ## First run
 
-1. Install `.pkg` / `.deb`
-2. Open **PoloDeck** from Applications / app menu
-3. Complete the browser setup wizard (`/setup`)
-4. Use the UI; connect Pis with `curl -fsSL 'http://<LAN-IP>:8080/kb' | sudo bash`
+See the platform install guides above. In short: install the package → open PoloDeck → complete the browser setup wizard → optionally connect Pis with `curl -fsSL 'http://<LAN-IP>:8080/kb' | sudo bash`.
 
 ## Signing (macOS)
 
