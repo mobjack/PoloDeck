@@ -37,39 +37,71 @@ mv "${TMP}/node-v${VERSION_NODE}-${NODE_PLAT}-${NODE_ARCH}"/* "${OUT}/node/"
 
 echo "Node installed at ${OUT}/node"
 
-# PostgreSQL: prefer a pre-placed tarball, else document manual step / use system for smoke tests
+find_pg_prefix() {
+  local candidates=(
+    "/opt/homebrew/opt/postgresql@16"
+    "/usr/local/opt/postgresql@16"
+    "/usr/lib/postgresql/16"
+    "/usr/pgsql-16"
+  )
+  local d
+  for d in "${candidates[@]}"; do
+    if [[ -x "${d}/bin/postgres" ]]; then
+      echo "${d}"
+      return 0
+    fi
+  done
+  if command -v postgres >/dev/null 2>&1; then
+    dirname "$(dirname "$(command -v postgres)")"
+    return 0
+  fi
+  return 1
+}
+
+# PostgreSQL: tarball, copy system tree (release packages), or symlink (dev smoke)
 PG_TARBALL="${POLODECK_PG_TARBALL:-}"
 if [[ -n "${PG_TARBALL}" && -f "${PG_TARBALL}" ]]; then
   echo "Extracting PostgreSQL from ${PG_TARBALL}…"
   rm -rf "${OUT}/postgres"
   mkdir -p "${OUT}/postgres"
   tar -xzf "${PG_TARBALL}" -C "${OUT}/postgres" --strip-components=1
+elif [[ "${POLODECK_COPY_SYSTEM_PG:-0}" == "1" ]]; then
+  echo "POLODECK_COPY_SYSTEM_PG=1 — copying local PostgreSQL tree into the package…"
+  PG_PREFIX="$(find_pg_prefix)" || {
+    echo "ERROR: could not find PostgreSQL 16 to copy. Install postgresql@16 / postgresql-16 first." >&2
+    exit 1
+  }
+  rm -rf "${OUT}/postgres"
+  mkdir -p "${OUT}/postgres"
+  # Prefer full prefix (bin + lib + share). Debian layout may split share.
+  if [[ -d "${PG_PREFIX}/bin" ]]; then
+    rsync -a "${PG_PREFIX}/" "${OUT}/postgres/"
+  fi
+  if [[ ! -d "${OUT}/postgres/share" && -d /usr/share/postgresql/16 ]]; then
+    mkdir -p "${OUT}/postgres/share"
+    rsync -a /usr/share/postgresql/16/ "${OUT}/postgres/share/"
+  fi
+  if [[ ! -x "${OUT}/postgres/bin/postgres" ]]; then
+    echo "ERROR: copy failed; ${OUT}/postgres/bin/postgres missing" >&2
+    exit 1
+  fi
+  echo "PostgreSQL copied from ${PG_PREFIX}"
 elif [[ "${POLODECK_USE_SYSTEM_PG_FOR_RUNTIME:-0}" == "1" ]]; then
   echo "POLODECK_USE_SYSTEM_PG_FOR_RUNTIME=1 — linking local PostgreSQL tools (dev/smoke only)."
   mkdir -p "${OUT}/postgres/bin"
-  CANDIDATE_DIRS=(
-    "/opt/homebrew/opt/postgresql@16/bin"
-    "/usr/local/opt/postgresql@16/bin"
-    "/usr/lib/postgresql/16/bin"
-    "/usr/pgsql-16/bin"
-  )
+  PG_PREFIX="$(find_pg_prefix || true)"
   for b in postgres initdb pg_ctl pg_isready psql pg_dump; do
     resolved=""
-    if command -v "${b}" >/dev/null 2>&1; then
+    if [[ -n "${PG_PREFIX}" && -x "${PG_PREFIX}/bin/${b}" ]]; then
+      resolved="${PG_PREFIX}/bin/${b}"
+    elif command -v "${b}" >/dev/null 2>&1; then
       resolved="$(command -v "${b}")"
-    else
-      for d in "${CANDIDATE_DIRS[@]}"; do
-        if [[ -x "${d}/${b}" ]]; then
-          resolved="${d}/${b}"
-          break
-        fi
-      done
     fi
     if [[ -n "${resolved}" ]]; then
       ln -sf "${resolved}" "${OUT}/postgres/bin/${b}"
     fi
   done
-  if [[ ! -x "${OUT}/postgres/bin/postgres" ]]; then
+  if [[ ! -x "${OUT}/postgres/bin/postgres" && ! -L "${OUT}/postgres/bin/postgres" ]]; then
     echo "WARNING: could not find local postgres binaries to link." >&2
   fi
 else
@@ -81,7 +113,8 @@ containing \`postgres\`, \`initdb\`, \`pg_ctl\`, \`pg_isready\`, \`psql\`, and \
 
 Options:
 - Set \`POLODECK_PG_TARBALL=/path/to/pgsql.tgz\` when running this script
-- Or set \`POLODECK_USE_SYSTEM_PG_FOR_RUNTIME=1\` for local smoke tests only
+- Set \`POLODECK_COPY_SYSTEM_PG=1\` to copy a local PostgreSQL 16 install (CI/release)
+- Set \`POLODECK_USE_SYSTEM_PG_FOR_RUNTIME=1\` to symlink tools (local smoke tests only)
 
 Official binaries: https://www.postgresql.org/download/
 EOF

@@ -1,13 +1,33 @@
+# Smoke-build the native app tree (no GitHub Release).
+#
+# Runs on:
+# - pull requests that touch packaging / app paths
+# - pushes to main that touch those paths
+# - manual Run workflow
+#
+# Does NOT publish installers. For publishing, use "Release native packages"
+# (tag v* or workflow_dispatch).
+
 name: Native package build
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     paths:
       - "api/**"
       - "web-app/**"
       - "packaging/**"
       - "pi/**"
+      - ".github/workflows/package-native.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - "web-app/**"
+      - "packaging/**"
+      - "pi/**"
+      - ".github/workflows/package-native.yml"
 
 jobs:
   build-app:

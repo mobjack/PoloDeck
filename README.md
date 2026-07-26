@@ -148,6 +148,7 @@ cd setup && docker compose up -d --build
 
 For coaches and volunteers who should not install Docker, Node, or PostgreSQL:
 
+- **Download installers:** [GitHub Releases](https://github.com/mobjack/PoloDeck/releases)
 - **macOS install:** [`packaging/INSTALL-MAC.md`](packaging/INSTALL-MAC.md)
 - **Linux (Ubuntu) install:** [`packaging/INSTALL-LINUX.md`](packaging/INSTALL-LINUX.md)
 - Packaging / build notes: [`packaging/README.md`](packaging/README.md)

@@ -19,11 +19,16 @@ Developers using Docker should follow [../setup/SETUP-LINUX-MAC.md](../setup/SET
 
 ## 1. Download
 
-Get the macOS installer from the PoloDeck release you were given, for example:
+1. Open the PoloDeck releases page:  
+   **https://github.com/mobjack/PoloDeck/releases**
+2. Open the latest release.
+3. Download the macOS installer asset, named like:  
+   `PoloDeck-<version>-arm64.pkg`  
+   Example: `PoloDeck-0.1.0-arm64.pkg`
+4. Optionally download the matching `.sha256` file to verify the download.
 
-- `PoloDeck-<version>-arm64.pkg`
-
-Also keep the matching `.sha256` file if one was provided, so you can confirm the download is complete.
+Direct link to the releases list (always current):  
+https://github.com/mobjack/PoloDeck/releases/latest
 
 ---
 

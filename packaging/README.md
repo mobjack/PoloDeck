@@ -9,12 +9,41 @@ Coach-facing distribution for **macOS (Apple Silicon)** and **Ubuntu 22.04/24.04
 
 Developers continue to use Docker via [`../setup/setup.sh`](../setup/setup.sh). This tree builds an additional native Core that bundles Node + PostgreSQL and runs as a background service.
 
-## Quick build
+## Download published installers
+
+Coaches should use **GitHub Releases** (not this build section):
+
+https://github.com/mobjack/PoloDeck/releases
+
+Install steps: [INSTALL-MAC.md](INSTALL-MAC.md) · [INSTALL-LINUX.md](INSTALL-LINUX.md)
+
+## Publishing a release (maintainers)
+
+Installers are built and uploaded by the **Release native packages** GitHub Action.
+
+| Trigger | When it runs |
+|---------|----------------|
+| Git tag `v*` (e.g. `v0.1.0`) | On that tag only — usually created from `main` |
+| Actions → Run workflow | Manual; you choose which branch to build from |
+
+It does **not** run on every feature-branch push.
 
 ```bash
-# From repo root
-./packaging/scripts/build-runtime.sh
-# Optional: POLODECK_PG_TARBALL=… or POLODECK_USE_SYSTEM_PG_FOR_RUNTIME=1
+# From an up-to-date main (example):
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Or: GitHub → **Actions** → **Release native packages** → **Run workflow**.
+
+A separate workflow (**Native package build**) only smoke-builds the app tree on PRs and pushes to `main` (no Release upload).
+
+## Quick local build
+
+```bash
+# From repo root — install PostgreSQL 16 first for a real package
+POLODECK_COPY_SYSTEM_PG=1 ./packaging/scripts/build-runtime.sh
+# Or: POLODECK_PG_TARBALL=… / POLODECK_USE_SYSTEM_PG_FOR_RUNTIME=1 (smoke only)
 
 ./packaging/scripts/build-app.sh
 

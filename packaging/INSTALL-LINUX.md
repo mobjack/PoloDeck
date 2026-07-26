@@ -19,11 +19,16 @@ Developers using Docker should follow [../setup/SETUP-LINUX-MAC.md](../setup/SET
 
 ## 1. Download
 
-Get the Debian package from the PoloDeck release you were given, for example:
+1. Open the PoloDeck releases page:  
+   **https://github.com/mobjack/PoloDeck/releases**
+2. Open the latest release.
+3. Download the Linux installer asset, named like:  
+   `polodeck_<version>_amd64.deb`  
+   Example: `polodeck_0.1.0_amd64.deb`
+4. Optionally download the matching `.sha256` file to verify the download.
 
-- `polodeck_<version>_amd64.deb`
-
-Also keep the matching `.sha256` file if one was provided.
+Direct link to the releases list (always current):  
+https://github.com/mobjack/PoloDeck/releases/latest
 
 ---
 
