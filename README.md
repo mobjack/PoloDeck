@@ -125,11 +125,17 @@ Other useful commands (Linux/macOS shown; on Windows use `.\setup\setup.ps1 <com
 
 ```bash
 ./setup/setup.sh config    # only write/update setup/.env
-./setup/setup.sh up        # start stack without the full install/migrate flow
+./setup/setup.sh start     # start existing services
+./setup/setup.sh stop      # stop services without removing them
+./setup/setup.sh restart   # restart all services
 ./setup/setup.sh migrate   # prisma migrate deploy (API container must be running)
-./setup/setup.sh down
+./setup/setup.sh update    # pull, rebuild/recreate, and migrate
 ./setup/setup.sh help
 ```
+
+Use `restart` first when the Docker services become unresponsive. The `update` command performs a
+fast-forward-only Git pull, rebuilds the images with current base images, recreates the stack, and
+applies database migrations. Neither command deletes the PostgreSQL data volume.
 
 Manual compose (equivalent to what the scripts use):
 

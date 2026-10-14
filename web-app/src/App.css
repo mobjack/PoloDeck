@@ -652,6 +652,8 @@
 
 .game-sheet-page {
   max-width: 1200px;
+  margin-left: 0;
+  margin-right: auto;
   padding-left: 0.75rem;
   padding-right: 0.75rem;
   display: flex;
@@ -659,28 +661,29 @@
   min-height: 100vh;
 }
 
-/* Match .game-sheet-main flex proportions: back over sidebar col, title over both roster cols */
+/* Keep sheet navigation and title anchored to the same left edge as the content. */
 .game-sheet-page > .game-sheet-page-header {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
 }
 
 .game-sheet-page > .game-sheet-page-header > .game-sheet-page-header-back {
-  flex: 1 1 320px;
-  min-width: 320px;
+  flex: none;
+  min-width: 0;
 }
 
 .game-sheet-page > .game-sheet-page-header > .game-sheet-page-header-title {
-  flex: 2 1 0;
-  min-width: min(100%, 280px);
+  flex: none;
+  min-width: 0;
+  width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .game-sheet-page > .game-sheet-page-header > .game-sheet-page-header-title h1 {
-  text-align: center;
+  text-align: left;
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
@@ -970,8 +973,18 @@
 }
 
 .game-sheet-roster-column-away .game-sheet-roster-card {
-  background: rgba(255, 153, 102, 0.18);
+  border-color: rgba(218, 229, 244, 0.3);
+  background: linear-gradient(
+    145deg,
+    rgba(218, 229, 244, 0.14),
+    rgba(79, 140, 255, 0.055)
+  );
+  box-shadow: inset 3px 0 0 rgba(235, 241, 249, 0.78);
   margin-left: 0.5rem;
+}
+
+.game-sheet-roster-column-away .game-sheet-roster-card > h3 {
+  color: #f3f7fc;
 }
 
 @media (prefers-color-scheme: light) {
@@ -983,7 +996,16 @@
     background: rgba(51, 102, 255, 0.08);
   }
   .game-sheet-roster-column-away .game-sheet-roster-card {
-    background: rgba(255, 153, 102, 0.08);
+    border-color: rgba(218, 229, 244, 0.3);
+    background: linear-gradient(
+      145deg,
+      rgba(218, 229, 244, 0.14),
+      rgba(79, 140, 255, 0.055)
+    );
+    box-shadow: inset 3px 0 0 rgba(235, 241, 249, 0.78);
+  }
+  .game-sheet-roster-column-away .game-sheet-roster-card > h3 {
+    color: #f3f7fc;
   }
 }
 
@@ -4004,5 +4026,510 @@ body:has(.kiosk-shotclock-display) .app {
   }
   .timer-ctrl-clock-digits--shot {
     color: #0284c7;
+  }
+}
+
+/* --- PoloDeck site-inspired application theme --- */
+:root {
+  --pd-bg: #080c12;
+  --pd-surface: #0f151f;
+  --pd-surface-raised: #131b27;
+  --pd-surface-soft: rgba(20, 29, 42, 0.78);
+  --pd-border: rgba(151, 171, 202, 0.16);
+  --pd-border-strong: rgba(151, 171, 202, 0.27);
+  --pd-text: #edf2f9;
+  --pd-muted: #96a2b5;
+  --pd-blue: #4f8cff;
+  --pd-cyan: #55c8f3;
+  --pd-green: #54d98c;
+  --pd-red: #ff7b82;
+  --pd-shadow: 0 22px 70px rgba(0, 0, 0, 0.32);
+}
+
+.app {
+  color: var(--pd-text);
+}
+
+.page:not(.kiosk-display-page):not(.timer-ctrl-page) {
+  box-sizing: border-box;
+  padding: clamp(1rem, 2.2vw, 2rem);
+}
+
+.page--shell {
+  width: 100%;
+  max-width: 1460px;
+  padding-top: clamp(1.25rem, 3vw, 2.75rem) !important;
+}
+
+.page-header h1 {
+  color: var(--pd-text);
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.game-day-shell-header {
+  margin-bottom: clamp(1.4rem, 3vw, 2.35rem);
+  padding-bottom: 1.35rem;
+  border-bottom: 1px solid var(--pd-border);
+}
+
+.game-day-shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.game-day-shell-brand-mark,
+.game-day-shell-placeholder-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--pd-blue), var(--pd-cyan));
+  box-shadow: 0 12px 28px rgba(48, 126, 255, 0.28);
+}
+
+.game-day-shell-brand-mark {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 11px;
+}
+
+.game-day-shell-eyebrow,
+.game-day-shell-placeholder-kicker {
+  display: block;
+  color: var(--pd-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.game-day-shell-brand h1 {
+  margin-top: 0.27rem;
+  font-size: clamp(1.55rem, 2.7vw, 2.15rem);
+  line-height: 1;
+}
+
+.game-day-shell-brand h1 span {
+  color: var(--pd-blue);
+}
+
+.game-day-shell-header-actions {
+  padding-top: 0.25rem;
+}
+
+.game-day-shell-icon-btn {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-color: var(--pd-border-strong);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #dce5f2;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.game-day-shell-icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(79, 140, 255, 0.55);
+  background: rgba(79, 140, 255, 0.1);
+}
+
+.game-day-shell-icon-btn--active {
+  border-color: rgba(79, 140, 255, 0.62);
+  background: rgba(79, 140, 255, 0.14);
+  color: #82b4ff;
+}
+
+.client-status-line {
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.client-status-item {
+  gap: 0.45rem;
+  padding: 0.32rem 0.62rem;
+  border: 1px solid var(--pd-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--pd-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.client-dot {
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 0 3px currentColor;
+}
+
+.client-dot-on {
+  color: rgba(84, 217, 140, 0.13);
+  background: var(--pd-green);
+}
+
+.client-dot-off {
+  color: rgba(255, 123, 130, 0.12);
+  background: var(--pd-red);
+}
+
+.game-day-shell-layout {
+  grid-template-columns: minmax(230px, 285px) minmax(0, 1fr);
+  gap: clamp(1rem, 2.5vw, 2rem);
+}
+
+.game-day-shell-sidebar,
+.game-day-shell-placeholder,
+.game-card,
+.timer-access-section,
+.database-unavailable-card,
+.modal {
+  border: 1px solid var(--pd-border);
+  background: linear-gradient(145deg, rgba(20, 29, 42, 0.94), rgba(13, 19, 29, 0.94));
+  box-shadow: var(--pd-shadow);
+}
+
+.game-day-shell-sidebar {
+  top: 1.5rem;
+  padding: 1.05rem;
+  border-radius: 16px;
+}
+
+.game-day-shell-sidebar-title {
+  color: #c9d3e1;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.game-day-shell-new-btn {
+  margin-bottom: 0.85rem;
+}
+
+.game-day-shell-link {
+  gap: 0.2rem;
+  padding: 0.72rem 0.78rem;
+  border-radius: 10px;
+  color: #dce4f0;
+}
+
+.game-day-shell-link:hover {
+  border-color: var(--pd-border);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.game-day-shell-link--active {
+  border-color: rgba(79, 140, 255, 0.42);
+  background: linear-gradient(110deg, rgba(79, 140, 255, 0.17), rgba(85, 200, 243, 0.06));
+}
+
+.game-day-shell-link-location,
+.game-day-shell-link-count,
+.game-day-shell-empty {
+  color: var(--pd-muted);
+  opacity: 1;
+}
+
+.game-day-shell-placeholder {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 1.8rem);
+  min-height: 13rem;
+  padding: clamp(1.4rem, 4vw, 2.75rem);
+  border-style: solid;
+  border-radius: 18px;
+  text-align: left;
+}
+
+.game-day-shell-placeholder-mark {
+  width: clamp(4rem, 9vw, 5.6rem);
+  height: clamp(4rem, 9vw, 5.6rem);
+  border-radius: 19px;
+  font-size: clamp(1rem, 2.5vw, 1.35rem);
+}
+
+.game-day-shell-placeholder-kicker {
+  margin-bottom: 0.65rem;
+  color: var(--pd-green);
+}
+
+.game-day-shell-placeholder-title {
+  margin-bottom: 0.55rem;
+  color: var(--pd-text);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.game-day-shell-placeholder-hint {
+  max-width: 42rem;
+  color: var(--pd-muted);
+  font-size: 0.95rem;
+  opacity: 1;
+}
+
+.game-day-detail-header {
+  padding: 0.15rem 0 1rem;
+  border-bottom: 1px solid var(--pd-border);
+}
+
+.games-section h2,
+.timer-access-section h2 {
+  color: #dce6f4;
+  letter-spacing: -0.02em;
+}
+
+.games-section--cards .games-section-hint,
+.timer-access-hint,
+.kiosks-admin-sub {
+  color: var(--pd-muted);
+  opacity: 1;
+}
+
+.game-card {
+  padding: 1.05rem 1.15rem;
+  border-radius: 14px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+}
+
+.game-card--live {
+  border-color: rgba(79, 140, 255, 0.58);
+  background: linear-gradient(125deg, rgba(79, 140, 255, 0.17), rgba(15, 21, 31, 0.96) 65%);
+  box-shadow:
+    inset 3px 0 0 var(--pd-blue),
+    0 15px 40px rgba(0, 0, 0, 0.22);
+}
+
+.game-card-teams {
+  color: #f3f6fb;
+  letter-spacing: -0.015em;
+}
+
+.game-card-score {
+  color: #8fbcff;
+  font-weight: 750;
+  opacity: 1;
+}
+
+.game-card-meta-label {
+  color: var(--pd-muted);
+  opacity: 1;
+}
+
+.btn {
+  box-sizing: border-box;
+  padding: 0.58rem 0.95rem;
+  border-radius: 9px;
+  font-weight: 680;
+  line-height: 1.35;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  border-color: rgba(118, 171, 255, 0.32);
+  background: linear-gradient(135deg, #427cf0, #4e99f4);
+  color: #fff;
+  box-shadow: 0 9px 24px rgba(49, 113, 229, 0.2);
+}
+
+.btn.primary:hover {
+  border-color: rgba(151, 194, 255, 0.5);
+  background: linear-gradient(135deg, #4d88fa, #59a8fa);
+  color: #fff;
+}
+
+.btn.secondary {
+  border-color: var(--pd-border-strong);
+  background: rgba(255, 255, 255, 0.035);
+  color: #dce5f2;
+}
+
+.btn.secondary:hover {
+  border-color: rgba(79, 140, 255, 0.5);
+  background: rgba(79, 140, 255, 0.09);
+  color: #fff;
+}
+
+.btn.danger {
+  color: var(--pd-red);
+  border-color: rgba(255, 123, 130, 0.42);
+}
+
+.form {
+  max-width: 520px;
+  gap: 1.1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--pd-border);
+  border-radius: 15px;
+  background: var(--pd-surface-soft);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+}
+
+.form label {
+  color: #cdd7e5;
+  font-size: 0.88rem;
+}
+
+.form input,
+.form select,
+.games-start-time-input,
+.kiosks-admin-select,
+textarea {
+  box-sizing: border-box;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: 9px;
+  background: #0b111a;
+  color: var(--pd-text);
+}
+
+.form input,
+.form select {
+  padding: 0.65rem 0.75rem;
+}
+
+.form input:focus,
+.form select:focus,
+.games-start-time-input:focus,
+.kiosks-admin-select:focus,
+textarea:focus {
+  border-color: rgba(79, 140, 255, 0.72);
+  outline: 3px solid rgba(79, 140, 255, 0.14);
+}
+
+.form fieldset {
+  border-color: var(--pd-border);
+}
+
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--pd-border);
+  border-radius: 12px;
+  background: rgba(13, 19, 29, 0.72);
+}
+
+.table th,
+.table td {
+  border: 0;
+  border-bottom: 1px solid var(--pd-border);
+}
+
+.table th {
+  background: rgba(255, 255, 255, 0.035);
+  color: #b9c5d6;
+  font-size: 0.74rem;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: rgba(79, 140, 255, 0.055);
+}
+
+.modal-backdrop,
+.timer-confirm-overlay {
+  background: rgba(2, 5, 9, 0.78);
+  backdrop-filter: blur(7px);
+}
+
+.modal,
+.timer-confirm-dialog {
+  border-color: var(--pd-border-strong);
+  border-radius: 16px;
+  background: var(--pd-surface-raised);
+  color: var(--pd-text);
+}
+
+.kiosks-admin-code,
+.database-unavailable-checklist code {
+  border: 1px solid var(--pd-border);
+  background: rgba(255, 255, 255, 0.045);
+  color: #b7d6ff;
+}
+
+.timer-access-section {
+  border-radius: 15px;
+}
+
+.database-unavailable-card {
+  border-radius: 18px;
+}
+
+.database-unavailable-lead,
+.database-unavailable-footnote {
+  color: var(--pd-muted);
+  opacity: 1;
+}
+
+@media (max-width: 960px) {
+  .game-day-shell-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .game-day-shell-sidebar {
+    position: static;
+  }
+
+  .game-day-shell-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.4rem;
+  }
+
+  .game-day-shell-list li {
+    margin: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .game-day-shell-placeholder {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .game-day-shell-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .client-status-line {
+    gap: 0.35rem;
+  }
+
+  .client-status-item {
+    padding: 0.28rem 0.52rem;
+    font-size: 0.69rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

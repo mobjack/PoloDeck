@@ -65,13 +65,34 @@ Run any of these from the repository root:
 | `.\setup\setup.ps1` | First-time install: copy `.env`, prompt for LAN bind, start the stack, run migrations |
 | `.\setup\setup.ps1 install` | Same as no args (non-interactive if no usable console) |
 | `.\setup\setup.ps1 config` | Only create/update `setup\.env` |
-| `.\setup\setup.ps1 up` | Build and start containers |
-| `.\setup\setup.ps1 down` | Stop and remove containers |
+| `.\setup\setup.ps1 start` | Start the stack; creates missing containers without forcing a rebuild |
+| `.\setup\setup.ps1 stop` | Stop the stack while keeping its containers |
+| `.\setup\setup.ps1 restart` | Restart Postgres, the API, and the web app |
 | `.\setup\setup.ps1 migrate` | Run `prisma migrate deploy` in the API container |
+| `.\setup\setup.ps1 update` | Fast-forward the Git checkout, refresh/rebuild images, recreate the stack, and migrate |
+| `.\setup\setup.ps1 up` | Build and start containers (compatibility/development command) |
+| `.\setup\setup.ps1 down` | Stop and remove containers and the Compose network; database data remains in its volume |
 | `.\setup\setup.ps1 build` | `docker compose build` |
 | `.\setup\setup.ps1 logs` | Follow container logs |
 | `.\setup\setup.ps1 restart-api` | Rebuild and restart just the API container |
 | `.\setup\setup.ps1 help` | Show usage |
+
+### Day-to-day service recovery
+
+These commands do not remove the PostgreSQL data volume:
+
+```powershell
+.\setup\setup.ps1 start
+.\setup\setup.ps1 stop
+.\setup\setup.ps1 restart
+.\setup\setup.ps1 migrate
+.\setup\setup.ps1 update
+```
+
+`restart` is the quickest first step when a service becomes unresponsive. `update` uses
+`git pull --ff-only`, so it refuses to rewrite local commits or resolve a divergent branch. It then
+pulls current base images, rebuilds the local PoloDeck images, recreates the services, and applies
+database migrations.
 
 ### Non-interactive / CI
 

@@ -15,9 +15,13 @@ PoloDeck setup (Docker)
   ./setup/setup.sh              First-time: copy .env from example, prompt for LAN bind, start stack + migrations
   ./setup/setup.sh install      Same as no args (non-interactive if no usable console)
   ./setup/setup.sh config       Only create/update .env (interactive when console available)
-  ./setup/setup.sh up           Build and start containers (uses existing .env or copies example)
-  ./setup/setup.sh down         Stop and remove containers
+  ./setup/setup.sh start        Start existing containers (uses existing .env or copies example)
+  ./setup/setup.sh stop         Stop containers without removing them
+  ./setup/setup.sh restart      Restart all containers
   ./setup/setup.sh migrate      Run prisma migrate deploy in the API container
+  ./setup/setup.sh update       Pull latest code, rebuild/recreate containers, then migrate
+  ./setup/setup.sh up           Build and start containers (compatibility command)
+  ./setup/setup.sh down         Stop and remove containers (including the Compose network)
   ./setup/setup.sh build        docker compose build
   ./setup/setup.sh logs         docker compose logs -f
   ./setup/setup.sh restart-api  Rebuild and restart the API container (after api code changes)
@@ -152,6 +156,34 @@ cmd_up() {
   (cd "${SETUP_DIR}" && "${COMPOSE[@]}" up -d --build)
 }
 
+cmd_start() {
+  ensure_env_file
+  (cd "${SETUP_DIR}" && "${COMPOSE[@]}" up -d)
+}
+
+cmd_update() {
+  ensure_env_file
+
+  if [[ -d "${REPO_ROOT}/.git" ]]; then
+    if ! command -v git >/dev/null 2>&1; then
+      echo "error: git is required to update this checkout" >&2
+      return 1
+    fi
+    echo "Pulling the latest PoloDeck code (fast-forward only)…"
+    git -C "${REPO_ROOT}" pull --ff-only
+  else
+    echo "No Git checkout found; rebuilding the code already in ${REPO_ROOT}."
+  fi
+
+  echo "Rebuilding and recreating PoloDeck containers…"
+  (cd "${SETUP_DIR}" && "${COMPOSE[@]}" build --pull)
+  (cd "${SETUP_DIR}" && "${COMPOSE[@]}" up -d --remove-orphans)
+
+  echo "Applying database migrations…"
+  run_migrate_install
+  echo "PoloDeck is updated and running."
+}
+
 cmd_install() {
   ensure_env_file
   if setup_can_prompt; then
@@ -207,6 +239,21 @@ main() {
     install)
       echo "PoloDeck — install (Docker)"
       cmd_install
+      ;;
+    start)
+      cmd_start
+      echo "PoloDeck is running at http://localhost:8080"
+      ;;
+    stop)
+      (cd "${SETUP_DIR}" && "${COMPOSE[@]}" stop)
+      ;;
+    restart)
+      ensure_env_file
+      (cd "${SETUP_DIR}" && "${COMPOSE[@]}" restart)
+      echo "PoloDeck services restarted."
+      ;;
+    update)
+      cmd_update
       ;;
     up)
       ensure_env_file

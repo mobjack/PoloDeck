@@ -23,8 +23,9 @@ function Invoke-Compose {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ComposeArgs)
   Push-Location $SetupDir
   try {
-    & docker compose -f $ComposeFile --project-directory $SetupDir @ComposeArgs
-    return $LASTEXITCODE
+    & docker compose -f $ComposeFile --project-directory $SetupDir @ComposeArgs | Out-Host
+    $exitCode = $LASTEXITCODE
+    return $exitCode
   } finally {
     Pop-Location
   }
@@ -37,9 +38,13 @@ PoloDeck setup (Docker, Windows/PowerShell)
   .\setup\setup.ps1               First-time: copy .env from example, prompt for LAN bind, start stack + migrations
   .\setup\setup.ps1 install       Same as no args (non-interactive if no usable console)
   .\setup\setup.ps1 config        Only create/update .env (interactive when console available)
-  .\setup\setup.ps1 up            Build and start containers (uses existing .env or copies example)
-  .\setup\setup.ps1 down          Stop and remove containers
+  .\setup\setup.ps1 start         Start existing containers (uses existing .env or copies example)
+  .\setup\setup.ps1 stop          Stop containers without removing them
+  .\setup\setup.ps1 restart       Restart all containers
   .\setup\setup.ps1 migrate       Run prisma migrate deploy in the API container
+  .\setup\setup.ps1 update        Pull latest code, rebuild/recreate containers, then migrate
+  .\setup\setup.ps1 up            Build and start containers (compatibility command)
+  .\setup\setup.ps1 down          Stop and remove containers (including the Compose network)
   .\setup\setup.ps1 build         docker compose build
   .\setup\setup.ps1 logs          docker compose logs -f
   .\setup\setup.ps1 restart-api   Rebuild and restart the API container (after api code changes)
@@ -186,6 +191,40 @@ function Invoke-Up {
   if ($code -ne 0) { exit $code }
 }
 
+function Invoke-Start {
+  Confirm-EnvFile
+  $code = Invoke-Compose up -d
+  if ($code -ne 0) { exit $code }
+}
+
+function Invoke-Update {
+  Confirm-EnvFile
+
+  $gitDir = Join-Path $RepoRoot '.git'
+  if (Test-Path -LiteralPath $gitDir) {
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $git) {
+      Write-Error 'git is required to update this checkout.'
+      exit 1
+    }
+    Write-Output 'Pulling the latest PoloDeck code (fast-forward only)...'
+    & git -C $RepoRoot pull --ff-only
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  } else {
+    Write-Output "No Git checkout found; rebuilding the code already in $RepoRoot."
+  }
+
+  Write-Output 'Rebuilding and recreating PoloDeck containers...'
+  $code = Invoke-Compose build --pull
+  if ($code -ne 0) { exit $code }
+  $code = Invoke-Compose up -d --remove-orphans
+  if ($code -ne 0) { exit $code }
+
+  Write-Output 'Applying database migrations...'
+  Invoke-MigrateInstall
+  Write-Output 'PoloDeck is updated and running.'
+}
+
 function Invoke-Install {
   Confirm-EnvFile
   if (Test-CanPrompt) {
@@ -243,6 +282,27 @@ switch ($Command.ToLower()) {
     Test-DockerAvailable
     Write-Output 'PoloDeck - install (Docker)'
     Invoke-Install
+  }
+  'start' {
+    Test-DockerAvailable
+    Invoke-Start
+    Write-Output 'PoloDeck is running at http://localhost:8080'
+  }
+  'stop' {
+    Test-DockerAvailable
+    $code = Invoke-Compose stop
+    if ($code -ne 0) { exit $code }
+  }
+  'restart' {
+    Test-DockerAvailable
+    Confirm-EnvFile
+    $code = Invoke-Compose restart
+    if ($code -ne 0) { exit $code }
+    Write-Output 'PoloDeck services restarted.'
+  }
+  'update' {
+    Test-DockerAvailable
+    Invoke-Update
   }
   'up' {
     Test-DockerAvailable
