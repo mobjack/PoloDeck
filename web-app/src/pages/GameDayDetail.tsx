@@ -100,7 +100,7 @@ export function GameDayDetail() {
         </h1>
         <div className="game-day-detail-header-actions">
           <Link to="/kiosks" className="btn secondary">
-            Manage kiosks
+            Manage displays
           </Link>
           <Link to={`/game-days/${gameDay.id}/edit`} className="btn secondary">
             Edit day
@@ -111,7 +111,7 @@ export function GameDayDetail() {
       <section className="games-section games-section--cards">
         <h2>Games</h2>
         <p className="games-section-hint">
-          Choose which game is <strong>live on displays</strong>. All activated kiosks follow that game
+          Choose which game is <strong>live on displays</strong>. All activated displays follow that game
           (displays pick up the change within a few seconds).
         </p>
         {liveError ? <p className="games-live-error">{liveError}</p> : null}

@@ -110,14 +110,26 @@ export function Scoresheet() {
   useLayoutEffect(() => {
     const el = paperRef.current;
     if (!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    if (!h) return;
-    const scale = Math.min(1, PAGE_W / w, PAGE_H / h);
-    setFit((prev) =>
-      prev.w === w && prev.h === h && prev.scale === scale ? prev : { scale, w, h }
-    );
-  });
+
+    const updateFit = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (!h) return;
+      const scale = Math.min(1, PAGE_W / w, PAGE_H / h);
+      setFit((prev) =>
+        prev.w === w && prev.h === h && prev.scale === scale ? prev : { scale, w, h }
+      );
+    };
+
+    updateFit();
+    const observer = new ResizeObserver(updateFit);
+    observer.observe(el);
+    window.addEventListener("resize", updateFit);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFit);
+    };
+  }, [loading]);
 
   if (loading) return <div className="page"><p>Loading…</p></div>;
   if (error) return <ApiErrorDisplay error={error} />;

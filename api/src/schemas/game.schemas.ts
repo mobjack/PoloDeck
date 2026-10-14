@@ -132,6 +132,15 @@ export const deviceIdParamSchema = z.object({
   deviceId: z.string().cuid(),
 });
 
+export const displayClientIdParamSchema = z.object({
+  clientId: z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/),
+});
+
+export const displaySyncBodySchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  firmwareVersion: z.string().trim().min(1).max(40).optional(),
+});
+
 export const patchDeviceBodySchema = z.object({
   type: z.enum(["UNASSIGNED", "SCOREBOARD", "SHOT_CLOCK", "TIMER"]).optional(),
   gameId: z.string().cuid().nullable().optional(),
@@ -153,4 +162,3 @@ export type ScoreCommandBody = z.infer<typeof scoreCommandBodySchema>;
 export type EventLogRebuildBody = z.infer<typeof eventLogRebuildBodySchema>;
 export type DeviceCheckInBody = z.infer<typeof deviceCheckInBodySchema>;
 export type PatchDeviceBody = z.infer<typeof patchDeviceBodySchema>;
-

@@ -63,7 +63,7 @@ export function KioskManaged() {
       cancelled = true;
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
-  }, []);
+  }, [applyDevice]);
 
   if (error && !device) {
     return (
@@ -93,8 +93,8 @@ export function KioskManaged() {
       <header className="kiosk-managed-waiting-header">
         <h1 className="kiosk-managed-waiting-title">Waiting for assignment</h1>
         <p className="kiosk-managed-waiting-sub">
-          This kiosk is connected. On the game day page, choose which game is{" "}
-          <strong>live on displays</strong>, then open <strong>Manage kiosks</strong> (monitor icon in
+          This browser simulator is connected. On the game day page, choose which game is{" "}
+          <strong>live on displays</strong>, then open <strong>Manage displays</strong> (monitor icon in
           the header) and <strong>Activate</strong> this device with a display role.
         </p>
         <p className="kiosk-managed-device-id" aria-label="Device identifier for matching in admin">

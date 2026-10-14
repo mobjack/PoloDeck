@@ -6,7 +6,6 @@
   "scripts": {
     "predev": "node scripts/copy-kiosk-fonts.mjs",
     "dev": "vite --host 0.0.0.0",
-    "sync-kiosk": "node scripts/sync-kiosk.mjs",
     "prebuild": "node scripts/copy-kiosk-fonts.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

@@ -128,8 +128,8 @@ export function GameDayShell() {
             className={({ isActive }) =>
               `game-day-shell-icon-btn${isActive ? " game-day-shell-icon-btn--active" : ""}`
             }
-            aria-label="Manage kiosks"
-            title="Manage kiosks"
+            aria-label="Manage displays"
+            title="Manage displays"
           >
             <Monitor size={22} strokeWidth={2} aria-hidden />
           </NavLink>
@@ -214,8 +214,8 @@ export function GameDayShell() {
                 Use <strong>Roster</strong> on each game to enter or import player names by cap number.
               </li>
               <li>
-                Open <strong>Kiosks</strong> (monitor icon) to assign Raspberry Pi displays; connection status
-                appears above.
+                Open <strong>Displays</strong> (monitor icon) to assign ESP32-S3 controllers or browser
+                simulators; connection status appears above.
               </li>
             </ul>
           </div>

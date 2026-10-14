@@ -3069,7 +3069,7 @@
   gap: 0.65rem;
 }
 
-/* —— Kiosk (Pi / fullscreen displays) —— */
+/* —— Browser simulator / fullscreen displays —— */
 .kiosk-home-page {
   max-width: 960px;
 }

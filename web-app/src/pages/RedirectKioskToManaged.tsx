@@ -1,7 +1,7 @@
 import { Navigate, useSearchParams } from "react-router-dom";
 
 /**
- * Legacy per-game kiosk URLs redirect to server-managed mode on Pis.
+ * Legacy per-game browser display URLs redirect to server-managed mode.
  * Add ?legacy=1 for a fixed-game preview in a desktop browser.
  */
 export function LegacyKioskGate({ children }: { children: React.ReactNode }) {

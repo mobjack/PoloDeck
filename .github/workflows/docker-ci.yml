@@ -1,0 +1,62 @@
+name: Docker CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  application:
+    name: Build and test Docker stack
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build application images
+        run: docker compose -f setup/docker-compose.yml --project-directory setup build
+
+      - name: Start database
+        run: docker compose -f setup/docker-compose.yml --project-directory setup up -d postgres
+
+      - name: Apply migrations
+        run: docker compose -f setup/docker-compose.yml --project-directory setup run --rm polodeck-api npx prisma migrate deploy
+
+      - name: Start application
+        run: docker compose -f setup/docker-compose.yml --project-directory setup up -d
+
+      - name: Verify API and web health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              curl -fsS http://127.0.0.1:8080/api/games >/dev/null
+              exit 0
+            fi
+            echo "Waiting for PoloDeck health (${attempt}/30)"
+            sleep 2
+          done
+          docker compose -f setup/docker-compose.yml --project-directory setup ps
+          docker compose -f setup/docker-compose.yml --project-directory setup logs
+          exit 1
+
+      - name: Show container status
+        if: always()
+        run: docker compose -f setup/docker-compose.yml --project-directory setup ps
+
+      - name: Stop stack
+        if: always()
+        run: docker compose -f setup/docker-compose.yml --project-directory setup down -v
+
+  esp32:
+    name: Build ESP32-S3 firmware in Docker
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: PlatformIO build
+        run: |
+          docker build --platform linux/amd64 -t polodeck-platformio esp32
+          docker run --rm \
+            --platform linux/amd64 \
+            -v "${GITHUB_WORKSPACE}/esp32:/workspace" \
+            -w /workspace \
+            polodeck-platformio \
+            run

@@ -40,6 +40,7 @@ api/src/generated/
 docker-compose.override.yml
 setup/docker-compose.override.yml
 .docker/
+deploy/backups/
 
 # Test and coverage
 coverage/

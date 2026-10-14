@@ -25,7 +25,6 @@ PoloDeck setup (Docker)
 Environment (non-interactive / CI):
 
   POLODECK_BIND_ADDRESS=0.0.0.0   Skip LAN prompt; use with install/up
-  POLODECK_PI_APT_PROXY=...       Skip Pi APT proxy prompts; passed to API for GET /kb installs
   POLODECK_SETUP_SKIP_START=1   config/install: write .env only, do not run compose
 
 From repo root, quick start:
@@ -88,7 +87,7 @@ prompt_bind() {
   echo ""
   echo "Bind address for API (:3000) and web-app (:8080) on this machine."
   echo "  127.0.0.1 — localhost only (default)"
-  echo "  0.0.0.0   — all interfaces (other PCs / Raspberry Pis on your pool LAN)"
+  echo "  0.0.0.0   — all interfaces (operator devices / ESP32-S3 displays on your pool LAN)"
   echo ""
   read_console -r -p "Use LAN binding (0.0.0.0)? [y/N] " LAN
   if [[ "${LAN,,}" == "y" || "${LAN,,}" == "yes" ]]; then
@@ -98,35 +97,12 @@ prompt_bind() {
   fi
 }
 
-# Optional Apt-Cacher NG URL baked into GET /kb for Pi apt-get (sameersbn/apt-cacher-ng default :3142).
-prompt_pi_apt_proxy() {
-  if ! setup_can_prompt; then
-    printf '%s' "${POLODECK_PI_APT_PROXY:-}"
-    return
-  fi
-  echo ""
-  echo "Optional: default APT HTTP proxy for Raspberry Pi kiosk installs (Apt-Cacher NG)."
-  echo "When set, curl …/kb | sudo bash passes this to the Pi before apt-get."
-  echo ""
-  read_console -r -p "Configure default APT proxy for Pi installers? [y/N] " USE_PROXY
-  if [[ "${USE_PROXY,,}" != "y" && "${USE_PROXY,,}" != "yes" ]]; then
-    printf ''
-    return
-  fi
-  read_console -r -p "APT proxy base URL (e.g. http://192.168.1.10:3142): " URL_IN
-  URL_IN="$(printf '%s' "${URL_IN:-}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-  printf '%s' "${URL_IN}"
-}
-
 configure_env_interactive() {
   ensure_env_file
-  local bind proxy
+  local bind
   bind="$(prompt_bind)"
   upsert_env "POLODECK_BIND_ADDRESS" "${bind}" "${ENV_FILE}"
   echo "Updated POLODECK_BIND_ADDRESS=${bind} in ${ENV_FILE}"
-  proxy="$(prompt_pi_apt_proxy)"
-  upsert_env "POLODECK_PI_APT_PROXY" "${proxy}" "${ENV_FILE}"
-  echo "Updated POLODECK_PI_APT_PROXY in ${ENV_FILE}"
 }
 
 run_migrate() {
@@ -155,21 +131,14 @@ cmd_up() {
 cmd_install() {
   ensure_env_file
   if setup_can_prompt; then
-    local bind proxy
+    local bind
     bind="$(prompt_bind)"
     upsert_env "POLODECK_BIND_ADDRESS" "${bind}" "${ENV_FILE}"
     echo "Wrote POLODECK_BIND_ADDRESS to ${ENV_FILE}"
-    proxy="$(prompt_pi_apt_proxy)"
-    upsert_env "POLODECK_PI_APT_PROXY" "${proxy}" "${ENV_FILE}"
-    echo "Wrote POLODECK_PI_APT_PROXY to ${ENV_FILE}"
   else
     local bind="${POLODECK_BIND_ADDRESS:-127.0.0.1}"
     upsert_env "POLODECK_BIND_ADDRESS" "${bind}" "${ENV_FILE}"
     echo "Non-interactive: POLODECK_BIND_ADDRESS=${bind} (set env to override)"
-    if [[ -n "${POLODECK_PI_APT_PROXY+x}" ]]; then
-      upsert_env "POLODECK_PI_APT_PROXY" "${POLODECK_PI_APT_PROXY:-}" "${ENV_FILE}"
-      echo "Non-interactive: POLODECK_PI_APT_PROXY=${POLODECK_PI_APT_PROXY:-} (from environment)"
-    fi
   fi
 
   if [[ "${POLODECK_SETUP_SKIP_START:-}" == "1" ]]; then

@@ -7,6 +7,8 @@ import {
   createGameBodySchema,
   createGameDayBodySchema,
   deviceCheckInBodySchema,
+  displayClientIdParamSchema,
+  displaySyncBodySchema,
   deviceIdParamSchema,
   exclusionIdParamSchema,
   gameDayIdParamSchema,
@@ -23,6 +25,7 @@ import {
   eventLogRebuildBodySchema,
 } from "../schemas/game.schemas";
 import { GameService } from "../services/game.service";
+import { buildDisplaySyncResponse } from "../services/displaySync";
 
 export async function registerGameRoutes(app: FastifyInstance) {
   const service = new GameService(app);
@@ -121,6 +124,19 @@ export async function registerGameRoutes(app: FastifyInstance) {
 
   app.get("/capabilities", async () => {
     return service.getGlobalDeviceCapabilities();
+  });
+
+  // ESP32-S3 display protocol. Check-in and state synchronization intentionally
+  // use ordinary HTTP so firmware bring-up does not depend on a Socket.IO client.
+  app.post("/displays/:clientId/sync", async (request) => {
+    const params = displayClientIdParamSchema.parse(request.params);
+    const body = displaySyncBodySchema.parse(request.body ?? {});
+    const device = await service.checkInDevice({
+      clientId: params.clientId,
+      name: body.name ?? (body.firmwareVersion ? `ESP32-S3 ${body.firmwareVersion}` : undefined),
+    });
+    const game = device.gameId ? await service.getGameAggregate(device.gameId) : null;
+    return buildDisplaySyncResponse({ device, game });
   });
 
   // Server-authoritative active game (timer controller follows this).
@@ -295,4 +311,3 @@ export async function registerGameRoutes(app: FastifyInstance) {
     return service.triggerHorn(params.id, body.reason);
   });
 }
-

@@ -5,7 +5,6 @@ import prismaPlugin from "./plugins/prisma";
 import socketPlugin from "./plugins/socket";
 import { registerHealthRoutes } from "./routes/health";
 import { registerGameRoutes } from "./routes/games";
-import { registerKioskBootstrapRoutes } from "./routes/kioskBootstrap";
 import { isDatabaseConnectionError } from "./lib/databaseErrors";
 
 export async function buildApp() {
@@ -20,7 +19,6 @@ export async function buildApp() {
   await app.register(socketPlugin);
 
   await app.register(registerHealthRoutes);
-  await app.register(registerKioskBootstrapRoutes);
   await app.register(registerGameRoutes, { prefix: "/api" });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -53,4 +51,3 @@ export async function buildApp() {
 
   return app;
 }
-

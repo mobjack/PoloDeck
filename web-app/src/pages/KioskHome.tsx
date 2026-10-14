@@ -48,15 +48,11 @@ export function KioskHome() {
   return (
     <div className="page kiosk-home-page">
       <header className="kiosk-home-header">
-        <h1>PoloDeck kiosk</h1>
+        <h1>PoloDeck display simulator</h1>
         <p className="kiosk-home-sub">
-          New Pis: run the installer below, then assign each device under <strong>Kiosks</strong> in the main app.
-          Legacy links below open a fixed game URL without server assignment.
-        </p>
-        <p className="kiosk-home-install">
-          Install a Pi with:{" "}
-          <code className="kiosk-home-code">{`curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash`}</code>{" "}
-          (opens <code className="kiosk-home-code">/kiosk/managed</code>)
+          These browser views remain available for development and diagnostics while physical displays move
+          to ESP32-S3 controllers. Production controllers register through the display API and are assigned
+          under <strong>Displays</strong> in the main app.
         </p>
       </header>
       {games.length === 0 ? (
@@ -68,7 +64,7 @@ export function KioskHome() {
               <th>Matchup</th>
               <th>Scoreboard</th>
               <th>Shot clock</th>
-              <th>Timer</th>
+              <th>Timer simulator</th>
             </tr>
           </thead>
           <tbody>

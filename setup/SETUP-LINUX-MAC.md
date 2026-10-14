@@ -33,9 +33,8 @@ This first-time install will:
 
 1. Create `setup/.env` from `setup/.env.example` if it does not exist.
 2. Prompt whether to bind the ports to your LAN (`0.0.0.0`) or localhost only (`127.0.0.1`). See [Choosing the bind address](#choosing-the-bind-address) below for how to answer.
-3. Optionally configure an APT proxy for Raspberry Pi kiosk installs. This is only useful for developers who install/reimage Raspberry Pis repeatedly (it caches apt packages so re-installs are faster); most users can safely skip it.
-4. Build and start Postgres, the API, and the web app.
-5. Apply the database migrations.
+3. Build and start Postgres, the API, and the web app.
+4. Apply the database migrations.
 
 ### Choosing the bind address
 
@@ -46,7 +45,7 @@ Use LAN binding (0.0.0.0)? [y/N]
 ```
 
 - Answer **N** (or just press Enter) to bind to `127.0.0.1`. The stack is then reachable **only from this machine** at <http://localhost:8080>. This is the safest default for testing on a single computer.
-- Answer **y** to bind to `0.0.0.0`. The ports are published on **all network interfaces**, so other PCs and Raspberry Pi kiosks on the same pool LAN can reach the stack at `http://<this-machine-LAN-IP>:8080`. Use this for a real pool-deck deployment.
+- Answer **y** to bind to `0.0.0.0`. The ports are published on **all network interfaces**, so operator devices and ESP32-S3 displays on the same pool LAN can reach the stack at `http://<this-machine-LAN-IP>:8080`. Use this for a real pool-deck deployment.
 
 Your answer is written to `POLODECK_BIND_ADDRESS` in `setup/.env`.
 
@@ -103,7 +102,6 @@ Set these environment variables to skip the prompts:
 | Variable | Purpose |
 | --- | --- |
 | `POLODECK_BIND_ADDRESS=0.0.0.0` | Skip the LAN prompt; use with `install`/`up` |
-| `POLODECK_PI_APT_PROXY=...` | Skip the Pi APT proxy prompt; passed to the API for `GET /kb` installs |
 | `POLODECK_SETUP_SKIP_START=1` | `config`/`install`: write `.env` only, do not run compose |
 
 Example:
@@ -112,17 +110,11 @@ Example:
 POLODECK_BIND_ADDRESS=0.0.0.0 ./setup/setup.sh install
 ```
 
-## LAN and Raspberry Pi access
+## LAN and ESP32-S3 display access
 
-By default the published ports bind to `127.0.0.1` (localhost only). To let other machines on your pool network (other PCs, Raspberry Pi kiosks) reach the stack, choose LAN binding when prompted, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`.
+By default the published ports bind to `127.0.0.1` (localhost only). To let operator devices and ESP32-S3 displays reach the stack, choose LAN binding when prompted, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`.
 
-The web-app nginx container proxies `/api/` and `/socket.io/` to the API, so clients usually only need port **8080**. Install a Pi with:
-
-```bash
-curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash
-```
-
-(optional query `?host=<LAN-IP>` if the `Host` header would be wrong). See [`../pi/README.md`](../pi/README.md).
+The web-app nginx container proxies `/api/`, `/socket.io/`, and `/health` to the API, so clients only need port **8080**. ESP32-S3 firmware configuration is documented in [`../esp32/README.md`](../esp32/README.md).
 
 > Only expose `0.0.0.0` on networks you trust.
 

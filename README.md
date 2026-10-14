@@ -9,8 +9,8 @@ Everything runs on the pool deck over local WiFi—no internet required.
 ## Overview
 
 - **Central server** is the single source of truth for game state; clients send commands and never run their own timers.
-- **Browser-based UIs** for game-day setup, operators, and scoreboard displays connect over the local network.
-- **Optional hardware** (e.g. physical displays, horns) can plug into the same server over the same APIs.
+- **Browser-based UIs** provide game-day setup, operator controls, and display simulation over the local network.
+- **ESP32-S3 controllers** drive physical scoreboards, shot clocks, and horns using a compact synchronization API.
 
 ## What the server does
 
@@ -19,7 +19,7 @@ Everything runs on the pool deck over local WiFi—no internet required.
 - Score tracking
 - Game clock and shot clock (drift-free: `remainingMs` + `lastStartedAt`, clients compute display time)
 - Period management
-- Horn triggers (event + WebSocket for clients to play sound, to be coded eta unknown)
+- Horn triggers (events are sent to browser clients and included in ESP32-S3 display synchronization)
 - Player rosters (per-game snapshot, string cap numbers like `1`, `10`, `A`, `B`)
 - Player exclusions (20s, ACTIVE / ROLLED)
 - Team timeouts (2 full + 1 short per team)
@@ -52,8 +52,9 @@ PoloDeck/
 │   ├── postman/   # Postman collection for local testing
 │   └── Dockerfile
 ├── web-app/       # Browser UI (game-day admin, operator views)
-├── pi/            # Raspberry Pi kiosk scripts (served under /kiosk/ from the web-app image)
-├── setup/         # Docker Compose + install helpers (Postgres, API, web-app)
+├── deploy/        # Customer Compose bundle and macOS/Linux + Windows installers
+├── esp32/         # ESP32-S3 display-controller firmware (PlatformIO, built in Docker)
+├── setup/         # Docker Compose + source-build helpers (Postgres, API, web-app)
 │   ├── docker-compose.yml
 │   ├── setup.sh            # Linux/macOS install helper
 │   ├── setup.ps1           # Windows (PowerShell) install helper
@@ -64,45 +65,36 @@ PoloDeck/
 └── README.md
 ```
 
-## Local development
+## Development
 
-From the repo root, you typically run **api** and **web-app** separately during development.
-
-### 1. Backend API
+The supported development environment is Docker Compose; no host Node.js or PostgreSQL installation is required.
 
 ```bash
-cd api
-cp .env.example .env   # configure DATABASE_URL, etc.
-npm install
-npx prisma migrate dev
-npm run dev            # Fastify on http://localhost:3000
+./setup/setup.sh
 ```
 
-Key endpoints:
+On Windows PowerShell use `./setup/setup.ps1`. These helpers build the current source, start the development
+Compose stack, and apply migrations.
 
-- **Health:** `GET http://localhost:3000/health`
-- **Games API:** `http://localhost:3000/api/games`
-- **Game days API:** `http://localhost:3000/api/game-days`
+## Customer installation
 
-You can also import `api/postman/PoloDeck-API.postman_collection.json` into Postman to exercise all endpoints (including game days, games, rosters, clocks, and horn).
-
-### 2. Web app
+Released installer bundles contain a production Compose file that pulls versioned multi-platform images from
+GitHub Container Registry. Customers install Docker first, then run one of two helpers:
 
 ```bash
-cd web-app
-npm install
-cp .env.example .env   # optional; defaults to http://localhost:3000/api
-npm run dev            # Vite dev server (e.g. http://localhost:5173)
+# macOS / Linux
+./deploy/install.sh install
 ```
 
-The UI currently focuses on **game-day setup**:
+```powershell
+# Windows
+.\deploy\install.ps1 install
+```
 
-- List all game days.
-- Create a new game day (date, location, timing defaults).
-- View a game day and see its games.
-- Add/edit games for a day (home/away, level, gender, type, label).
+The deployment helper supports `update`, versioned `rollback`, `backup`, `logs`, `status`, and a non-destructive
+`uninstall`. See [`deploy/README.md`](deploy/README.md).
 
-## Docker (full stack)
+## Docker development stack
 
 Everything runs in Docker, so the only prerequisite is a working Docker install. Platform-specific setup guides:
 
@@ -141,7 +133,7 @@ cd setup && docker compose up -d --build
 - **Web app:** `http://localhost:8080`
 - **Health:** `GET http://localhost:3000/health`
 
-**LAN / Raspberry Pi:** By default, published ports bind to `127.0.0.1` only. Run `./setup/setup.sh` and choose LAN binding, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`, so other machines on the pool network can reach the stack. The **web-app** nginx container proxies `/api/` and `/socket.io/` to the API, so browsers and kiosk Pis usually use port **8080** only (same-origin). Install a Pi with `curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash` (optional query `?host=<LAN-IP>` if the `Host` header would be wrong). See [`pi/README.md`](pi/README.md). Only expose `0.0.0.0` on networks you trust.
+**Pool LAN / ESP32-S3:** Set `POLODECK_BIND_ADDRESS=0.0.0.0` so operator devices and display controllers can reach the web container on port **8080**. Nginx proxies `/api/`, `/socket.io/`, and `/health` to the API container; PostgreSQL stays private to the Docker network. See [`esp32/README.md`](esp32/README.md). Only expose PoloDeck on networks you trust.
 
 ## Status
 
@@ -149,4 +141,5 @@ Early MVP scaffold:
 
 - Backend: game model, timing, rosters, exclusions, timeouts, device check-in, event log.
 - Game-day planning and game metadata APIs are in place.
-- UI: first pass game-day admin UI built with React (no auth, no production hardening yet).
+- UI: game-day administration, operator controls, and browser display simulators.
+- Hardware: ESP32-S3 protocol and pre-panel firmware scaffold; HUB75 integration follows panel inspection.

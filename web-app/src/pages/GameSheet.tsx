@@ -148,7 +148,7 @@ export function GameSheet() {
       if (side === "HOME" || side === "AWAY") setToSide(side);
       setToShort(p.type === "short");
     }
-  }, [progressEditOpen, progressEditSelectedId, progressSelected?.id, progressSelected?.eventType]);
+  }, [progressEditOpen, progressSelected]);
 
   useEffect(() => {
     if (!gameDayId || !gameId) return;
@@ -2044,4 +2044,3 @@ function describeParsed(parsed: ParsedInput, aggregate: GameAggregate): string {
       return parsed.raw;
   }
 }
-
