@@ -47,7 +47,6 @@ PoloDeck setup (Docker, Windows/PowerShell)
 Environment (non-interactive / CI):
 
   POLODECK_BIND_ADDRESS=0.0.0.0   Skip LAN prompt; use with install/up
-  POLODECK_PI_APT_PROXY=...       Skip Pi APT proxy prompts; passed to API for GET /kb installs
   POLODECK_SETUP_SKIP_START=1     config/install: write .env only, do not run compose
 
 If PowerShell blocks the script, run:
@@ -122,7 +121,7 @@ function Get-BindAddress {
   Write-Output ''
   Write-Output 'Bind address for API (:3000) and web-app (:8080) on this machine.'
   Write-Output '  127.0.0.1 - localhost only (default)'
-  Write-Output '  0.0.0.0   - all interfaces (other PCs / Raspberry Pis on your pool LAN)'
+  Write-Output '  0.0.0.0   - all interfaces (operator devices / ESP32-S3 displays on your pool LAN)'
   Write-Output ''
   $lan = Read-Host 'Use LAN binding (0.0.0.0)? [y/N]'
   if ($lan -and ($lan.ToLower() -eq 'y' -or $lan.ToLower() -eq 'yes')) {
@@ -131,33 +130,11 @@ function Get-BindAddress {
   return $bindDefault
 }
 
-function Get-PiAptProxy {
-  if (-not (Test-CanPrompt)) {
-    $envProxy = [Environment]::GetEnvironmentVariable('POLODECK_PI_APT_PROXY')
-    if ($null -eq $envProxy) { return '' }
-    return $envProxy
-  }
-  Write-Output ''
-  Write-Output 'Optional: default APT HTTP proxy for Raspberry Pi kiosk installs (Apt-Cacher NG).'
-  Write-Output 'When set, curl .../kb | sudo bash passes this to the Pi before apt-get.'
-  Write-Output ''
-  $useProxy = Read-Host 'Configure default APT proxy for Pi installers? [y/N]'
-  if (-not ($useProxy -and ($useProxy.ToLower() -eq 'y' -or $useProxy.ToLower() -eq 'yes'))) {
-    return ''
-  }
-  $urlIn = Read-Host 'APT proxy base URL (e.g. http://192.168.1.10:3142)'
-  if ($null -eq $urlIn) { return '' }
-  return $urlIn.Trim()
-}
-
 function Set-EnvInteractive {
   Confirm-EnvFile
   $bind = Get-BindAddress
   Set-EnvValue -Key 'POLODECK_BIND_ADDRESS' -Value $bind -File $EnvFile
   Write-Output "Updated POLODECK_BIND_ADDRESS=$bind in $EnvFile"
-  $proxy = Get-PiAptProxy
-  Set-EnvValue -Key 'POLODECK_PI_APT_PROXY' -Value $proxy -File $EnvFile
-  Write-Output "Updated POLODECK_PI_APT_PROXY in $EnvFile"
 }
 
 function Invoke-Migrate {
@@ -192,19 +169,11 @@ function Invoke-Install {
     $bind = Get-BindAddress
     Set-EnvValue -Key 'POLODECK_BIND_ADDRESS' -Value $bind -File $EnvFile
     Write-Output "Wrote POLODECK_BIND_ADDRESS to $EnvFile"
-    $proxy = Get-PiAptProxy
-    Set-EnvValue -Key 'POLODECK_PI_APT_PROXY' -Value $proxy -File $EnvFile
-    Write-Output "Wrote POLODECK_PI_APT_PROXY to $EnvFile"
   } else {
     $bind = [Environment]::GetEnvironmentVariable('POLODECK_BIND_ADDRESS')
     if ([string]::IsNullOrEmpty($bind)) { $bind = '127.0.0.1' }
     Set-EnvValue -Key 'POLODECK_BIND_ADDRESS' -Value $bind -File $EnvFile
     Write-Output "Non-interactive: POLODECK_BIND_ADDRESS=$bind (set env to override)"
-    $proxyVar = [Environment]::GetEnvironmentVariable('POLODECK_PI_APT_PROXY')
-    if ($null -ne $proxyVar) {
-      Set-EnvValue -Key 'POLODECK_PI_APT_PROXY' -Value $proxyVar -File $EnvFile
-      Write-Output "Non-interactive: POLODECK_PI_APT_PROXY=$proxyVar (from environment)"
-    }
   }
 
   if ([Environment]::GetEnvironmentVariable('POLODECK_SETUP_SKIP_START') -eq '1') {

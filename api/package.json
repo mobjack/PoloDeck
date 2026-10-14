@@ -16,7 +16,7 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/services/gameEventRerun.sort.test.ts"
+    "test": "tsx --test src/services/gameEventRerun.sort.test.ts src/services/displaySync.test.ts"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -37,6 +37,9 @@
     "@types/socket.io": "^3.0.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "effect": "3.20.0"
   }
 }
-

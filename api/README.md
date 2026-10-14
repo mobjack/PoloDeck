@@ -23,19 +23,7 @@ The backend is designed to run entirely on a local network without internet acce
 
 ### Prerequisites
 
-- Node.js 18+
-- npm
-- Docker and docker-compose (for containerized setup)
-
-### Environment configuration
-
-1. Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-1. Adjust values as needed, especially `DATABASE_URL` if you are not using the provided [`setup/docker-compose.yml`](../setup/docker-compose.yml).
+- Docker Desktop or Docker Engine with Docker Compose
 
 ---
 
@@ -49,22 +37,25 @@ cd ../setup && docker compose up -d --build
 
 This will:
 
-- Start a PostgreSQL 16 container on port `5432`.
+- Start a PostgreSQL 16 container on the private Compose network.
 - Build and start the PoloDeck API container on port `3000` and the web-app (nginx) on port `8080`.
 
 The web-app nginx image proxies **`/api/`** and **`/socket.io/`** to the API container so clients can use **port 8080** alone.
 
-### Pi kiosk installer (`GET /kb`)
+### ESP32-S3 display synchronization
 
-Returns a shell script that downloads `bootstrap-kiosk.sh` from `http://<host>:8080/kiosk/` and installs Chromium + X11 + systemd on a **Raspberry Pi** only.
+Physical displays check in and receive compact, time-anchored state through:
 
-```bash
-curl -fsSL 'http://<LAN-IP>:3000/kb' | sudo bash
+```http
+POST /api/displays/:clientId/sync
+Content-Type: application/json
+
+{"name":"East shot clock","firmwareVersion":"0.1.0-dev"}
 ```
 
-Optional query parameters: `host=<LAN-IP>` (embed correct URLs when `Host` would otherwise be wrong), `kiosk=managed|setup|board|clock|timer` (default `managed` = `/kiosk/managed` for server-assigned roles; `setup` = static connectivity screen), `gameId=<id>` (only with `board`/`clock`/`timer`, open that game’s legacy kiosk URL), `aptProxy=<http://cache:3142>` (Apt-Cacher NG — overrides optional env `POLODECK_PI_APT_PROXY` on the API container). Canonical scripts live under [`../pi/kiosk`](../pi/kiosk) and are copied into the web-app image at build time.
+Protocol version 1 returns the assigned role, active game, scores, clock anchors, and latest horn event. See [`../esp32/README.md`](../esp32/README.md).
 
-For a guided install (including migrations), prefer from repo root: `./setup/setup.sh`.
+For a guided source build (including migrations), run `./setup/setup.sh` from the repo root.
 
 Once containers are running, apply migrations and seed data in the API container (one-time for development):
 
@@ -73,50 +64,8 @@ cd ../setup && docker compose exec polodeck-api npx prisma migrate dev --name in
 cd ../setup && docker compose exec polodeck-api npm run db:seed
 ```
 
----
-
-## Running Locally (without Docker)
-
-1. Ensure you have a PostgreSQL instance running and create a database (e.g. `polodeck`).
-2. Update `DATABASE_URL` in `.env` to point to your Postgres instance.
-3. Install dependencies:
-
-```bash
-npm install
-```
-
-1. Apply Prisma migrations and generate the client:
-
-```bash
-npx prisma migrate dev --name init
-npx prisma generate
-```
-
-1. (Optional) Seed example data:
-
-```bash
-npm run db:seed
-```
-
-1. Start the development server:
-
-```bash
-npm run dev
-```
-
-The server will listen on `http://localhost:3000`.
-
-### Restart / production vs dev
-
-| How you run | Command |
-| ------------- | --------- |
-| **Local dev** (recommended while coding) | `npm run dev` — runs TypeScript via `tsx watch` |
-| **Compiled** | `npm run build` then `npm start` — needs `copy:prisma-client` (included in `build`) |
-| **Docker** | `./setup/setup.sh restart-api` from repo root — rebuilds the API image |
-
-`npm run dev` works even when `npm start` or the Docker API container fails, because dev loads `src/` directly. If restart fails with `Cannot find module '../generated/prisma'`, run `npm run build` (or rebuild the Docker API).
-
-**Port 3000 already in use:** stop the other process (`lsof -i :3000`) or stop Docker API (`docker stop polodeck-api`) before starting dev again.
+The supported development path is Docker-only. Rebuild the API after a code change with
+`./setup/setup.sh restart-api`; the Dockerfile generates Prisma code, runs tests, and compiles TypeScript.
 
 ---
 
@@ -143,20 +92,20 @@ Key models:
 npx prisma migrate dev --name init
 ```
 
-- **Generate Prisma client** (writes to `src/generated/prisma`; also runs on `npm install` via `postinstall`):
+- **Generate Prisma client in the API container** (writes to `src/generated/prisma`):
 
 ```bash
-npx prisma generate
+cd setup && docker compose run --rm polodeck-api npx prisma generate
 ```
 
 Application code imports enums and `PrismaClient` from `@lib/prisma` (not `@prisma/client` directly), so the IDE uses the same generated types as the compiler.
 
-If TypeScript still shows missing `BreakPhase` or break fields after schema changes, run `npx prisma generate` again, then **TypeScript: Restart TS Server** in the editor.
+If TypeScript still shows missing generated types after a schema change, rebuild the API image.
 
 - **Open Prisma Studio**:
 
 ```bash
-npx prisma studio
+cd setup && docker compose exec polodeck-api npx prisma studio
 ```
 
 ---

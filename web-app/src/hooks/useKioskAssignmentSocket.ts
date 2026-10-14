@@ -6,7 +6,10 @@ import { getOrCreateKioskClientId } from "./useKioskDeviceCheckIn";
 /** Push assignment changes from server (live game, activate) without waiting for HTTP poll. */
 export function useKioskAssignmentSocket(onDevice: (device: KioskDevice) => void) {
   const onDeviceRef = useRef(onDevice);
-  onDeviceRef.current = onDevice;
+
+  useEffect(() => {
+    onDeviceRef.current = onDevice;
+  }, [onDevice]);
 
   useEffect(() => {
     const clientId = getOrCreateKioskClientId();

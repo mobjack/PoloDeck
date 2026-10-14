@@ -2,14 +2,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-ENV NODE_ENV=production
-
-COPY package.json tsconfig.json tsconfig.build.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 COPY prisma ./prisma
 COPY scripts ./scripts
 COPY src ./src
 
-RUN npm install && npx prisma generate && npm run build
+RUN npm ci \
+  && npm audit --omit=dev --audit-level=high \
+  && npx prisma generate \
+  && npm test \
+  && npm run build \
+  && npm prune --omit=dev
 
 FROM node:20-alpine AS runner
 
@@ -24,5 +27,7 @@ COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
-CMD ["node", "dist/server.js"]
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
+CMD ["node", "dist/server.js"]

@@ -1,10 +1,10 @@
 # PoloDeck web app
 
-Vite + React operator UI and **kiosk** routes under `/kiosk` (including **`/kiosk/managed`** for server-assigned Pis, plus per-game display URLs). Static Pi installer assets and the optional **setup screen** live in `public/kiosk/` (shell scripts are copied from [`../pi/kiosk`](../pi/kiosk) during `npm run sync-kiosk` or the Docker build).
+Vite + React operator UI and browser-based display simulator routes under `/kiosk` (including **`/kiosk/managed`** and per-game display URLs). Production LED displays use the ESP32-S3 firmware and display synchronization API; the browser views remain useful for development and diagnostics.
 
 **Docker / production:** The image uses nginx. It serves the SPA and proxies **`/api/`** and **`/socket.io/`** to the `polodeck-api` service. Default build args use **`VITE_API_URL=/api`** and an empty **`VITE_SOCKET_URL`** so the browser uses the same origin as the page (port **8080** on the host).
 
-**Local dev:** `npm run dev` uses `VITE_API_URL=http://localhost:3000/api` from `.env` unless overridden. Run `npm run sync-kiosk` after changing files under `../pi/kiosk` so `public/kiosk/` stays in sync.
+**Local dev:** `npm run dev` uses `VITE_API_URL=http://localhost:3000/api` from `.env` unless overridden.
 
 ---
 

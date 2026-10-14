@@ -55,7 +55,7 @@ export function KiosksAdmin() {
   };
 
   const onDelete = async (device: KioskDevice) => {
-    if (!window.confirm("Remove this kiosk from the list? It can register again when reopened.")) {
+    if (!window.confirm("Remove this display from the list? It can register again when reconnected.")) {
       return;
     }
     setDeletingId(device.id);
@@ -75,7 +75,7 @@ export function KiosksAdmin() {
   if (loading) {
     return (
       <div className="page kiosks-admin-page">
-        <p>Loading kiosks…</p>
+        <p>Loading displays…</p>
       </div>
     );
   }
@@ -90,18 +90,18 @@ export function KiosksAdmin() {
   return (
     <div className="page kiosks-admin-page">
       <header className="kiosks-admin-header">
-        <h1 className="kiosks-admin-title">Kiosks</h1>
+        <h1 className="kiosks-admin-title">Displays</h1>
         <p className="kiosks-admin-sub">
-          Devices appear here after they open <code className="kiosks-admin-code">/kiosk/managed</code>.
-          Set the <strong>live game</strong> on the game day page, then choose what each Pi displays
-          (scoreboard, shot clock, or timer) and click Activate.
+          ESP32-S3 controllers appear here after firmware synchronization. Browser simulators can register
+          through <code className="kiosks-admin-code">/kiosk/managed</code>. Set the <strong>live game</strong>,
+          choose each display role, and click Activate.
         </p>
       </header>
 
       {rowError ? <p className="kiosks-admin-banner-error">{rowError}</p> : null}
 
       {devices.length === 0 ? (
-        <p className="kiosks-admin-empty">No kiosks yet. Boot a Pi with the PoloDeck installer URL.</p>
+        <p className="kiosks-admin-empty">No displays yet. Power on an ESP32-S3 controller or open the browser simulator.</p>
       ) : (
         <div className="kiosks-admin-table-wrap">
           <table className="table kiosks-admin-table">
@@ -205,7 +205,7 @@ function KioskDeviceRow({
           className="kiosks-admin-select"
           value={type}
           onChange={(e) => setType(e.target.value as KioskDeviceType)}
-          aria-label="Kiosk role"
+          aria-label="Display role"
         >
           {DEVICE_TYPES.map((opt) => (
             <option key={opt.value} value={opt.value}>

@@ -16,15 +16,7 @@ COPY web-app/public ./public
 COPY web-app/src ./src
 COPY web-app/scripts ./scripts
 
-# Pi scripts live in repo-root pi/kiosk (compose build context is repo parent).
-COPY pi/kiosk /tmp/pi-kiosk-artifacts/
-RUN mkdir -p public/kiosk && \
-    if [ -d /tmp/pi-kiosk-artifacts ]; then \
-      cp -f /tmp/pi-kiosk-artifacts/* public/kiosk/ 2>/dev/null || true; \
-      chmod +x public/kiosk/*.sh 2>/dev/null || true; \
-    fi
-
-RUN npm run build
+RUN npm audit --omit=dev --audit-level=high && npm test && npm run lint && npm run build
 
 FROM nginx:alpine AS runner
 
@@ -32,5 +24,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY web-app/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+  CMD wget -qO- http://127.0.0.1/health >/dev/null || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
