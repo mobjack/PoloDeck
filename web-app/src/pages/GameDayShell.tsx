@@ -81,7 +81,17 @@ export function GameDayShell() {
     <div className="page page--shell">
       <header className="page-header page-header--client-status game-day-shell-header">
         <div className="game-day-shell-header-text">
-          <h1>Water Polo Deck Manager</h1>
+          <div className="game-day-shell-brand">
+            <span className="game-day-shell-brand-mark" aria-hidden>
+              PD
+            </span>
+            <div>
+              <span className="game-day-shell-eyebrow">Pool deck operations</span>
+              <h1>
+                Polo<span>Deck</span>
+              </h1>
+            </div>
+          </div>
           <div className="client-status-line">
             <span
               className="client-status-item"

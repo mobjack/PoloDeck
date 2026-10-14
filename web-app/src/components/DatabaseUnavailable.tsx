@@ -19,15 +19,16 @@ export function DatabaseUnavailable() {
         </p>
         <ul className="database-unavailable-checklist">
           <li>
-            <strong>Start Postgres</strong> (e.g. run <code>./setup/setup.sh</code> from the repo
-            root, or your local service).
+            <strong>Start PoloDeck</strong> (run <code>./setup/setup.sh start</code> from the repo
+            root, or <code>.\setup\setup.ps1 start</code> on Windows).
           </li>
           <li>
             <strong>Check the URL</strong> in <code>.env</code> matches where Postgres listens (often{" "}
             <code>localhost:5432</code>).
           </li>
           <li>
-            <strong>Restart the API</strong> after the database is up.
+            <strong>Restart the services</strong> with <code>./setup/setup.sh restart</code> after
+            the database is up.
           </li>
         </ul>
         <div className="database-unavailable-actions">

@@ -1,11 +1,11 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: dark;
+  color: #e8edf5;
+  background: #080c12;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -14,20 +14,22 @@
 }
 
 a {
-  font-weight: 500;
-  color: #646cff;
+  font-weight: 600;
+  color: #69b8ff;
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: #93caff;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% -12%, rgba(48, 113, 222, 0.18), transparent 31rem),
+    radial-gradient(circle at 88% 8%, rgba(25, 155, 219, 0.08), transparent 26rem),
+    #080c12;
 }
 
 h1 {
@@ -42,27 +44,23 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #141b26;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: #4f8cff;
 }
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 3px solid rgba(79, 140, 255, 0.35);
+  outline-offset: 2px;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+::selection {
+  color: #fff;
+  background: rgba(64, 135, 255, 0.62);
 }
