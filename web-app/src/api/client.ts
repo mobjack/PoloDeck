@@ -1,3 +1,5 @@
+import type { DisplaySyncResponse } from "../lib/displayProtocol";
+
 function resolveApiBase(): string {
   const v = import.meta.env.VITE_API_URL;
   if (typeof v === "string" && v.trim() !== "") {
@@ -201,6 +203,13 @@ async function setPeriodFallback(id: string, targetPeriod: number): Promise<Game
 }
 
 export const api = {
+  displays: {
+    sync: (clientId: string, body: { name: string; firmwareVersion: string }) =>
+      request<DisplaySyncResponse>(`/displays/${encodeURIComponent(clientId)}/sync`, {
+        method: "POST",
+        json: body,
+      }),
+  },
   devices: {
     checkIn: (body: { clientId: string; name?: string; role?: "TIMER" }) =>
       request<DeviceCheckInResponse>("/devices/check-in", {

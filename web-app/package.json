@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "tsx --test src/lib/scoresheetData.test.ts"
+    "test": "tsx --test src/lib/*.test.ts"
   },
   "dependencies": {
     "dseg": "^0.46.0",

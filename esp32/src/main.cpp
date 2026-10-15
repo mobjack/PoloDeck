@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <polodeck/ShotClockCore.h>
 
 #if __has_include("polodeck_config.h")
 #include "polodeck_config.h"
@@ -36,41 +37,12 @@ constexpr uint32_t kWifiRetryMs = 5000;
 constexpr uint32_t kButtonDebounceMs = 180;
 constexpr uint32_t kHornDurationMs = 750;
 
-struct ClockState {
-  uint32_t remainingMs = 0;
-  bool running = false;
-};
-
-struct DisplayState {
-  String role = "UNASSIGNED";
-  String gameId;
-  String homeTeam;
-  String awayTeam;
-  int homeScore = 0;
-  int awayScore = 0;
-  int period = 1;
-  ClockState gameClock;
-  ClockState shotClock;
-  String hornEventId;
-  uint32_t receivedAtMs = 0;
-};
-
-DisplayState state;
+polodeck::ShotClockCore shotClockCore;
 String clientId;
-String lastHornEventId;
 uint32_t nextSyncAtMs = 0;
 uint32_t nextWifiAttemptMs = 0;
 uint32_t lastButtonAtMs = 0;
 uint32_t hornOffAtMs = 0;
-uint8_t brightness = 96;
-bool receivedInitialState = false;
-bool shotClockWasAboveZero = false;
-
-uint32_t effectiveRemaining(const ClockState &clock) {
-  if (!clock.running) return clock.remainingMs;
-  const uint32_t elapsed = millis() - state.receivedAtMs;
-  return elapsed >= clock.remainingMs ? 0 : clock.remainingMs - elapsed;
-}
 
 void triggerHorn() {
   digitalWrite(POLODECK_HORN_PIN, HIGH);
@@ -91,29 +63,30 @@ void renderSerialPreview() {
   if (static_cast<int32_t>(millis() - nextRenderAtMs) < 0) return;
   nextRenderAtMs = millis() + 250;
 
-  if (state.role == "UNASSIGNED") {
-    Serial.printf("display %s waiting for assignment (brightness %u)\n", clientId.c_str(), brightness);
+  const polodeck::DisplayFrame frame = shotClockCore.frame(millis());
+  if (!frame.assigned()) {
+    Serial.printf("display %s waiting for assignment (brightness %u)\n", clientId.c_str(), frame.brightness);
     return;
   }
-  if (state.gameId.isEmpty()) {
-    Serial.printf("display role=%s waiting for active game\n", state.role.c_str());
+  if (!frame.hasGame()) {
+    Serial.printf("display role=%s waiting for active game\n", frame.role.c_str());
     return;
   }
 
   Serial.printf(
       "%s %d - %d %s | period %d | game %lu | shot %lu | brightness %u\n",
-      state.homeTeam.c_str(), state.homeScore, state.awayScore, state.awayTeam.c_str(), state.period,
-      static_cast<unsigned long>(effectiveRemaining(state.gameClock)),
-      static_cast<unsigned long>(effectiveRemaining(state.shotClock)), brightness);
+      frame.homeTeam.c_str(), frame.homeScore, frame.awayScore, frame.awayTeam.c_str(), frame.period,
+      static_cast<unsigned long>(frame.gameRemainingMs),
+      static_cast<unsigned long>(frame.shotRemainingMs), frame.brightness);
 }
 
 void serviceBrightnessButtons() {
   if (millis() - lastButtonAtMs < kButtonDebounceMs) return;
   if (digitalRead(POLODECK_BRIGHTER_PIN) == LOW) {
-    brightness = static_cast<uint8_t>(min(255, brightness + 16));
+    shotClockCore.brighten();
     lastButtonAtMs = millis();
   } else if (digitalRead(POLODECK_DARKER_PIN) == LOW) {
-    brightness = static_cast<uint8_t>(max(16, brightness - 16));
+    shotClockCore.darken();
     lastButtonAtMs = millis();
   }
 }
@@ -130,35 +103,24 @@ void ensureWifi() {
   Serial.printf("wifi: connecting to %s\n", POLODECK_WIFI_SSID);
 }
 
-void applySync(JsonDocument &doc) {
-  state.role = doc["device"]["role"] | "UNASSIGNED";
-  state.gameId = doc["device"]["gameId"] | "";
+void applySync(JsonDocument &doc, uint32_t snapshotAgeMs) {
+  polodeck::SyncSnapshot snapshot;
+  snapshot.role = doc["device"]["role"] | "UNASSIGNED";
+  snapshot.gameId = doc["device"]["gameId"] | "";
   const JsonVariant game = doc["state"];
-  state.receivedAtMs = millis();
-  if (game.isNull()) {
-    state.homeTeam = "";
-    state.awayTeam = "";
-    state.gameClock = {};
-    state.shotClock = {};
-  } else {
-    state.homeTeam = game["homeTeamName"] | "";
-    state.awayTeam = game["awayTeamName"] | "";
-    state.homeScore = game["homeScore"] | 0;
-    state.awayScore = game["awayScore"] | 0;
-    state.period = game["currentPeriod"] | 1;
-    state.gameClock.remainingMs = game["gameClock"]["remainingMs"] | 0;
-    state.gameClock.running = game["gameClock"]["running"] | false;
-    state.shotClock.remainingMs = game["shotClock"]["remainingMs"] | 0;
-    state.shotClock.running = game["shotClock"]["running"] | false;
-    state.hornEventId = game["horn"]["eventId"] | "";
-
-    if (receivedInitialState && !state.hornEventId.isEmpty() && state.hornEventId != lastHornEventId) {
-      triggerHorn();
-    }
-    lastHornEventId = state.hornEventId;
-    shotClockWasAboveZero = state.shotClock.remainingMs > 0;
+  if (!game.isNull()) {
+    snapshot.homeTeam = game["homeTeamName"] | "";
+    snapshot.awayTeam = game["awayTeamName"] | "";
+    snapshot.homeScore = game["homeScore"] | 0;
+    snapshot.awayScore = game["awayScore"] | 0;
+    snapshot.period = game["currentPeriod"] | 1;
+    snapshot.gameClock.remainingMs = game["gameClock"]["remainingMs"] | 0;
+    snapshot.gameClock.running = game["gameClock"]["running"] | false;
+    snapshot.shotClock.remainingMs = game["shotClock"]["remainingMs"] | 0;
+    snapshot.shotClock.running = game["shotClock"]["running"] | false;
+    snapshot.hornEventId = game["horn"]["eventId"] | "";
   }
-  receivedInitialState = true;
+  shotClockCore.applySync(snapshot, millis(), snapshotAgeMs);
   nextSyncAtMs = millis() + static_cast<uint32_t>(doc["pollAfterMs"] | 1000);
 }
 
@@ -176,7 +138,9 @@ void syncDisplay() {
   String body;
   serializeJson(request, body);
 
+  const uint32_t requestStartedAtMs = millis();
   const int status = http.POST(body);
+  const uint32_t roundTripMs = millis() - requestStartedAtMs;
   if (status != 200) {
     Serial.printf("sync: HTTP %d\n", status);
     http.end();
@@ -193,17 +157,12 @@ void syncDisplay() {
     Serial.println("sync: unsupported protocol version");
     return;
   }
-  applySync(response);
+  applySync(response, roundTripMs / 2);
 }
 
-void serviceLocalShotClockHorn() {
-  const uint32_t remaining = effectiveRemaining(state.shotClock);
-  if (shotClockWasAboveZero && remaining == 0 && state.shotClock.running) {
-    shotClockWasAboveZero = false;
-    triggerHorn();
-  } else if (remaining > 0) {
-    shotClockWasAboveZero = true;
-  }
+void serviceLocalClockHorns() {
+  shotClockCore.update(millis());
+  if (shotClockCore.takeHornTrigger()) triggerHorn();
 }
 
 }  // namespace
@@ -228,7 +187,7 @@ void loop() {
   ensureWifi();
   syncDisplay();
   serviceBrightnessButtons();
-  serviceLocalShotClockHorn();
+  serviceLocalClockHorns();
   serviceHorn();
   renderSerialPreview();
   delay(5);

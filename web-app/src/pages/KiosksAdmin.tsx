@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { Link } from "react-router-dom";
 import { api, ApiError, type KioskDevice, type KioskDeviceType } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 
@@ -92,9 +93,9 @@ export function KiosksAdmin() {
       <header className="kiosks-admin-header">
         <h1 className="kiosks-admin-title">Displays</h1>
         <p className="kiosks-admin-sub">
-          ESP32-S3 controllers appear here after firmware synchronization. Browser simulators can register
-          through <code className="kiosks-admin-code">/kiosk/managed</code>. Set the <strong>live game</strong>,
-          choose each display role, and click Activate.
+          ESP32-S3 controllers appear here after firmware synchronization. Set the <strong>live game</strong>,
+          choose each display role, and click Activate. You can also use the{" "}
+          <Link to="/simulator/shot-clock">shot-clock test bed</Link> before connecting hardware.
         </p>
       </header>
 
