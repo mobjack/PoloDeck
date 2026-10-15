@@ -47,10 +47,18 @@ jobs:
         run: docker compose -f setup/docker-compose.yml --project-directory setup down -v
 
   esp32:
-    name: Build ESP32-S3 firmware in Docker
+    name: Test core and build ESP32-S3 firmware
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Test portable shot-clock core
+        run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            -Iesp32/lib/polodeck_core/include \
+            esp32/lib/polodeck_core/src/ShotClockCore.cpp \
+            esp32/test/native/test_shot_clock_core.cpp \
+            -o /tmp/polodeck_core_tests
+          /tmp/polodeck_core_tests
       - name: PlatformIO build
         run: |
           docker build --platform linux/amd64 -t polodeck-platformio esp32

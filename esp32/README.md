@@ -9,9 +9,10 @@ synchronizations so a short Wi-Fi interruption does not freeze the display.
 - Stable device ID derived from the ESP32 eFuse MAC.
 - HTTP check-in and compact display-state synchronization through protocol version 1.
 - Local game/shot-clock interpolation.
-- Local shot-clock horn trigger plus server horn-event handling.
+- Local game-clock and shot-clock horn triggers plus server horn-event handling.
 - Brighter/darker buttons.
 - Serial rendering preview while the exact HUB75 panel scan type and driver IC are unknown.
+- A platform-independent C++ clock core shared by the firmware and native tests.
 
 The HUB75 output is deliberately not selected until the panels arrive. At that point record the panel resolution,
 scan rate, HUB75 pinout, driver IC, and full-brightness current before choosing the DMA driver and final GPIO map.
@@ -38,6 +39,29 @@ docker run --rm \
 ```
 
 The local configuration file is ignored by Git. Never commit pool Wi-Fi credentials.
+
+## Simulator and native tests
+
+Open `/simulator/shot-clock` in the PoloDeck web application. Fixture mode provides repeatable pregame,
+running, final-minute, and expired states. Live API mode registers `sim-shot-clock-001` as a display; assign
+it the Shot clock role from the Displays page to exercise the same polling protocol as the ESP32-S3.
+
+The browser includes game time, shot time, brightness, a horn indicator, and simulated network loss. The
+portable core under `lib/polodeck_core` remains the firmware source of truth for interpolation, brightness,
+and horn-edge behavior.
+
+Run the native core tests on Linux or macOS with a C++17 compiler:
+
+```bash
+c++ -std=c++17 \
+  -Iesp32/lib/polodeck_core/include \
+  esp32/lib/polodeck_core/src/ShotClockCore.cpp \
+  esp32/test/native/test_shot_clock_core.cpp \
+  -o /tmp/polodeck_core_tests
+/tmp/polodeck_core_tests
+```
+
+The included `CMakeLists.txt` can be used by IDEs and Windows toolchains.
 
 ## First hardware bring-up after panel delivery
 

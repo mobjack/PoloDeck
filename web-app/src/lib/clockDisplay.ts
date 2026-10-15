@@ -174,6 +174,11 @@ export function formatShotClockDisplay(ms: number): string {
   return String(Math.max(0, Math.ceil(totalSec - 1e-9)));
 }
 
+/** Regulation display rule: show only an enlarged game clock at 0:30 or below. */
+export function shouldUseGameTimeOnlyDisplay(gameRemainingMs: number): boolean {
+  return gameRemainingMs <= 30_000;
+}
+
 /** Break countdown on scoreboard/kiosk: m:ss for breaks (usually ≥ 1 min). */
 export function formatBreakCountdownDisplay(ms: number): string {
   return formatGameTimeDisplay(ms);

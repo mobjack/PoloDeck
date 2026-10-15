@@ -3409,6 +3409,15 @@ body:has(.kiosk-shotclock-display) .app {
   color: #ffd700;
 }
 
+.kiosk-shotclock-display--game-only {
+  justify-content: center;
+}
+
+.kiosk-shotclock-game.kiosk-shotclock-game--final-seconds {
+  font-size: min(32vw, 60vh);
+  transform: translateY(7vh);
+}
+
 .kiosk-shotclock-shot {
   flex: 1 1 auto;
   display: flex;
@@ -3431,6 +3440,240 @@ body:has(.kiosk-shotclock-display) .app {
   .kiosk-shotclock-shot {
     max-height: 62vh;
     font-size: min(56vw, 58vh);
+  }
+}
+
+/* ESP32 shot-clock test bed */
+.shot-sim-page {
+  min-height: 100vh;
+  padding: clamp(1rem, 3vw, 3rem);
+  color: #e6edf7;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(17, 116, 176, 0.2), transparent 38rem),
+    #07101b;
+}
+
+.shot-sim-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  max-width: 1180px;
+  margin: 0 auto 2rem;
+}
+
+.shot-sim-header h1 {
+  margin: 0.1rem 0 0.35rem;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+}
+
+.shot-sim-header p {
+  margin: 0;
+  color: #93a7bd;
+}
+
+.shot-sim-header a {
+  color: #66c7ff;
+  white-space: nowrap;
+}
+
+.shot-sim-eyebrow {
+  color: #55d6be !important;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.shot-sim-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 360px);
+  gap: clamp(1.25rem, 3vw, 3rem);
+  align-items: start;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.shot-sim-panel {
+  --sim-brightness: 0.38;
+  position: relative;
+  container-type: inline-size;
+  display: grid;
+  grid-template-rows: minmax(4rem, 0.42fr) minmax(10rem, 1.18fr);
+  align-items: center;
+  min-height: min(72vh, 760px);
+  padding: clamp(1rem, 3vw, 2.5rem);
+  overflow: hidden;
+  text-align: center;
+  background-color: #020303;
+  background-image: radial-gradient(#182028 0.7px, transparent 0.8px);
+  background-size: 4px 4px;
+  border: 0.75rem solid #1a222c;
+  border-radius: 1.5rem;
+  box-shadow: inset 0 0 0 2px #303b47, 0 2rem 5rem rgba(0, 0, 0, 0.35);
+}
+
+.shot-sim-panel--horn {
+  box-shadow: inset 0 0 0 3px #ffb020, 0 0 4rem rgba(255, 61, 42, 0.48);
+}
+
+.shot-sim-panel--game-only {
+  grid-template-rows: 1fr;
+}
+
+.shot-sim-game-time,
+.shot-sim-shot-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: bold;
+  line-height: 0.86;
+  white-space: nowrap;
+  opacity: calc(0.34 + var(--sim-brightness) * 0.66);
+  filter: saturate(calc(0.7 + var(--sim-brightness)));
+}
+
+.shot-sim-game-time {
+  font-family: "DSEG14-Classic", monospace;
+  font-size: clamp(3rem, 8vw, 7rem);
+  color: #ffd31a;
+  text-shadow: 0 0 0.15em rgba(255, 211, 26, var(--sim-brightness));
+}
+
+.shot-sim-game-time.shot-sim-game-time--final-seconds {
+  align-self: center;
+  font-size: clamp(7rem, 32cqw, 23.5rem);
+  transform: translateY(7%);
+}
+
+.shot-sim-shot-time {
+  font-family: "DSEG7-Classic", monospace;
+  font-size: clamp(9rem, 29vw, 23rem);
+  color: #ff352c;
+  text-shadow: 0 0 0.12em rgba(255, 53, 44, var(--sim-brightness));
+}
+
+.shot-sim-horn {
+  position: absolute;
+  right: 0;
+  bottom: 0.7rem;
+  left: 0;
+  min-height: 1.4rem;
+  color: #ffb020;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.shot-sim-controls {
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem;
+  background: #101c2a;
+  border: 1px solid #26384a;
+  border-radius: 1rem;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.22);
+}
+
+.shot-sim-controls label {
+  display: grid;
+  gap: 0.45rem;
+  color: #b8c5d3;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.shot-sim-controls input,
+.shot-sim-controls select,
+.shot-sim-controls button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.72rem 0.85rem;
+  color: #e6edf7;
+  background: #172638;
+  border: 1px solid #354a60;
+  border-radius: 0.55rem;
+}
+
+.shot-sim-controls button {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.shot-sim-controls button:hover,
+.shot-sim-controls button.active {
+  color: #07101b;
+  background: #55d6be;
+  border-color: #55d6be;
+}
+
+.shot-sim-mode,
+.shot-sim-button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.shot-sim-status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding-bottom: 0.8rem;
+  color: #b8c5d3;
+  border-bottom: 1px solid #26384a;
+}
+
+.shot-sim-status span {
+  width: 0.65rem;
+  height: 0.65rem;
+  background: #55d6be;
+  border-radius: 50%;
+  box-shadow: 0 0 0.7rem #55d6be;
+}
+
+.shot-sim-status span.paused {
+  background: #ffb020;
+  box-shadow: 0 0 0.7rem #ffb020;
+}
+
+.shot-sim-help {
+  margin: 0;
+  padding: 0.8rem;
+  color: #aab9c8;
+  background: #0b1623;
+  border-radius: 0.55rem;
+}
+
+.shot-sim-telemetry {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+}
+
+.shot-sim-telemetry div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.shot-sim-telemetry dt {
+  color: #718096;
+}
+
+.shot-sim-telemetry dd {
+  margin: 0;
+  color: #d6e1ec;
+  font-family: ui-monospace, monospace;
+}
+
+@media (max-width: 820px) {
+  .shot-sim-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .shot-sim-panel {
+    min-height: 65vh;
+  }
+
+  .shot-sim-header {
+    flex-direction: column;
   }
 }
 

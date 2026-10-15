@@ -18,6 +18,7 @@ import { KioskShotClockDisplay } from "./pages/KioskShotClockDisplay";
 import { KioskTimerDisplay } from "./pages/KioskTimerDisplay";
 import { KiosksAdmin } from "./pages/KiosksAdmin";
 import { LegacyKioskGate } from "./pages/RedirectKioskToManaged";
+import { ShotClockSimulator } from "./pages/ShotClockSimulator";
 import "./App.css";
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
         <Routes>
           <Route path="/kiosk" element={<KioskHome />} />
           <Route path="/kiosk/managed" element={<KioskManaged />} />
+          <Route path="/simulator/shot-clock" element={<ShotClockSimulator />} />
           <Route
             path="/kiosk/g/:gameId/display"
             element={

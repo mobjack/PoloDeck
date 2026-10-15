@@ -12,6 +12,7 @@ import {
   getBreakRemainingMs,
   getEffectiveRemainingMs,
   isOnBreak,
+  shouldUseGameTimeOnlyDisplay,
 } from "../lib/clockDisplay";
 import { createGameSocket } from "../lib/socketUrl";
 
@@ -102,6 +103,7 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
   const shotMs = aggregate.shotClock
     ? getEffectiveRemainingMs(aggregate.shotClock, now)
     : 0;
+  const gameTimeOnly = shouldUseGameTimeOnlyDisplay(gameMs);
 
   if (onBreak && breakLabel) {
     return (
@@ -117,13 +119,21 @@ export function KioskShotClockDisplay(props: KioskShotClockDisplayProps) {
   }
 
   return (
-    <div className="kiosk-display-page kiosk-shotclock-display" aria-live="polite">
-      <div className="kiosk-shotclock-game" aria-label="Game time">
+    <div
+      className={`kiosk-display-page kiosk-shotclock-display ${gameTimeOnly ? "kiosk-shotclock-display--game-only" : ""}`}
+      aria-live="polite"
+    >
+      <div
+        className={`kiosk-shotclock-game ${gameTimeOnly ? "kiosk-shotclock-game--final-seconds" : ""}`}
+        aria-label="Game time"
+      >
         {formatGameTimeDisplay(gameMs)}
       </div>
-      <div className="kiosk-shotclock-shot" aria-label="Shot clock">
-        {formatShotClockDisplay(shotMs)}
-      </div>
+      {gameTimeOnly ? null : (
+        <div className="kiosk-shotclock-shot" aria-label="Shot clock">
+          {formatShotClockDisplay(shotMs)}
+        </div>
+      )}
     </div>
   );
 }
