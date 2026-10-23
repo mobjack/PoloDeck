@@ -3488,7 +3488,7 @@ body:has(.kiosk-shotclock-display) .app {
   }
 }
 
-/* ESP32 shot-clock test bed */
+/* Future ESP32 shot-clock test bed */
 .shot-sim-page {
   min-height: 100vh;
   padding: clamp(1rem, 3vw, 3rem);

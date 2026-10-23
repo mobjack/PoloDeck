@@ -175,7 +175,7 @@ export function ShotClockSimulator() {
     <main className="shot-sim-page">
       <header className="shot-sim-header">
         <div>
-          <p className="shot-sim-eyebrow">ESP32-S3 test bed</p>
+          <p className="shot-sim-eyebrow">Future ESP32 display test bed</p>
           <h1>Shot-clock simulator</h1>
           <p>Protocol v1 · game time + shot time · local interpolation</p>
         </div>

@@ -10,7 +10,7 @@ Everything runs on the pool deck over local WiFi—no internet required.
 
 - **Central server** is the single source of truth for game state; clients send commands and never run their own timers.
 - **Browser-based UIs** provide game-day setup, operator controls, and display simulation over the local network.
-- **ESP32-S3 controllers** drive physical scoreboards, shot clocks, and horns using a compact synchronization API.
+- **Physical shot clocks and scoreboards** will be available in a future release, using ESP32 controllers. Browser simulators are the displays available today.
 
 ## What the server does
 
@@ -19,7 +19,7 @@ Everything runs on the pool deck over local WiFi—no internet required.
 - Score tracking
 - Game clock and shot clock (drift-free: `remainingMs` + `lastStartedAt`, clients compute display time)
 - Period management
-- Horn triggers (events are sent to browser clients and included in ESP32-S3 display synchronization)
+- Horn triggers (events are sent to browser clients and will be included when ESP32 displays ship)
 - Player rosters (per-game snapshot, string cap numbers like `1`, `10`, `A`, `B`)
 - Player exclusions (20s, ACTIVE / ROLLED)
 - Team timeouts (2 full + 1 short per team)
@@ -53,7 +53,7 @@ PoloDeck/
 │   └── Dockerfile
 ├── web-app/       # Browser UI (game-day admin, operator views)
 ├── deploy/        # Customer Compose bundle and macOS/Linux + Windows installers
-├── esp32/         # ESP32-S3 display-controller firmware (PlatformIO, built in Docker)
+├── esp32/         # Future ESP32-S3 display-controller firmware (PlatformIO, built in Docker)
 ├── setup/         # Docker Compose + source-build helpers (Postgres, API, web-app)
 │   ├── docker-compose.yml
 │   ├── setup.sh            # Linux/macOS install helper
@@ -139,7 +139,7 @@ cd setup && docker compose up -d --build
 - **Web app:** `http://localhost:8080`
 - **Health:** `GET http://localhost:3000/health`
 
-**Pool LAN / ESP32-S3:** Set `POLODECK_BIND_ADDRESS=0.0.0.0` so operator devices and display controllers can reach the web container on port **8080**. Nginx proxies `/api/`, `/socket.io/`, and `/health` to the API container; PostgreSQL stays private to the Docker network. See [`esp32/README.md`](esp32/README.md). Only expose PoloDeck on networks you trust.
+**Pool LAN:** Set `POLODECK_BIND_ADDRESS=0.0.0.0` so operator devices on the pool network can reach the web container on port **8080**. Future ESP32 shot clocks and scoreboards will use the same address. Nginx proxies `/api/`, `/socket.io/`, and `/health` to the API container; PostgreSQL stays private to the Docker network. See [`esp32/README.md`](esp32/README.md). Only expose PoloDeck on networks you trust.
 
 ## Status
 
@@ -148,4 +148,4 @@ Early MVP scaffold:
 - Backend: game model, timing, rosters, exclusions, timeouts, device check-in, event log.
 - Game-day planning and game metadata APIs are in place.
 - UI: game-day administration, operator controls, and browser display simulators.
-- Hardware: ESP32-S3 protocol and pre-panel firmware scaffold; HUB75 integration follows panel inspection.
+- Hardware: physical shot clocks and scoreboards will be available in a future release. The ESP32-S3 protocol and pre-panel firmware scaffold are in the repo; HUB75 integration follows panel inspection.

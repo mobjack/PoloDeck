@@ -93,16 +93,20 @@ export function KiosksAdmin() {
       <header className="kiosks-admin-header">
         <h1 className="kiosks-admin-title">Displays</h1>
         <p className="kiosks-admin-sub">
-          ESP32-S3 controllers appear here after firmware synchronization. Set the <strong>live game</strong>,
-          choose each display role, and click Activate. You can also use the{" "}
-          <Link to="/simulator/shot-clock">shot-clock test bed</Link> before connecting hardware.
+          Browser simulators appear here after they connect. Set the <strong>live game</strong>, choose each
+          display role, and click Activate. Physical shot clocks and scoreboards will be available in a
+          future release. You can also open the{" "}
+          <Link to="/simulator/shot-clock">shot-clock test bed</Link>.
         </p>
       </header>
 
       {rowError ? <p className="kiosks-admin-banner-error">{rowError}</p> : null}
 
       {devices.length === 0 ? (
-        <p className="kiosks-admin-empty">No displays yet. Power on an ESP32-S3 controller or open the browser simulator.</p>
+        <p className="kiosks-admin-empty">
+          No displays yet. Open a browser simulator to connect one. Physical shot clocks and scoreboards
+          will be available in a future release.
+        </p>
       ) : (
         <div className="kiosks-admin-table-wrap">
           <table className="table kiosks-admin-table">

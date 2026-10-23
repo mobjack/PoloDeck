@@ -36,7 +36,7 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-polodeck}:${POSTGRES_PASSWORD:-polodeck}@postgres:5432/${POSTGRES_DB:-polodeck}?schema=public
     ports:
-      # Use POLODECK_BIND_ADDRESS=0.0.0.0 so ESP32-S3 displays and operator devices can reach PoloDeck.
+      # Use POLODECK_BIND_ADDRESS=0.0.0.0 so operator devices, and future ESP32 displays, can reach PoloDeck.
       - "${POLODECK_BIND_ADDRESS:-127.0.0.1}:3000:3000"
     command: ["node", "dist/server.js"]
     networks:
