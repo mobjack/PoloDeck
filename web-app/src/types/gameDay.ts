@@ -1,3 +1,5 @@
+import type { TimeoutPreset } from "../lib/timeoutRules";
+
 export interface GameDay {
   id: string;
   date: string;
@@ -5,6 +7,13 @@ export interface GameDay {
   defaultQuarterDurationMs: number;
   defaultBreakBetweenQuartersMs: number;
   defaultHalftimeDurationMs: number;
+  timeoutPreset: TimeoutPreset;
+  fullTimeoutsRegulation: number;
+  shortTimeouts: number;
+  fullTimeoutsOvertime: number;
+  separateOvertimeTimeouts: boolean;
+  fullTimeoutDurationSec: number;
+  shortTimeoutDurationSec: number;
   activeGameId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +50,13 @@ export interface CreateGameDayInput {
   defaultQuarterDurationMs: number;
   defaultBreakBetweenQuartersMs: number;
   defaultHalftimeDurationMs: number;
+  timeoutPreset: TimeoutPreset;
+  fullTimeoutsRegulation: number;
+  shortTimeouts: number;
+  fullTimeoutsOvertime: number;
+  separateOvertimeTimeouts: boolean;
+  fullTimeoutDurationSec: number;
+  shortTimeoutDurationSec: number;
 }
 
 export interface UpdateGameDayInput {
@@ -49,6 +65,13 @@ export interface UpdateGameDayInput {
   defaultQuarterDurationMs?: number;
   defaultBreakBetweenQuartersMs?: number;
   defaultHalftimeDurationMs?: number;
+  timeoutPreset?: TimeoutPreset;
+  fullTimeoutsRegulation?: number;
+  shortTimeouts?: number;
+  fullTimeoutsOvertime?: number;
+  separateOvertimeTimeouts?: boolean;
+  fullTimeoutDurationSec?: number;
+  shortTimeoutDurationSec?: number;
   activeGameId?: string | null;
 }
 

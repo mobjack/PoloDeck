@@ -25,6 +25,13 @@ import {
   ROLLED_PLAYER_MESSAGE,
 } from "../lib/rolledPlayer";
 import {
+  HIGH_SCHOOL_TIMEOUT_RULES,
+  remainingTimeouts,
+  timeoutRulesFromGame,
+  type TimeoutPreset,
+  type TimeoutRules,
+} from "../lib/timeoutRules";
+import {
   rerunGameEventLog,
   sortEventsForRerun,
   type RebuildEventInput,
@@ -419,6 +426,13 @@ export class GameService {
     defaultQuarterDurationMs: number;
     defaultBreakBetweenQuartersMs: number;
     defaultHalftimeDurationMs: number;
+    timeoutPreset: TimeoutPreset;
+    fullTimeoutsRegulation: number;
+    shortTimeouts: number;
+    fullTimeoutsOvertime: number;
+    separateOvertimeTimeouts: boolean;
+    fullTimeoutDurationSec: number;
+    shortTimeoutDurationSec: number;
   }) {
     const gameDay = await this.prisma.gameDay.create({
       data: {
@@ -427,6 +441,13 @@ export class GameService {
         defaultQuarterDurationMs: input.defaultQuarterDurationMs,
         defaultBreakBetweenQuartersMs: input.defaultBreakBetweenQuartersMs,
         defaultHalftimeDurationMs: input.defaultHalftimeDurationMs,
+        timeoutPreset: input.timeoutPreset,
+        fullTimeoutsRegulation: input.fullTimeoutsRegulation,
+        shortTimeouts: input.shortTimeouts,
+        fullTimeoutsOvertime: input.fullTimeoutsOvertime,
+        separateOvertimeTimeouts: input.separateOvertimeTimeouts,
+        fullTimeoutDurationSec: input.fullTimeoutDurationSec,
+        shortTimeoutDurationSec: input.shortTimeoutDurationSec,
       },
     });
     return gameDay;
@@ -482,6 +503,13 @@ export class GameService {
       defaultQuarterDurationMs?: number;
       defaultBreakBetweenQuartersMs?: number;
       defaultHalftimeDurationMs?: number;
+      timeoutPreset?: TimeoutPreset;
+      fullTimeoutsRegulation?: number;
+      shortTimeouts?: number;
+      fullTimeoutsOvertime?: number;
+      separateOvertimeTimeouts?: boolean;
+      fullTimeoutDurationSec?: number;
+      shortTimeoutDurationSec?: number;
       activeGameId?: string | null;
     }
   ) {
@@ -498,6 +526,13 @@ export class GameService {
       defaultQuarterDurationMs?: number;
       defaultBreakBetweenQuartersMs?: number;
       defaultHalftimeDurationMs?: number;
+      timeoutPreset?: TimeoutPreset;
+      fullTimeoutsRegulation?: number;
+      shortTimeouts?: number;
+      fullTimeoutsOvertime?: number;
+      separateOvertimeTimeouts?: boolean;
+      fullTimeoutDurationSec?: number;
+      shortTimeoutDurationSec?: number;
       activeGameId?: string | null;
     } = {};
     if (input.date != null) data.date = new Date(input.date);
@@ -505,9 +540,25 @@ export class GameService {
     if (input.defaultQuarterDurationMs != null) data.defaultQuarterDurationMs = input.defaultQuarterDurationMs;
     if (input.defaultBreakBetweenQuartersMs != null) data.defaultBreakBetweenQuartersMs = input.defaultBreakBetweenQuartersMs;
     if (input.defaultHalftimeDurationMs != null) data.defaultHalftimeDurationMs = input.defaultHalftimeDurationMs;
+    if (input.timeoutPreset != null) data.timeoutPreset = input.timeoutPreset;
+    if (input.fullTimeoutsRegulation != null) data.fullTimeoutsRegulation = input.fullTimeoutsRegulation;
+    if (input.shortTimeouts != null) data.shortTimeouts = input.shortTimeouts;
+    if (input.fullTimeoutsOvertime != null) data.fullTimeoutsOvertime = input.fullTimeoutsOvertime;
+    if (input.separateOvertimeTimeouts != null) data.separateOvertimeTimeouts = input.separateOvertimeTimeouts;
+    if (input.fullTimeoutDurationSec != null) data.fullTimeoutDurationSec = input.fullTimeoutDurationSec;
+    if (input.shortTimeoutDurationSec != null) data.shortTimeoutDurationSec = input.shortTimeoutDurationSec;
+    const timeoutRulesChanged =
+      input.timeoutPreset !== undefined ||
+      input.fullTimeoutsRegulation !== undefined ||
+      input.shortTimeouts !== undefined ||
+      input.fullTimeoutsOvertime !== undefined ||
+      input.separateOvertimeTimeouts !== undefined ||
+      input.fullTimeoutDurationSec !== undefined ||
+      input.shortTimeoutDurationSec !== undefined;
     if (input.activeGameId === null) {
       data.activeGameId = null;
       await this.prisma.gameDay.update({ where: { id: gameDayId }, data });
+      if (timeoutRulesChanged) await this.applyTimeoutRulesToGames(gameDayId);
       await this.syncAssignedDevicesToActiveGame(null);
       await this.emitActiveGameChanged();
       return this.getGameDay(gameDayId);
@@ -517,7 +568,65 @@ export class GameService {
       where: { id: gameDayId },
       data,
     });
+    if (timeoutRulesChanged) await this.applyTimeoutRulesToGames(gameDayId);
     return this.getGameDay(gameDayId);
+  }
+
+  private timeoutRulesData(rules: TimeoutRules) {
+    return {
+      fullTimeoutsRegulation: rules.fullTimeoutsRegulation,
+      shortTimeouts: rules.shortTimeouts,
+      fullTimeoutsOvertime: rules.fullTimeoutsOvertime,
+      separateOvertimeTimeouts: rules.separateOvertimeTimeouts,
+      fullTimeoutDurationSec: rules.fullTimeoutDurationSec,
+      shortTimeoutDurationSec: rules.shortTimeoutDurationSec,
+    };
+  }
+
+  /** Copy the game day's timeout rules onto every game and recompute what is left. */
+  private async applyTimeoutRulesToGames(gameDayId: string) {
+    const day = await this.prisma.gameDay.findUnique({ where: { id: gameDayId } });
+    if (!day) return;
+    const games = await this.prisma.game.findMany({
+      where: { gameDayId },
+      select: { id: true },
+    });
+    const data = this.timeoutRulesData(day);
+    for (const game of games) {
+      await this.prisma.game.update({ where: { id: game.id }, data });
+      await this.syncTimeoutStates(game.id);
+    }
+  }
+
+  /** Replay timeout events against the game's rules and store each team's remaining count. */
+  private async syncTimeoutStates(gameId: string) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        events: { orderBy: { createdAt: "asc" } },
+        timeoutStates: true,
+      },
+    });
+    if (!game) return;
+    const remaining = remainingTimeouts(
+      timeoutRulesFromGame(game),
+      game.events.map((event) => ({ eventType: event.eventType, payload: event.payload })),
+      game.currentPeriod
+    );
+    for (const teamSide of [TeamSide.HOME, TeamSide.AWAY]) {
+      const data = {
+        fullTimeoutsRemaining: remaining[teamSide].full,
+        shortTimeoutsRemaining: remaining[teamSide].short,
+      };
+      const row = game.timeoutStates.find((state) => state.teamSide === teamSide);
+      if (row) {
+        await this.prisma.teamTimeoutState.update({ where: { id: row.id }, data });
+      } else {
+        await this.prisma.teamTimeoutState.create({
+          data: { gameId, teamSide, ...data },
+        });
+      }
+    }
   }
 
   async createGame(input: {
@@ -542,6 +651,15 @@ export class GameService {
     let breakBetweenQuartersDurationMs = input.breakBetweenQuartersDurationMs;
     let halftimeDurationMs = input.halftimeDurationMs;
 
+    let timeoutRules: TimeoutRules = {
+      fullTimeoutsRegulation: HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsRegulation,
+      shortTimeouts: HIGH_SCHOOL_TIMEOUT_RULES.shortTimeouts,
+      fullTimeoutsOvertime: HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsOvertime,
+      separateOvertimeTimeouts: HIGH_SCHOOL_TIMEOUT_RULES.separateOvertimeTimeouts,
+      fullTimeoutDurationSec: HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutDurationSec,
+      shortTimeoutDurationSec: HIGH_SCHOOL_TIMEOUT_RULES.shortTimeoutDurationSec,
+    };
+
     if (input.gameDayId) {
       const gameDay = await this.prisma.gameDay.findUnique({
         where: { id: input.gameDayId },
@@ -552,6 +670,7 @@ export class GameService {
         if (breakBetweenQuartersDurationMs == null) breakBetweenQuartersDurationMs = gameDay.defaultBreakBetweenQuartersMs;
         if (halftimeDurationMs == null) halftimeDurationMs = gameDay.defaultHalftimeDurationMs;
         if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000;
+        timeoutRules = timeoutRulesFromGame(gameDay);
       }
     }
     if (gameClockDurationMs == null) gameClockDurationMs = 8 * 60 * 1000;
@@ -559,6 +678,7 @@ export class GameService {
     if (breakBetweenQuartersDurationMs == null) breakBetweenQuartersDurationMs = 2 * 60 * 1000;
     if (halftimeDurationMs == null) halftimeDurationMs = 5 * 60 * 1000;
     if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000;
+    const openingTimeouts = remainingTimeouts(timeoutRules, [], 1);
 
     const maxOrder = input.gameDayId
       ? await this.prisma.game
@@ -584,6 +704,7 @@ export class GameService {
         breakBetweenQuartersDurationMs,
         halftimeDurationMs,
         shotClockDurationMs,
+        ...this.timeoutRulesData(timeoutRules),
         score: { create: {} },
         gameClock: {
           create: {
@@ -599,8 +720,16 @@ export class GameService {
         },
         timeoutStates: {
           create: [
-            { teamSide: TeamSide.HOME, fullTimeoutsRemaining: 2, shortTimeoutsRemaining: 1 },
-            { teamSide: TeamSide.AWAY, fullTimeoutsRemaining: 2, shortTimeoutsRemaining: 1 },
+            {
+              teamSide: TeamSide.HOME,
+              fullTimeoutsRemaining: openingTimeouts.HOME.full,
+              shortTimeoutsRemaining: openingTimeouts.HOME.short,
+            },
+            {
+              teamSide: TeamSide.AWAY,
+              fullTimeoutsRemaining: openingTimeouts.AWAY.full,
+              shortTimeoutsRemaining: openingTimeouts.AWAY.short,
+            },
           ],
         },
       },
@@ -1375,6 +1504,7 @@ export class GameService {
       payload as Prisma.InputJsonValue,
       "operator"
     );
+    await this.syncTimeoutStates(gameId);
     await this.resetClocksForQuarterPlay(gameId);
     return this.emitState(gameId);
   }
@@ -1498,6 +1628,7 @@ export class GameService {
       payload as Prisma.InputJsonValue,
       "operator"
     );
+    await this.syncTimeoutStates(gameId);
 
     await this.resetClocksForQuarterPlay(gameId);
     return this.emitState(gameId);
@@ -1535,6 +1666,7 @@ export class GameService {
       payload as Prisma.InputJsonValue,
       "operator"
     );
+    await this.syncTimeoutStates(gameId);
     return this.emitState(gameId);
   }
 
@@ -1603,6 +1735,7 @@ export class GameService {
         payload as Prisma.InputJsonValue,
         "operator"
       );
+      await this.syncTimeoutStates(gameId);
       return this.emitState(gameId);
     }
 
@@ -1653,6 +1786,7 @@ export class GameService {
           payload as Prisma.InputJsonValue,
           "operator"
         );
+        await this.syncTimeoutStates(gameId);
       }
     }
 
@@ -1689,6 +1823,7 @@ export class GameService {
       payload as Prisma.InputJsonValue,
       "operator"
     );
+    await this.syncTimeoutStates(gameId);
     return this.emitState(gameId);
   }
 
@@ -1804,35 +1939,33 @@ export class GameService {
   }
 
   async useTimeout(gameId: string, teamSide: TeamSide, type: "full" | "short", timeSeconds?: number) {
-    const timeoutState = await this.prisma.teamTimeoutState.findUnique({
-      where: {
-        gameId_teamSide: {
-          gameId,
-          teamSide,
-        },
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        events: { orderBy: { createdAt: "asc" } },
+        timeoutStates: true,
       },
     });
-
-    if (!timeoutState) {
+    if (!game) throw this.notFound("Game not found");
+    if (game.timeoutStates.length === 0) {
       throw this.notFound("Timeout state not found");
     }
 
-    const field =
-      type === "full" ? "fullTimeoutsRemaining" : "shortTimeoutsRemaining";
-    const remaining = timeoutState[field];
-
-    if (remaining <= 0) {
+    const remaining = remainingTimeouts(
+      timeoutRulesFromGame(game),
+      game.events.map((event) => ({ eventType: event.eventType, payload: event.payload })),
+      game.currentPeriod
+    );
+    const left = type === "full" ? remaining[teamSide].full : remaining[teamSide].short;
+    if (left <= 0) {
       throw this.badRequest("No timeouts remaining");
     }
 
-    await this.prisma.teamTimeoutState.update({
-      where: { id: timeoutState.id },
-      data: {
-        [field]: remaining - 1,
-      },
-    });
-
-    const timeoutPayload: Record<string, unknown> = { teamSide, type };
+    const timeoutPayload: Record<string, unknown> = {
+      teamSide,
+      type,
+      period: game.currentPeriod,
+    };
     if (timeSeconds != null) timeoutPayload.timeSeconds = timeSeconds;
     await this.createEvent(
       gameId,
@@ -1840,6 +1973,7 @@ export class GameService {
       timeoutPayload as Prisma.InputJsonValue,
       "operator"
     );
+    await this.syncTimeoutStates(gameId);
 
     return this.emitState(gameId);
   }

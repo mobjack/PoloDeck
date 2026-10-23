@@ -12,4 +12,5 @@ export {
   GameEventType,
   GameStatus,
   TeamSide,
+  TimeoutPreset,
 } from "../generated/prisma";

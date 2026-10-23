@@ -15,6 +15,7 @@ import {
   sortGameEventsAsc,
   type ProgressRow,
 } from "../lib/scoresheetData";
+import { fullTimeoutColumnCount, shortTimeoutLabel } from "../lib/timeoutRules";
 import "../scoresheet.css";
 
 type TeamSide = "HOME" | "AWAY";
@@ -87,6 +88,19 @@ export function Scoresheet() {
   );
   const foulsByPlayer = useMemo(() => computeFoulsByPlayer(events), [events]);
   const timeoutCalls = useMemo(() => computeTimeoutCalls(events), [events]);
+  const fullColumns = fullTimeoutColumnCount(
+    {
+      fullTimeoutsRegulation: aggregate?.fullTimeoutsRegulation ?? 2,
+      fullTimeoutsOvertime: aggregate?.fullTimeoutsOvertime ?? 0,
+      separateOvertimeTimeouts: aggregate?.separateOvertimeTimeouts ?? false,
+    },
+    Math.max(timeoutCalls.HOME.full.length, timeoutCalls.AWAY.full.length)
+  );
+  const showShortTimeout =
+    (aggregate?.shortTimeouts ?? 1) > 0 ||
+    timeoutCalls.HOME.short.length > 0 ||
+    timeoutCalls.AWAY.short.length > 0;
+  const shortLabel = shortTimeoutLabel(aggregate?.shortTimeoutDurationSec ?? 30);
   const scoreByQuarter = useMemo(
     () =>
       computeScoreByQuarter(
@@ -101,8 +115,10 @@ export function Scoresheet() {
   const progressRows = useMemo(() => {
     const ascending = [...events];
     sortGameEventsAsc(ascending);
-    return buildProgressRows(ascending, foulsByPlayer);
-  }, [events, foulsByPlayer]);
+    return buildProgressRows(ascending, foulsByPlayer, {
+      shortTimeoutDurationSec: aggregate?.shortTimeoutDurationSec ?? 30,
+    });
+  }, [events, foulsByPlayer, aggregate?.shortTimeoutDurationSec]);
 
   // Measure the rendered sheet and scale it down uniformly so it always fits a
   // single landscape page. offsetWidth/Height ignore CSS transforms, so this is
@@ -329,10 +345,10 @@ export function Scoresheet() {
   const renderTimeoutRow = (label: string, calls: { full: string[]; short: string[] }) => (
     <tr>
       <td className="ss-to-team">{label}</td>
-      <td>{calls.full[0] ?? ""}</td>
-      <td>{calls.full[1] ?? ""}</td>
-      <td>{calls.full[2] ?? ""}</td>
-      <td>{calls.short[0] ?? ""}</td>
+      {Array.from({ length: fullColumns }, (_, index) => (
+        <td key={index}>{calls.full[index] ?? ""}</td>
+      ))}
+      {showShortTimeout ? <td>{calls.short[0] ?? ""}</td> : null}
     </tr>
   );
 
@@ -455,10 +471,10 @@ export function Scoresheet() {
               <thead>
                 <tr>
                   <th>Team</th>
-                  <th>T1</th>
-                  <th>T2</th>
-                  <th>T3</th>
-                  <th>20s</th>
+                  {Array.from({ length: fullColumns }, (_, index) => (
+                    <th key={index}>T{index + 1}</th>
+                  ))}
+                  {showShortTimeout ? <th>{shortLabel}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -467,10 +483,14 @@ export function Scoresheet() {
               </tbody>
             </table>
             <p className="ss-timeouts-remaining">
-              Remaining — Dark: F {homeTimeouts?.fullTimeoutsRemaining ?? 0} / 20s{" "}
-              {homeTimeouts?.shortTimeoutsRemaining ?? 0} · White: F{" "}
-              {awayTimeouts?.fullTimeoutsRemaining ?? 0} / 20s{" "}
-              {awayTimeouts?.shortTimeoutsRemaining ?? 0}
+              Remaining — Dark: F {homeTimeouts?.fullTimeoutsRemaining ?? 0}
+              {showShortTimeout
+                ? ` / ${shortLabel} ${homeTimeouts?.shortTimeoutsRemaining ?? 0}`
+                : ""}
+              {" · "}White: F {awayTimeouts?.fullTimeoutsRemaining ?? 0}
+              {showShortTimeout
+                ? ` / ${shortLabel} ${awayTimeouts?.shortTimeoutsRemaining ?? 0}`
+                : ""}
             </p>
           </div>
         </div>

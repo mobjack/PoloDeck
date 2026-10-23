@@ -309,10 +309,12 @@ export function computeEventPeriods(rawEvents: ScoresheetEvent[]): Map<string, n
  */
 export function buildProgressRows(
   rawEvents: ScoresheetEvent[],
-  foulsByPlayer: FoulsByPlayer
+  foulsByPlayer: FoulsByPlayer,
+  options?: { shortTimeoutDurationSec?: number }
 ): ProgressRow[] {
   const events = Array.isArray(rawEvents) ? rawEvents : [];
   const periodById = computeEventPeriods(events);
+  const shortTimeoutDurationSec = options?.shortTimeoutDurationSec ?? 30;
 
   return eventsForGameProgressDisplay(events).map((ev) => {
     const p = ev.payload as Record<string, unknown> | undefined;
@@ -349,7 +351,10 @@ export function buildProgressRows(
         remark = "Exclusion cleared";
         break;
       case "TIMEOUT_USED":
-        remark = (p?.type as string) === "short" ? "Timeout (30s)" : "Timeout (full)";
+        remark =
+          (p?.type as string) === "short"
+            ? `Timeout (${shortTimeoutDurationSec}s)`
+            : "Timeout (full)";
         break;
       case "PERIOD_ADVANCED":
         remark = `End Q${(p?.from as number) ?? "?"} → Q${(p?.to as number) ?? "?"}`;
@@ -398,7 +403,9 @@ export function buildProgressRows(
       isQuarterEnd,
       foulCount,
       editable: ev.eventType !== "GAME_CREATED",
-      chronologyCode: chronologyEventCode(ev.eventType, p),
+      chronologyCode: chronologyEventCode(ev.eventType, p, {
+        shortTimeoutDurationSec,
+      }),
     };
   });
 }
@@ -411,7 +418,8 @@ export type EventJustify = "left" | "center" | "right";
  */
 export function chronologyEventCode(
   eventType: string,
-  payload?: Record<string, unknown>
+  payload?: Record<string, unknown>,
+  options?: { shortTimeoutDurationSec?: number }
 ): string | null {
   switch (eventType) {
     case "GOAL_HOME":
@@ -420,7 +428,11 @@ export function chronologyEventCode(
     case "EXCLUSION_STARTED":
       return payload?.isPenalty === true ? "P" : "E";
     case "TIMEOUT_USED":
-      return payload?.type === "short" ? "T/O 20" : "T/O";
+      if (payload?.type === "short") {
+        const seconds = options?.shortTimeoutDurationSec ?? 30;
+        return `T/O ${seconds}`;
+      }
+      return "T/O";
     default:
       return null;
   }

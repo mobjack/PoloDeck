@@ -126,6 +126,12 @@ export interface GameAggregate {
   breakBetweenQuartersDurationMs?: number;
   halftimeDurationMs?: number;
   shotClockDurationMs?: number;
+  fullTimeoutsRegulation: number;
+  shortTimeouts: number;
+  fullTimeoutsOvertime: number;
+  separateOvertimeTimeouts: boolean;
+  fullTimeoutDurationSec: number;
+  shortTimeoutDurationSec: number;
   score: {
     homeScore: number;
     awayScore: number;

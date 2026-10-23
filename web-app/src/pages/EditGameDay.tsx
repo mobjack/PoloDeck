@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, isDatabaseUnavailableError } from "../api/client";
 import type { GameDay, UpdateGameDayInput } from "../types/gameDay";
+import { TimeoutRulesFields } from "../components/TimeoutRulesFields";
+import { HIGH_SCHOOL_TIMEOUT_RULES } from "../lib/timeoutRules";
 import {
   ApiErrorDisplay,
   DatabaseUnavailable,
@@ -25,6 +27,18 @@ export function EditGameDay() {
         setForm({
           date: gd.date,
           location: gd.location,
+          timeoutPreset: gd.timeoutPreset ?? HIGH_SCHOOL_TIMEOUT_RULES.timeoutPreset,
+          fullTimeoutsRegulation:
+            gd.fullTimeoutsRegulation ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsRegulation,
+          shortTimeouts: gd.shortTimeouts ?? HIGH_SCHOOL_TIMEOUT_RULES.shortTimeouts,
+          fullTimeoutsOvertime:
+            gd.fullTimeoutsOvertime ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsOvertime,
+          separateOvertimeTimeouts:
+            gd.separateOvertimeTimeouts ?? HIGH_SCHOOL_TIMEOUT_RULES.separateOvertimeTimeouts,
+          fullTimeoutDurationSec:
+            gd.fullTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutDurationSec,
+          shortTimeoutDurationSec:
+            gd.shortTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.shortTimeoutDurationSec,
         });
       })
       .catch((e) => setError(e))
@@ -50,8 +64,8 @@ export function EditGameDay() {
   }
 
   return (
-    <div className="page">
-      <header className="page-header">
+    <div className="page page--left">
+      <header className="page-header page-header--stacked">
         <Link to={`/game-days/${id}`}>← Back to game day</Link>
         <h1>Edit game day</h1>
       </header>
@@ -78,6 +92,23 @@ export function EditGameDay() {
             required
           />
         </label>
+        <TimeoutRulesFields
+          value={{
+            timeoutPreset: form.timeoutPreset ?? HIGH_SCHOOL_TIMEOUT_RULES.timeoutPreset,
+            fullTimeoutsRegulation:
+              form.fullTimeoutsRegulation ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsRegulation,
+            shortTimeouts: form.shortTimeouts ?? HIGH_SCHOOL_TIMEOUT_RULES.shortTimeouts,
+            fullTimeoutsOvertime:
+              form.fullTimeoutsOvertime ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsOvertime,
+            separateOvertimeTimeouts:
+              form.separateOvertimeTimeouts ?? HIGH_SCHOOL_TIMEOUT_RULES.separateOvertimeTimeouts,
+            fullTimeoutDurationSec:
+              form.fullTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutDurationSec,
+            shortTimeoutDurationSec:
+              form.shortTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.shortTimeoutDurationSec,
+          }}
+          onChange={(rules) => setForm((current) => ({ ...current, ...rules }))}
+        />
         <div className="form-actions">
           <button type="submit" className="btn primary">
             Save

@@ -37,6 +37,15 @@ enum BreakPhase {
   HALFTIME
 }
 
+enum TimeoutPreset {
+  USA_WATER_POLO
+  OLYMPICS
+  JUNIOR_OLYMPICS
+  COLLEGE
+  HIGH_SCHOOL
+  CUSTOM
+}
+
 enum GameEventType {
   GAME_CREATED
   GOAL_HOME
@@ -66,6 +75,13 @@ model GameDay {
   defaultQuarterDurationMs     Int
   defaultBreakBetweenQuartersMs Int
   defaultHalftimeDurationMs   Int
+  timeoutPreset               TimeoutPreset @default(CUSTOM)
+  fullTimeoutsRegulation      Int      @default(2)
+  shortTimeouts               Int      @default(1)
+  fullTimeoutsOvertime        Int      @default(0)
+  separateOvertimeTimeouts    Boolean  @default(false)
+  fullTimeoutDurationSec      Int      @default(60)
+  shortTimeoutDurationSec     Int      @default(30)
   activeGameId                String?  @unique
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
@@ -91,6 +107,12 @@ model Game {
   breakBetweenQuartersDurationMs Int       @default(120000)  // 2 min
   halftimeDurationMs            Int       @default(300000)   // 5 min
   shotClockDurationMs           Int       @default(30000)    // regulation shot length
+  fullTimeoutsRegulation        Int       @default(2)
+  shortTimeouts                 Int       @default(1)
+  fullTimeoutsOvertime          Int       @default(0)
+  separateOvertimeTimeouts      Boolean   @default(false)
+  fullTimeoutDurationSec        Int       @default(60)
+  shortTimeoutDurationSec       Int       @default(30)
   breakPhase                    BreakPhase @default(NONE)
   breakAfterPeriod              Int?
   createdAt      DateTime     @default(now())
