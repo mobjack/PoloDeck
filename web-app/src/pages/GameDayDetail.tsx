@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GameDay, GameOnDay } from "../types/gameDay";
+import { describeTimeoutRules } from "../lib/timeoutRules";
 import { ApiErrorDisplay, formatApiErrorMessage } from "../components/DatabaseUnavailable";
 
 function isoToTimeInputValue(iso: string | null): string {
@@ -95,9 +96,12 @@ export function GameDayDetail() {
   return (
     <div className="game-day-detail-pane">
       <header className="page-header game-day-detail-header">
-        <h1>
-          {gameDay.date} @ {gameDay.location}
-        </h1>
+        <div className="game-day-detail-title">
+          <h1>
+            {gameDay.date} @ {gameDay.location}
+          </h1>
+          <p className="form-hint">{describeTimeoutRules(gameDay)}</p>
+        </div>
         <div className="game-day-detail-header-actions">
           <Link to="/kiosks" className="btn secondary">
             Manage displays

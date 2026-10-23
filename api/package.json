@@ -16,7 +16,7 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/lib/rolledPlayer.test.ts src/services/gameEventRerun.sort.test.ts src/services/displaySync.test.ts"
+    "test": "tsx --test src/lib/rolledPlayer.test.ts src/lib/timeoutRules.test.ts src/services/gameEventRerun.sort.test.ts src/services/displaySync.test.ts"
   },
   "engines": {
     "node": ">=18.0.0"

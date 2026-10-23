@@ -25,6 +25,7 @@ import {
   sortGameEventsAsc,
 } from "../lib/scoresheetData";
 import { createGameSocket } from "../lib/socketUrl";
+import { fullTimeoutColumnCount, shortTimeoutLabel } from "../lib/timeoutRules";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import type { GameDay } from "../types/gameDay";
@@ -194,6 +195,25 @@ export function GameSheet() {
     () => computeTimeoutCalls(aggregate?.events ?? []),
     [aggregate?.events]
   );
+  const timeoutRules = {
+    fullTimeoutsRegulation: aggregate?.fullTimeoutsRegulation ?? 2,
+    fullTimeoutsOvertime: aggregate?.fullTimeoutsOvertime ?? 0,
+    separateOvertimeTimeouts: aggregate?.separateOvertimeTimeouts ?? false,
+    shortTimeouts: aggregate?.shortTimeouts ?? 1,
+    shortTimeoutDurationSec: aggregate?.shortTimeoutDurationSec ?? 30,
+  };
+  const fullColumns = fullTimeoutColumnCount(
+    timeoutRules,
+    Math.max(timeoutCalls.HOME.full.length, timeoutCalls.AWAY.full.length)
+  );
+  const showShortTimeout =
+    timeoutRules.shortTimeouts > 0 ||
+    timeoutCalls.HOME.short.length > 0 ||
+    timeoutCalls.AWAY.short.length > 0;
+  const shortLabel = shortTimeoutLabel(timeoutRules.shortTimeoutDurationSec);
+
+  const formatTimeoutValue = (full: number, short: number) =>
+    showShortTimeout ? `F: ${full}  ${shortLabel}: ${short}` : `F: ${full}`;
 
   const scoreByQuarter = useMemo(
     () =>
@@ -276,7 +296,8 @@ export function GameSheet() {
 
   const progressRows = buildProgressRows(
     Array.isArray(aggregate.events) ? aggregate.events : [],
-    foulsByPlayer
+    foulsByPlayer,
+    { shortTimeoutDurationSec: aggregate.shortTimeoutDurationSec }
   );
 
   const openProgressEditForRow = (rowId: string) => {
@@ -646,7 +667,10 @@ export function GameSheet() {
                       Timeouts:
                     </button>
                     <div className="scoreboard-timeouts-value">
-                      F: {homeTimeouts?.fullTimeoutsRemaining ?? 0}  30s: {homeTimeouts?.shortTimeoutsRemaining ?? 0}
+                      {formatTimeoutValue(
+                        homeTimeouts?.fullTimeoutsRemaining ?? 0,
+                        homeTimeouts?.shortTimeoutsRemaining ?? 0
+                      )}
                     </div>
                   </div>
                 </div>
@@ -669,7 +693,10 @@ export function GameSheet() {
                       Timeouts:
                     </button>
                     <div className="scoreboard-timeouts-value">
-                      F: {awayTimeouts?.fullTimeoutsRemaining ?? 0}  30s: {awayTimeouts?.shortTimeoutsRemaining ?? 0}
+                      {formatTimeoutValue(
+                        awayTimeouts?.fullTimeoutsRemaining ?? 0,
+                        awayTimeouts?.shortTimeoutsRemaining ?? 0
+                      )}
                     </div>
                   </div>
                 </div>
@@ -829,7 +856,7 @@ export function GameSheet() {
                   <h3>Timeout</h3>
                   <ul>
                     <li><strong>[time]t w/b</strong> — Full timeout for light (w) or dark (b); e.g. <code>tw</code> or <code>4.13tw</code></li>
-                    <li><strong>[time]t3 w/b</strong> — 30-second timeout; e.g. <code>t3w</code> or <code>4.13t3w</code></li>
+                    <li><strong>[time]t3 w/b</strong> — {timeoutRules.shortTimeoutDurationSec}-second timeout; e.g. <code>t3w</code> or <code>4.13t3w</code></li>
                   </ul>
 
                   <h3>Examples</h3>
@@ -1084,7 +1111,7 @@ export function GameSheet() {
                               checked={toShort}
                               onChange={(e) => setToShort(e.target.checked)}
                             />
-                            30-second timeout
+                            {timeoutRules.shortTimeoutDurationSec}-second timeout
                           </label>
                           {(() => {
                             const pl = sel.payload as Record<string, unknown>;
@@ -1172,7 +1199,9 @@ export function GameSheet() {
                                 <option value="EXCLUSION">Exclusion</option>
                                 <option value="PENALTY">Penalty</option>
                                 <option value="TIMEOUT">Timeout (full)</option>
-                                <option value="TIMEOUT_30">Timeout (30s)</option>
+                                <option value="TIMEOUT_30">
+                                  Timeout ({timeoutRules.shortTimeoutDurationSec}s)
+                                </option>
                               </select>
                             </label>
                             {(insertKind === "GOAL" ||
@@ -1330,30 +1359,22 @@ export function GameSheet() {
                     <thead>
                       <tr>
                         <th>Team</th>
-                        <th>T1</th>
-                        <th>T2</th>
-                        <th>T3</th>
-                        <th>T4</th>
-                        <th>30TO</th>
+                        {Array.from({ length: fullColumns }, (_, index) => (
+                          <th key={index}>T{index + 1}</th>
+                        ))}
+                        {showShortTimeout ? <th>{shortLabel}</th> : null}
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td><strong>DARK</strong></td>
-                        <td>{timeoutCalls.HOME.full[0] ?? "—"}</td>
-                        <td>{timeoutCalls.HOME.full[1] ?? "—"}</td>
-                        <td>{timeoutCalls.HOME.full[2] ?? "—"}</td>
-                        <td>{timeoutCalls.HOME.full[3] ?? "—"}</td>
-                        <td>{timeoutCalls.HOME.short[0] ?? "—"}</td>
-                      </tr>
-                      <tr>
-                        <td><strong>WHITE</strong></td>
-                        <td>{timeoutCalls.AWAY.full[0] ?? "—"}</td>
-                        <td>{timeoutCalls.AWAY.full[1] ?? "—"}</td>
-                        <td>{timeoutCalls.AWAY.full[2] ?? "—"}</td>
-                        <td>{timeoutCalls.AWAY.full[3] ?? "—"}</td>
-                        <td>{timeoutCalls.AWAY.short[0] ?? "—"}</td>
-                      </tr>
+                      {(["HOME", "AWAY"] as const).map((side) => (
+                        <tr key={side}>
+                          <td><strong>{side === "HOME" ? "DARK" : "WHITE"}</strong></td>
+                          {Array.from({ length: fullColumns }, (_, index) => (
+                            <td key={index}>{timeoutCalls[side].full[index] ?? "—"}</td>
+                          ))}
+                          {showShortTimeout ? <td>{timeoutCalls[side].short[0] ?? "—"}</td> : null}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -2033,7 +2054,7 @@ function describeParsed(parsed: ParsedInput, aggregate: GameAggregate): string {
     case "TIMEOUT":
       return `${parsed.side === "HOME" ? "Dark" : "Light"} timeout at ${formatParsedTime(parsed.timeSeconds)}`;
     case "TIMEOUT_30":
-      return `${parsed.side === "HOME" ? "Dark" : "Light"} 30s timeout at ${formatParsedTime(parsed.timeSeconds)}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} ${aggregate.shortTimeoutDurationSec}s timeout at ${formatParsedTime(parsed.timeSeconds)}`;
     case "GOAL":
       return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} goal at ${formatParsedTime(parsed.timeSeconds)}`;
     case "EXCLUSION":

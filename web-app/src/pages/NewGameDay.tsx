@@ -6,6 +6,8 @@ import {
   formatApiErrorMessage,
 } from "../components/DatabaseUnavailable";
 import type { CreateGameDayInput } from "../types/gameDay";
+import { HIGH_SCHOOL_TIMEOUT_RULES } from "../lib/timeoutRules";
+import { TimeoutRulesFields } from "../components/TimeoutRulesFields";
 
 const DEFAULT_QUARTER_MS = 8 * 60 * 1000;
 const DEFAULT_BREAK_MS = 30 * 1000;
@@ -20,6 +22,7 @@ export function NewGameDay() {
     defaultQuarterDurationMs: DEFAULT_QUARTER_MS,
     defaultBreakBetweenQuartersMs: DEFAULT_BREAK_MS,
     defaultHalftimeDurationMs: DEFAULT_HALFTIME_MS,
+    ...HIGH_SCHOOL_TIMEOUT_RULES,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -39,8 +42,8 @@ export function NewGameDay() {
   }
 
   return (
-    <div className="page">
-      <header className="page-header">
+    <div className="page page--left">
+      <header className="page-header page-header--stacked">
         <Link to="/">← Game Days</Link>
         <h1>New Game Day</h1>
       </header>
@@ -75,6 +78,7 @@ export function NewGameDay() {
             <input
               type="number"
               min={1}
+              step="any"
               value={form.defaultQuarterDurationMs / 60000}
               onChange={(e) => setMinutes("defaultQuarterDurationMs", Number(e.target.value))}
             />
@@ -84,6 +88,7 @@ export function NewGameDay() {
             <input
               type="number"
               min={0}
+              step="any"
               value={form.defaultBreakBetweenQuartersMs / 60000}
               onChange={(e) => setMinutes("defaultBreakBetweenQuartersMs", Number(e.target.value))}
             />
@@ -93,11 +98,16 @@ export function NewGameDay() {
             <input
               type="number"
               min={0}
+              step="any"
               value={form.defaultHalftimeDurationMs / 60000}
               onChange={(e) => setMinutes("defaultHalftimeDurationMs", Number(e.target.value))}
             />
           </label>
         </fieldset>
+        <TimeoutRulesFields
+          value={form}
+          onChange={(rules) => setForm((current) => ({ ...current, ...rules }))}
+        />
         <div className="form-actions">
           <button type="submit" className="btn primary">
             Create game day

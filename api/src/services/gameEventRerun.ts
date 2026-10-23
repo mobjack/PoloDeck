@@ -8,6 +8,7 @@ import {
 } from "../lib/prisma";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
 import { playerIsRolled, ROLLED_PLAYER_MESSAGE } from "../lib/rolledPlayer";
+import { remainingTimeouts, timeoutRulesFromGame } from "../lib/timeoutRules";
 
 export type RebuildEventInput = {
   id?: string;
@@ -89,12 +90,24 @@ export async function rerunGameEventLog(
     },
   });
 
-  for (const ts of game.timeoutStates) {
-    await tx.teamTimeoutState.update({
-      where: { id: ts.id },
-      data: { fullTimeoutsRemaining: 2, shortTimeoutsRemaining: 1 },
-    });
-  }
+  const timeoutRules = timeoutRulesFromGame(game);
+  const timeoutReplay: { eventType: string; payload?: unknown }[] = [];
+  let timeoutPeriod = 1;
+
+  const writeTimeoutRemaining = async () => {
+    const remaining = remainingTimeouts(timeoutRules, timeoutReplay, timeoutPeriod);
+    for (const ts of game.timeoutStates) {
+      await tx.teamTimeoutState.update({
+        where: { id: ts.id },
+        data: {
+          fullTimeoutsRemaining: remaining[ts.teamSide].full,
+          shortTimeoutsRemaining: remaining[ts.teamSide].short,
+        },
+      });
+    }
+  };
+
+  await writeTimeoutRemaining();
 
   await tx.playerExclusion.deleteMany({ where: { gameId } });
 
@@ -507,6 +520,9 @@ export async function rerunGameEventLog(
             ? { homeScore: scoreRow.homeScore, awayScore: scoreRow.awayScore }
             : {}),
         } as Prisma.InputJsonValue;
+        timeoutPeriod = to;
+        timeoutReplay.push({ eventType: "PERIOD_ADVANCED", payload: { to } });
+        await writeTimeoutRemaining();
         break;
       }
 
@@ -607,25 +623,20 @@ export async function rerunGameEventLog(
           throw new Error("TIMEOUT_USED: missing teamSide");
         }
         const type = p.type === "short" ? "short" : "full";
-        const timeoutState = await tx.teamTimeoutState.findUnique({
-          where: {
-            gameId_teamSide: { gameId, teamSide },
-          },
-        });
-        if (!timeoutState) throw new Error("Timeout state missing");
-        const field =
-          type === "full" ? "fullTimeoutsRemaining" : "shortTimeoutsRemaining";
-        const remaining = timeoutState[field];
-        if (remaining <= 0) {
+        const before = remainingTimeouts(timeoutRules, timeoutReplay, timeoutPeriod);
+        const left = type === "short" ? before[teamSide].short : before[teamSide].full;
+        if (left <= 0) {
           throw new Error("No timeouts remaining for team during rerun");
         }
-        await tx.teamTimeoutState.update({
-          where: { id: timeoutState.id },
-          data: { [field]: remaining - 1 },
+        timeoutReplay.push({
+          eventType: "TIMEOUT_USED",
+          payload: { teamSide, type },
         });
+        await writeTimeoutRemaining();
         payloadOut = {
           teamSide,
           type,
+          period: timeoutPeriod,
           ...(typeof p.timeSeconds === "number"
             ? { timeSeconds: p.timeSeconds }
             : {}),

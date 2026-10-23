@@ -440,6 +440,15 @@
   min-width: 0;
 }
 
+.game-day-detail-title {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.game-day-detail-title h1 {
+  flex: none;
+}
+
 @media (max-width: 960px) {
   .game-day-shell-layout {
     grid-template-columns: 1fr;
@@ -1727,6 +1736,23 @@
   font-size: 1.5rem;
 }
 
+.page.page--left {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.page-header.page-header--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.45rem;
+}
+
+.page-header.page-header--stacked h1 {
+  text-align: left;
+  width: 100%;
+}
+
 .page-header--client-status {
   flex-direction: column;
   align-items: flex-start;
@@ -1871,6 +1897,25 @@
   display: flex;
   gap: 0.75rem;
   margin-top: 0.5rem;
+}
+
+.form-hint {
+  margin: 0;
+  color: var(--pd-muted, #96a2b5);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.form-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem !important;
+  font-weight: 500;
+}
+
+.form-checkbox input {
+  width: auto;
 }
 
 .btn {

@@ -1,5 +1,19 @@
 import { GameEventType } from "../lib/prisma";
+import { TIMEOUT_PRESETS } from "../lib/timeoutRules";
 import { z } from "zod";
+
+const timeoutCount = z.number().int().min(0).max(20);
+const timeoutDurationSec = z.number().int().min(1).max(600);
+
+const timeoutRulesFields = {
+  timeoutPreset: z.enum(TIMEOUT_PRESETS),
+  fullTimeoutsRegulation: timeoutCount,
+  shortTimeouts: timeoutCount,
+  fullTimeoutsOvertime: timeoutCount,
+  separateOvertimeTimeouts: z.boolean(),
+  fullTimeoutDurationSec: timeoutDurationSec,
+  shortTimeoutDurationSec: timeoutDurationSec,
+};
 
 // Game day
 export const createGameDayBodySchema = z.object({
@@ -8,9 +22,28 @@ export const createGameDayBodySchema = z.object({
   defaultQuarterDurationMs: z.number().int().positive(),
   defaultBreakBetweenQuartersMs: z.number().int().nonnegative(),
   defaultHalftimeDurationMs: z.number().int().nonnegative(),
+  timeoutPreset: timeoutRulesFields.timeoutPreset.default("HIGH_SCHOOL"),
+  fullTimeoutsRegulation: timeoutRulesFields.fullTimeoutsRegulation.default(3),
+  shortTimeouts: timeoutRulesFields.shortTimeouts.default(1),
+  fullTimeoutsOvertime: timeoutRulesFields.fullTimeoutsOvertime.default(1),
+  separateOvertimeTimeouts: timeoutRulesFields.separateOvertimeTimeouts.default(true),
+  fullTimeoutDurationSec: timeoutRulesFields.fullTimeoutDurationSec.default(120),
+  shortTimeoutDurationSec: timeoutRulesFields.shortTimeoutDurationSec.default(30),
 });
 
-export const updateGameDayBodySchema = createGameDayBodySchema.partial().extend({
+export const updateGameDayBodySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  location: z.string().min(1).optional(),
+  defaultQuarterDurationMs: z.number().int().positive().optional(),
+  defaultBreakBetweenQuartersMs: z.number().int().nonnegative().optional(),
+  defaultHalftimeDurationMs: z.number().int().nonnegative().optional(),
+  timeoutPreset: timeoutRulesFields.timeoutPreset.optional(),
+  fullTimeoutsRegulation: timeoutRulesFields.fullTimeoutsRegulation.optional(),
+  shortTimeouts: timeoutRulesFields.shortTimeouts.optional(),
+  fullTimeoutsOvertime: timeoutRulesFields.fullTimeoutsOvertime.optional(),
+  separateOvertimeTimeouts: timeoutRulesFields.separateOvertimeTimeouts.optional(),
+  fullTimeoutDurationSec: timeoutRulesFields.fullTimeoutDurationSec.optional(),
+  shortTimeoutDurationSec: timeoutRulesFields.shortTimeoutDurationSec.optional(),
   activeGameId: z.string().cuid().nullable().optional(),
 });
 

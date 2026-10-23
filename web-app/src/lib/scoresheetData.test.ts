@@ -100,7 +100,11 @@ describe("chronologyEventCode + eventCellJustify", () => {
     assert.equal(chronologyEventCode("EXCLUSION_STARTED", {}), "E");
     assert.equal(chronologyEventCode("EXCLUSION_STARTED", { isPenalty: true }), "P");
     assert.equal(chronologyEventCode("TIMEOUT_USED", { type: "full" }), "T/O");
-    assert.equal(chronologyEventCode("TIMEOUT_USED", { type: "short" }), "T/O 20");
+    assert.equal(chronologyEventCode("TIMEOUT_USED", { type: "short" }), "T/O 30");
+    assert.equal(
+      chronologyEventCode("TIMEOUT_USED", { type: "short" }, { shortTimeoutDurationSec: 45 }),
+      "T/O 45"
+    );
     assert.equal(chronologyEventCode("GAME_CLOCK_STARTED", { period: 1 }), null);
   });
 
@@ -140,6 +144,23 @@ describe("buildProgressRows", () => {
 
     const timeout = rows.find((r) => r.eventType === "TIMEOUT_USED" && r.period === 1);
     assert.equal(timeout?.chronologyCode, "T/O");
+    assert.equal(timeout?.remark, "Timeout (full)");
+  });
+
+  it("labels a short timeout with the configured duration", () => {
+    seq = 0;
+    const events: ScoresheetEvent[] = [
+      ev("TIMEOUT_USED", { teamSide: "HOME", type: "short", timeSeconds: 90 }),
+    ];
+    const defaults = buildProgressRows(events, computeFoulsByPlayer(events));
+    assert.equal(defaults[0]?.remark, "Timeout (30s)");
+    assert.equal(defaults[0]?.chronologyCode, "T/O 30");
+
+    const custom = buildProgressRows(events, computeFoulsByPlayer(events), {
+      shortTimeoutDurationSec: 45,
+    });
+    assert.equal(custom[0]?.remark, "Timeout (45s)");
+    assert.equal(custom[0]?.chronologyCode, "T/O 45");
   });
 
   it("marks quarter-end rows for blacking out", () => {
