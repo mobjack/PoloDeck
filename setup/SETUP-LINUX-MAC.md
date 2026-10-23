@@ -45,7 +45,7 @@ Use LAN binding (0.0.0.0)? [y/N]
 ```
 
 - Answer **N** (or just press Enter) to bind to `127.0.0.1`. The stack is then reachable **only from this machine** at <http://localhost:8080>. This is the safest default for testing on a single computer.
-- Answer **y** to bind to `0.0.0.0`. The ports are published on **all network interfaces**, so operator devices and ESP32-S3 displays on the same pool LAN can reach the stack at `http://<this-machine-LAN-IP>:8080`. Use this for a real pool-deck deployment.
+- Answer **y** to bind to `0.0.0.0`. The ports are published on **all network interfaces**, so operator devices on the same pool LAN can reach the stack at `http://<this-machine-LAN-IP>:8080`. Future ESP32 shot clocks and scoreboards will use this address too. Use this for a real pool-deck deployment.
 
 Your answer is written to `POLODECK_BIND_ADDRESS` in `setup/.env`.
 
@@ -132,11 +132,11 @@ Example:
 POLODECK_BIND_ADDRESS=0.0.0.0 ./setup/setup.sh install
 ```
 
-## LAN and ESP32-S3 display access
+## LAN access
 
-By default the published ports bind to `127.0.0.1` (localhost only). To let operator devices and ESP32-S3 displays reach the stack, choose LAN binding when prompted, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`.
+By default the published ports bind to `127.0.0.1` (localhost only). To let operator devices reach the stack, choose LAN binding when prompted, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup/.env`. Physical shot clocks and scoreboards will be available in a future release and will use the same binding.
 
-The web-app nginx container proxies `/api/`, `/socket.io/`, and `/health` to the API, so clients only need port **8080**. ESP32-S3 firmware configuration is documented in [`../esp32/README.md`](../esp32/README.md).
+The web-app nginx container proxies `/api/`, `/socket.io/`, and `/health` to the API, so clients only need port **8080**. Future ESP32 firmware configuration is documented in [`../esp32/README.md`](../esp32/README.md).
 
 > Only expose `0.0.0.0` on networks you trust.
 

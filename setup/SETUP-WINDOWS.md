@@ -109,9 +109,9 @@ $env:POLODECK_BIND_ADDRESS = '0.0.0.0'
 .\setup\setup.ps1 install
 ```
 
-## LAN and ESP32-S3 display access
+## LAN access
 
-By default the published ports bind to `127.0.0.1` (localhost only). To let operator devices and ESP32-S3 displays reach the stack, choose LAN binding when prompted, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup\.env`.
+By default the published ports bind to `127.0.0.1` (localhost only). To let operator devices reach the stack, choose LAN binding when prompted, or set `POLODECK_BIND_ADDRESS=0.0.0.0` in `setup\.env`. Physical shot clocks and scoreboards will be available in a future release and will use the same binding.
 
 The web-app nginx container proxies `/api/` and `/socket.io/` to the API, so clients usually only need port **8080**.
 

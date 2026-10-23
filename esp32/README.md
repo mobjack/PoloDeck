@@ -1,8 +1,8 @@
 # PoloDeck ESP32-S3 display controller
 
-This firmware runs the physical scoreboards and shot clocks. The Docker-hosted PoloDeck server remains
-authoritative; each ESP32-S3 maintains the received clock locally between
-synchronizations so a short Wi-Fi interruption does not freeze the display.
+Physical shot clocks and scoreboards will be available in a future release. This firmware is the scaffold
+for that hardware. The Docker-hosted PoloDeck server remains authoritative; each ESP32-S3 will maintain
+the received clock locally between synchronizations so a short Wi-Fi interruption does not freeze the display.
 
 ## Current pre-panel milestone
 

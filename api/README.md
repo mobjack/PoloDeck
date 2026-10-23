@@ -42,9 +42,9 @@ This will:
 
 The web-app nginx image proxies **`/api/`** and **`/socket.io/`** to the API container so clients can use **port 8080** alone.
 
-### ESP32-S3 display synchronization
+### Future ESP32 display synchronization
 
-Physical displays check in and receive compact, time-anchored state through:
+Physical shot clocks and scoreboards will be available in a future release. The protocol they will use is already in the API. A display checks in and receives compact, time-anchored state through:
 
 ```http
 POST /api/displays/:clientId/sync

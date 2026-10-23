@@ -224,8 +224,8 @@ export function GameDayShell() {
                 Use <strong>Roster</strong> on each game to enter or import player names by cap number.
               </li>
               <li>
-                Open <strong>Displays</strong> (monitor icon) to assign ESP32-S3 controllers or browser
-                simulators; connection status appears above.
+                Open <strong>Displays</strong> (monitor icon) to assign browser simulators; connection status
+                appears above. Physical shot clocks and scoreboards will be available in a future release.
               </li>
             </ul>
           </div>

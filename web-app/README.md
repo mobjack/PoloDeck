@@ -1,6 +1,6 @@
 # PoloDeck web app
 
-Vite + React operator UI and browser-based display simulator routes under `/kiosk` (including **`/kiosk/managed`** and per-game display URLs). Production LED displays use the ESP32-S3 firmware and display synchronization API; the browser views remain useful for development and diagnostics.
+Vite + React operator UI and browser-based display simulator routes under `/kiosk` (including **`/kiosk/managed`** and per-game display URLs). Physical shot clocks and scoreboards will be available in a future release on ESP32 controllers. The browser views are the displays available today, and they remain useful for development and diagnostics.
 
 **Docker / production:** The image uses nginx. It serves the SPA and proxies **`/api/`** and **`/socket.io/`** to the `polodeck-api` service. Default build args use **`VITE_API_URL=/api`** and an empty **`VITE_SOCKET_URL`** so the browser uses the same origin as the page (port **8080** on the host).
 

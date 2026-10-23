@@ -50,9 +50,9 @@ export function KioskHome() {
       <header className="kiosk-home-header">
         <h1>PoloDeck display simulator</h1>
         <p className="kiosk-home-sub">
-          These browser views remain available for development and diagnostics while physical displays move
-          to ESP32-S3 controllers. Production controllers register through the display API and are assigned
-          under <strong>Displays</strong> in the main app.
+          Browser scoreboard, shot clock, and timer views for running a game without dedicated hardware.
+          Physical shot clocks and scoreboards will be available in a future release. Assign a connected
+          browser simulator under <strong>Displays</strong> in the main app.
         </p>
       </header>
       {games.length === 0 ? (
