@@ -7,6 +7,7 @@ import {
   TeamSide,
 } from "../lib/prisma";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
+import { playerIsRolled, ROLLED_PLAYER_MESSAGE } from "../lib/rolledPlayer";
 
 export type RebuildEventInput = {
   id?: string;
@@ -146,10 +147,8 @@ export async function rerunGameEventLog(
             );
           }
           const n = foulStartsByCap.get(capKey(side, cap)) ?? 0;
-          if (n >= 3) {
-            throw new Error(
-              `Player ${cap} has been rolled; cannot record another goal for them`
-            );
+          if (playerIsRolled(n)) {
+            throw new Error(ROLLED_PLAYER_MESSAGE);
           }
         }
         const delta = typeof p.delta === "number" ? p.delta : 1;
@@ -526,6 +525,13 @@ export async function rerunGameEventLog(
         if (!player) {
           throw new Error("EXCLUSION_STARTED: player not found");
         }
+        const key = capKey(player.teamSide, player.capNumber);
+        const foulsSoFar = foulStartsByCap.get(key) ?? 0;
+        if (playerIsRolled(foulsSoFar)) {
+          throw new Error(ROLLED_PLAYER_MESSAGE);
+        }
+        foulStartsByCap.set(key, foulsSoFar + 1);
+
         const g = await tx.game.findUnique({
           where: { id: gameId },
           select: { currentPeriod: true },
@@ -551,9 +557,6 @@ export async function rerunGameEventLog(
         const oldExId =
           typeof p.exclusionId === "string" ? p.exclusionId : undefined;
         if (oldExId) exclusionIdMap.set(oldExId, exclusion.id);
-
-        const key = capKey(player.teamSide, player.capNumber);
-        foulStartsByCap.set(key, (foulStartsByCap.get(key) ?? 0) + 1);
 
         payloadOut = {
           ...p,

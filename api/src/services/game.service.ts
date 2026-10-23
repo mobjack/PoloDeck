@@ -20,6 +20,11 @@ import {
 } from "./deviceCapabilities";
 import { env } from "../config/env";
 import {
+  countPersonalFouls,
+  playerIsRolled,
+  ROLLED_PLAYER_MESSAGE,
+} from "../lib/rolledPlayer";
+import {
   rerunGameEventLog,
   sortEventsForRerun,
   type RebuildEventInput,
@@ -112,15 +117,13 @@ export class GameService {
       where: { gameId, eventType: GameEventType.EXCLUSION_STARTED },
       select: { payload: true },
     });
-    const count = events.filter((ev) => {
-      const p = ev.payload as Record<string, unknown> | null;
-      return p?.teamSide === teamSide && String(p?.capNumber) === String(capNumber);
-    }).length;
-    if (count >= 3) {
-      const teamName = teamSide === TeamSide.HOME ? "Dark" : "Light";
-      throw this.badRequest(
-        `Player ${capNumber} (${teamName}) has been rolled from the game, no updates possible.`
-      );
+    const count = countPersonalFouls(
+      events.map((ev) => ev.payload),
+      teamSide,
+      capNumber
+    );
+    if (playerIsRolled(count)) {
+      throw this.badRequest(ROLLED_PLAYER_MESSAGE);
     }
   }
 
@@ -1724,6 +1727,8 @@ export class GameService {
     if (!player || player.gameId !== gameId) {
       throw this.notFound("Player not found for game");
     }
+
+    await this.assertPlayerNotRolled(gameId, player.teamSide, player.capNumber);
 
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
