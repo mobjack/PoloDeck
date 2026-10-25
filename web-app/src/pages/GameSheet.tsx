@@ -28,6 +28,14 @@ import { createGameSocket } from "../lib/socketUrl";
 import { buildTimeoutMatrix, shortTimeoutLabel } from "../lib/timeoutRules";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
+import { CardMarks, StaffCardLine } from "../components/CardMarks";
+import {
+  computeCards,
+  formatCardCommand,
+  isPlayerRolled,
+  parseCardRest,
+  type CardTarget,
+} from "../lib/cards";
 import type { GameDay } from "../types/gameDay";
 
 type TeamSide = "HOME" | "AWAY";
@@ -44,10 +52,14 @@ interface ParsedInput {
     | "EXCLUSION"
     | "PENALTY"
     | "TIMEOUT"
-    | "TIMEOUT_30";
+    | "TIMEOUT_30"
+    | "YELLOW_CARD"
+    | "RED_CARD"
+    | "YELLOW_RED_CARD";
   timeSeconds?: number;
   side?: TeamSide;
   capNumber?: string;
+  cardTarget?: CardTarget;
   /** Set for a 20-second shot clock reset. Omitted for a full reset. */
   resetRemainingMs?: number;
 }
@@ -62,7 +74,6 @@ export function GameSheet() {
   const [input, setInput] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
   const [lastParsed, setLastParsed] = useState<ParsedInput | null>(null);
-  const [commandHelpOpen, setCommandHelpOpen] = useState(false);
   const [timeoutsModalOpen, setTimeoutsModalOpen] = useState(false);
   const [scoreResultsModalOpen, setScoreResultsModalOpen] = useState(false);
   const [eqOvertimeModalOpen, setEqOvertimeModalOpen] = useState(false);
@@ -75,11 +86,17 @@ export function GameSheet() {
   const [progressEditBusy, setProgressEditBusy] = useState(false);
   const [progressInsertMode, setProgressInsertMode] = useState<null | "before" | "after">(null);
   const [insertKind, setInsertKind] = useState<
-    "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30"
+    "GOAL" | "EXCLUSION" | "PENALTY" | "TIMEOUT" | "TIMEOUT_30" | "YELLOW_CARD" | "RED_CARD" | "YELLOW_RED_CARD"
   >("GOAL");
   const [insertSide, setInsertSide] = useState<TeamSide>("HOME");
   const [insertCap, setInsertCap] = useState("");
   const [insertTimeSec, setInsertTimeSec] = useState("");
+  const [insertCardTarget, setInsertCardTarget] = useState<CardTarget>("PLAYER");
+  const [cardSide, setCardSide] = useState<TeamSide>("HOME");
+  const [cardTarget, setCardTarget] = useState<CardTarget>("PLAYER");
+  const [cardCap, setCardCap] = useState("");
+  const [cardColor, setCardColor] = useState<"YELLOW" | "RED" | "YELLOW_RED">("YELLOW");
+  const [cardTime, setCardTime] = useState("");
   const [gfSide, setGfSide] = useState<TeamSide>("HOME");
   const [gfCap, setGfCap] = useState("");
   const [gfTime, setGfTime] = useState("");
@@ -98,15 +115,6 @@ export function GameSheet() {
     const id = window.setInterval(() => setTick((n) => n + 1), 100);
     return () => window.clearInterval(id);
   }, [gameRunning, shotRunning]);
-
-  useEffect(() => {
-    if (!commandHelpOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCommandHelpOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [commandHelpOpen]);
 
   useEffect(() => {
     if (!progressEditOpen) return;
@@ -151,6 +159,26 @@ export function GameSheet() {
       if (side === "HOME" || side === "AWAY") setToSide(side);
       setToShort(p.type === "short");
     }
+    if (progressSelected.eventType === "CARD_ISSUED") {
+      const side = (p.teamSide ?? p.side) as TeamSide;
+      if (side === "HOME" || side === "AWAY") setCardSide(side);
+      const target = p.target;
+      if (
+        target === "PLAYER" ||
+        target === "HEAD_COACH" ||
+        target === "ASSISTANT_COACH" ||
+        target === "BENCH"
+      ) {
+        setCardTarget(target);
+      }
+      setCardCap(String(p.capNumber ?? ""));
+      setCardColor(
+        p.color === "RED" ? "RED" : p.color === "YELLOW_RED" ? "YELLOW_RED" : "YELLOW"
+      );
+      setCardTime(
+        typeof p.timeSeconds === "number" ? formatGameClockTimeForInput(p.timeSeconds) : ""
+      );
+    }
   }, [progressEditOpen, progressSelected]);
 
   useEffect(() => {
@@ -190,6 +218,10 @@ export function GameSheet() {
 
   const foulsByPlayer = useMemo(
     () => computeFoulsByPlayer(aggregate?.events ?? []),
+    [aggregate?.events]
+  );
+  const cardsBySide = useMemo(
+    () => computeCards(aggregate?.events ?? []),
     [aggregate?.events]
   );
 
@@ -354,20 +386,25 @@ export function GameSheet() {
               const g = getGoalsForPlayer(side, p.capNumber);
               const [s1, s2, s3] = getFoulSlots(side, p.capNumber);
               const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
+              const tally = cardsBySide.players[side]?.[p.capNumber];
+              const rolled = isPlayerRolled(foulCount, tally);
               return (
                 <tr
                   key={p.id}
                   className={
                     [
-                      foulCount === 2 && "fouls-row--2",
-                      foulCount >= 3 && "roster-row--ejected",
+                      !rolled && foulCount === 2 && "fouls-row--2",
+                      rolled && "roster-row--ejected",
                     ]
                       .filter(Boolean)
                       .join(" ") || undefined
                   }
                 >
                   <td className="roster-col-cap">{p.capNumber}</td>
-                  <td className="roster-col-name">{p.playerName}</td>
+                  <td className="roster-col-name">
+                    {p.playerName}
+                    <CardMarks yellows={tally?.yellow ?? 0} reds={tally?.red ?? 0} />
+                  </td>
                   <td className="roster-col-foul">{s1}</td>
                   <td className="roster-col-foul">{s2}</td>
                   <td className="roster-col-foul">{s3}</td>
@@ -457,11 +494,47 @@ export function GameSheet() {
           eventType: "TIMEOUT_USED",
           payload: { teamSide: insertSide, type: "full", ...ts },
         };
-      } else {
+      } else if (insertKind === "TIMEOUT_30") {
         built = {
           eventType: "TIMEOUT_USED",
           payload: { teamSide: insertSide, type: "short", ...ts },
         };
+      } else {
+        const color =
+          insertKind === "RED_CARD"
+            ? "RED"
+            : insertKind === "YELLOW_RED_CARD"
+              ? "YELLOW_RED"
+              : "YELLOW";
+        const target = color === "YELLOW_RED" ? "HEAD_COACH" : insertCardTarget;
+        if (target === "PLAYER") {
+          if (!insertCap.trim()) throw new Error("Cap # is required for a player card.");
+          const pl = aggregate.players.find(
+            (p) => p.teamSide === insertSide && p.capNumber === insertCap.trim()
+          );
+          if (!pl) throw new Error("No roster player matches that team and cap.");
+          built = {
+            eventType: "CARD_ISSUED",
+            payload: {
+              color,
+              target: "PLAYER",
+              teamSide: insertSide,
+              capNumber: pl.capNumber,
+              playerId: pl.id,
+              ...ts,
+            },
+          };
+        } else {
+          built = {
+            eventType: "CARD_ISSUED",
+            payload: {
+              color,
+              target,
+              teamSide: insertSide,
+              ...ts,
+            },
+          };
+        }
       }
     } catch (e) {
       setProgressEditError(e instanceof Error ? e.message : String(e));
@@ -603,6 +676,46 @@ export function GameSheet() {
                 },
               }
         );
+      } else if (sel.eventType === "CARD_ISSUED") {
+        if (cardColor === "YELLOW_RED" && cardTarget !== "HEAD_COACH") {
+          setProgressEditError("A yellow/red card is only for the head coach.");
+          return;
+        }
+        if (cardTarget === "PLAYER" && !cardCap.trim()) {
+          setProgressEditError("Cap # is required for a player card.");
+          return;
+        }
+        const cardParsed = parseOptionalGameClockTime(cardTime);
+        if (!cardParsed.ok) {
+          setProgressEditError(cardParsed.error);
+          return;
+        }
+        list = list.map((e) =>
+          e.id !== sel.id
+            ? e
+            : (() => {
+                const prev = sel.payload as Record<string, unknown>;
+                const nextPayload: Record<string, unknown> = {
+                  ...prev,
+                  color: cardColor,
+                  target: cardTarget,
+                  teamSide: cardSide,
+                  side: cardSide,
+                };
+                if (cardTarget === "PLAYER") {
+                  nextPayload.capNumber = cardCap.trim();
+                } else {
+                  delete nextPayload.capNumber;
+                  delete nextPayload.playerId;
+                }
+                if (cardParsed.seconds !== undefined) {
+                  nextPayload.timeSeconds = cardParsed.seconds;
+                } else {
+                  delete nextPayload.timeSeconds;
+                }
+                return { ...e, payload: nextPayload };
+              })()
+        );
       }
     }
     setProgressEditBusy(true);
@@ -672,6 +785,7 @@ export function GameSheet() {
       ...(parsed.value.timeSeconds != null && { timeSeconds: parsed.value.timeSeconds }),
       ...(parsed.value.side != null && { side: parsed.value.side }),
       ...(parsed.value.capNumber != null && { capNumber: parsed.value.capNumber }),
+      ...(parsed.value.cardTarget != null && { cardTarget: parsed.value.cardTarget }),
       ...(parsed.value.resetRemainingMs != null && { remainingMs: parsed.value.resetRemainingMs }),
     };
     try {
@@ -847,14 +961,19 @@ export function GameSheet() {
               {inputError && <p className="error">{inputError}</p>}
               <div className="scoring-row">
                 <label className="scoring-label">
-                  <button
-                    type="button"
-                    className="scoring-command-link"
-                    onClick={() => setCommandHelpOpen(true)}
-                    disabled={isGameOver}
-                  >
+                  <span className="scoring-label-heading">
                     Scoring command
-                  </button>
+                    <Link
+                      className="scoring-command-help"
+                      to="/commands"
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Open the scoring command cheat sheet"
+                      title="Scoring command cheat sheet"
+                    >
+                      ?
+                    </Link>
+                  </span>
                   <input
                     type="text"
                     value={input}
@@ -896,96 +1015,6 @@ export function GameSheet() {
               </p>
             )}
           </section>
-
-          {commandHelpOpen && (
-            <>
-              <div
-                className="scoring-command-help-overlay"
-                role="presentation"
-                onClick={() => setCommandHelpOpen(false)}
-              />
-              <aside
-                className="scoring-command-help-panel"
-                role="dialog"
-                aria-label="Scoring command reference"
-              >
-                <div className="scoring-command-help-header">
-                  <h2>Scoring command reference</h2>
-                  <button
-                    type="button"
-                    className="scoring-command-help-close"
-                    onClick={() => setCommandHelpOpen(false)}
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="scoring-command-help-body">
-                  <h3>Quarter</h3>
-                  <ul>
-                    <li><strong>sq</strong> — Start next quarter (after break, ends break and advances period)</li>
-                    <li><strong>eq</strong> — End quarter (stops clocks; does not start break countdown)</li>
-                    <li><strong>sb</strong> or <strong>startbreak</strong> — Start break/halftime countdown (after <strong>eq</strong>)</li>
-                  </ul>
-
-                  <h3>Clock</h3>
-                  <ul>
-                    <li><strong>c</strong> or <strong>clock</strong> — Start or stop the game clock</li>
-                    <li><strong>r</strong> or <strong>reset</strong> — Reset shot clock to full shot time (from game settings)</li>
-                    {aggregate.shotClockTwentyReset ? (
-                      <li><strong>r20</strong> or <strong>reset20</strong> — Reset shot clock to 20 seconds when the offense keeps the ball after a shot</li>
-                    ) : null}
-                  </ul>
-                  <p>
-                    After <strong>eq</strong>, use <strong>sb</strong> before <strong>c</strong> or <strong>r</strong> while break is pending.
-                  </p>
-
-                  <h3>Time</h3>
-                  <p>
-                    Use a dot or colon: <strong>6.07</strong> or <strong>6:07</strong> = 6 min 7 sec.
-                    Optional at the start of goals, exclusions, penalties, and timeouts. If omitted, the
-                    current <strong>game clock</strong> on the scoreboard is recorded. Scoring entries do not
-                    start or stop the live clock (use <strong>c</strong> or the Timer page).
-                  </p>
-
-                  <h3>Team</h3>
-                  <ul>
-                    <li><strong>b</strong> or <strong>d</strong> — Dark (home)</li>
-                    <li><strong>w</strong> or <strong>l</strong> — Light (away)</li>
-                  </ul>
-
-                  <h3>Goal / Exclusion / Penalty</h3>
-                  <p>Either order works (time optional):</p>
-                  <ul>
-                    <li><strong>[time] team cap action</strong> — e.g. <code>6.07w13g</code> or <code>w13g</code></li>
-                    <li><strong>[time] action cap team</strong> — e.g. <code>6.07g13w</code> or <code>g13w</code></li>
-                  </ul>
-                  <p>Actions: <strong>g</strong> = goal, <strong>e</strong> = exclusion, <strong>p</strong> = penalty. Cap number is required.</p>
-
-                  <h3>Timeout</h3>
-                  <ul>
-                    <li><strong>[time]t w/b</strong> — Full timeout for light (w) or dark (b); e.g. <code>tw</code> or <code>4.13tw</code></li>
-                    <li><strong>[time]t3 w/b</strong> — {timeoutRules.shortTimeoutDurationSec}-second timeout; e.g. <code>t3w</code> or <code>4.13t3w</code></li>
-                  </ul>
-
-                  <h3>Examples</h3>
-                  <ul className="scoring-command-help-examples">
-                    <li><code>sq</code> — start next quarter</li>
-                    <li><code>eq</code> — end quarter</li>
-                    <li><code>sb</code> — start break/halftime clock</li>
-                    <li><code>c</code> — toggle game clock (start/stop)</li>
-                    <li><code>r</code> — reset shot clock to full shot time</li>
-                    <li><code>w13g</code> — Light cap 13 goal (current game clock)</li>
-                    <li><code>6:50w13g</code> — Light cap 13 goal at 6:50</li>
-                    <li><code>5.53b2e</code> — Dark cap 2 exclusion at 5:53</li>
-                    <li><code>g13w</code> — Light cap 13 goal (current game clock)</li>
-                    <li><code>tw</code> — Light full timeout (current game clock)</li>
-                    <li><code>4.13tw</code> — Light full timeout at 4:13</li>
-                  </ul>
-                </div>
-              </aside>
-            </>
-          )}
 
           {eqOvertimeModalOpen && (
             <div className="game-sheet-modal-overlay" role="dialog" aria-labelledby="eq-overtime-title">
@@ -1243,11 +1272,89 @@ export function GameSheet() {
                         </div>
                       )}
 
+                      {sel.eventType === "CARD_ISSUED" && (
+                        <div className="form game-sheet-progress-edit-fields">
+                          <label>
+                            Card
+                            <select
+                              value={cardColor}
+                              onChange={(e) => {
+                                const next =
+                                  e.target.value === "RED"
+                                    ? "RED"
+                                    : e.target.value === "YELLOW_RED"
+                                      ? "YELLOW_RED"
+                                      : "YELLOW";
+                                setCardColor(next);
+                                if (next === "YELLOW_RED") setCardTarget("HEAD_COACH");
+                              }}
+                            >
+                              <option value="YELLOW">Yellow</option>
+                              <option value="RED">Red</option>
+                              <option value="YELLOW_RED">Yellow/red (head coach)</option>
+                            </select>
+                          </label>
+                          <label>
+                            Team
+                            <select
+                              value={cardSide}
+                              onChange={(e) => setCardSide(e.target.value as TeamSide)}
+                            >
+                              <option value="HOME">Dark</option>
+                              <option value="AWAY">Light</option>
+                            </select>
+                          </label>
+                          <label>
+                            Who
+                            <select
+                              value={cardTarget}
+                              onChange={(e) => setCardTarget(e.target.value as CardTarget)}
+                            >
+                              <option value="PLAYER">Player</option>
+                              <option value="HEAD_COACH">Head coach</option>
+                              <option value="ASSISTANT_COACH">Assistant coach</option>
+                              <option value="BENCH">Bench</option>
+                            </select>
+                          </label>
+                          {cardTarget === "PLAYER" && (
+                            <label>
+                              Cap #
+                              <input
+                                value={cardCap}
+                                onChange={(e) => setCardCap(e.target.value)}
+                              />
+                            </label>
+                          )}
+                          <label className="game-sheet-progress-field-span">
+                            Game clock in period (optional, same as scoring: 6.50 or 6:50)
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="e.g. 6.50 or 6:07"
+                              value={cardTime}
+                              onChange={(e) => setCardTime(e.target.value)}
+                            />
+                          </label>
+                          {(() => {
+                            const prefix = clockPrefixForPreview(cardTime);
+                            const prev = formatCardCommand({
+                              side: cardSide,
+                              color: cardColor,
+                              target: cardTarget,
+                              capNumber: cardCap,
+                              timePrefix: prefix,
+                            });
+                            return <ScoringCommandPreviewBlock command={prev} />;
+                          })()}
+                        </div>
+                      )}
+
                       {![
                         "GOAL_HOME",
                         "GOAL_AWAY",
                         "EXCLUSION_STARTED",
                         "TIMEOUT_USED",
+                        "CARD_ISSUED",
                       ].includes(sel.eventType) && (
                         <p className="game-sheet-progress-readonly">
                           No field editor for this entry type. You can delete it or insert a
@@ -1301,12 +1408,18 @@ export function GameSheet() {
                                       | "PENALTY"
                                       | "TIMEOUT"
                                       | "TIMEOUT_30"
+                                      | "YELLOW_CARD"
+                                      | "RED_CARD"
+                                      | "YELLOW_RED_CARD"
                                   )
                                 }
                               >
                                 <option value="GOAL">Goal</option>
                                 <option value="EXCLUSION">Exclusion</option>
                                 <option value="PENALTY">Penalty</option>
+                                <option value="YELLOW_CARD">Yellow card</option>
+                                <option value="RED_CARD">Red card</option>
+                                <option value="YELLOW_RED_CARD">Yellow/red card (head coach)</option>
                                 <option value="TIMEOUT">Timeout (full)</option>
                                 <option value="TIMEOUT_30">
                                   Timeout ({timeoutRules.shortTimeoutDurationSec}s)
@@ -1317,7 +1430,10 @@ export function GameSheet() {
                               insertKind === "EXCLUSION" ||
                               insertKind === "PENALTY" ||
                               insertKind === "TIMEOUT" ||
-                              insertKind === "TIMEOUT_30") && (
+                              insertKind === "TIMEOUT_30" ||
+                              insertKind === "YELLOW_CARD" ||
+                              insertKind === "RED_CARD" ||
+                              insertKind === "YELLOW_RED_CARD") && (
                               <label>
                                 Team
                                 <select
@@ -1331,9 +1447,27 @@ export function GameSheet() {
                                 </select>
                               </label>
                             )}
+                            {(insertKind === "YELLOW_CARD" || insertKind === "RED_CARD") && (
+                              <label>
+                                Who
+                                <select
+                                  value={insertCardTarget}
+                                  onChange={(e) =>
+                                    setInsertCardTarget(e.target.value as CardTarget)
+                                  }
+                                >
+                                  <option value="PLAYER">Player</option>
+                                  <option value="HEAD_COACH">Head coach</option>
+                                  <option value="ASSISTANT_COACH">Assistant coach</option>
+                                  <option value="BENCH">Bench</option>
+                                </select>
+                              </label>
+                            )}
                             {(insertKind === "GOAL" ||
                               insertKind === "EXCLUSION" ||
-                              insertKind === "PENALTY") && (
+                              insertKind === "PENALTY" ||
+                              ((insertKind === "YELLOW_CARD" || insertKind === "RED_CARD") &&
+                                insertCardTarget === "PLAYER")) && (
                               <label>
                                 Cap #
                                 <input
@@ -1353,6 +1487,27 @@ export function GameSheet() {
                               />
                             </label>
                             {(() => {
+                              if (
+                                insertKind === "YELLOW_CARD" ||
+                                insertKind === "RED_CARD" ||
+                                insertKind === "YELLOW_RED_CARD"
+                              ) {
+                                const prefix = clockPrefixForPreview(insertTimeSec);
+                                const command = formatCardCommand({
+                                  side: insertSide,
+                                  color:
+                                    insertKind === "RED_CARD"
+                                      ? "RED"
+                                      : insertKind === "YELLOW_RED_CARD"
+                                        ? "YELLOW_RED"
+                                        : "YELLOW",
+                                  target:
+                                    insertKind === "YELLOW_RED_CARD" ? "HEAD_COACH" : insertCardTarget,
+                                  capNumber: insertCap,
+                                  timePrefix: prefix,
+                                });
+                                return <ScoringCommandPreviewBlock command={command} />;
+                              }
                               const prev = buildInsertCommandPreview(
                                 insertKind,
                                 insertSide,
@@ -1598,6 +1753,7 @@ export function GameSheet() {
           <section className="game-sheet-roster-column game-sheet-roster-column-home">
             <div className="game-sheet-roster-card">
               <h3>Home - {aggregate.homeTeamName} (dark)</h3>
+              <StaffCardLine cards={cardsBySide} side="HOME" />
               {renderTeamMatrix("HOME", homePlayers, homeRosterTotals)}
             </div>
           </section>
@@ -1608,6 +1764,7 @@ export function GameSheet() {
           <section className="game-sheet-roster-column game-sheet-roster-column-away">
             <div className="game-sheet-roster-card">
               <h3>Away - {aggregate.awayTeamName} (light)</h3>
+              <StaffCardLine cards={cardsBySide} side="AWAY" />
               {renderTeamMatrix("AWAY", awayPlayers, awayRosterTotals)}
             </div>
           </section>
@@ -1623,7 +1780,7 @@ function splitScoringTimePrefix(lower: string): { timePart: string; rest: string
   const timePartMatch = lower.match(timePartRe);
   const timePart = timePartMatch?.[1] ?? "";
   const rest = lower.slice(timePart.length);
-  const standardRe = /^([bdwl])(\d+)([gep])$/;
+  const standardRe = /^([bdwl])(\d+)(yrc|yc|rc|[gep])$/;
   // Avoid "8b8g" → 8:00 + cap 8; single-digit bare minutes before team+cap+action is not a time prefix.
   if (
     timePart.length > 0 &&
@@ -1678,8 +1835,36 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
     return { ok: true, value: { raw, type, timeSeconds, side } };
   }
 
-  // Goal/exclusion/penalty: [time] then either (team)(cap)(action) or (action)(cap)(team)
+  // Goal/exclusion/penalty/card: [time] then either (team)(cap)(action) or (action)(cap)(team)
   const { timePart, rest } = splitScoringTimePrefix(lower);
+
+  const card = parseCardRest(rest);
+  if (card) {
+    if (card.color === "YELLOW_RED" && card.target !== "HEAD_COACH") {
+      return {
+        ok: false,
+        error: "A yellow/red card is only for the head coach. Example: yrchb or byrch.",
+      };
+    }
+    const timeSeconds =
+      timePart != null && timePart.length > 0 ? parseTimeToSeconds(timePart) : undefined;
+    return {
+      ok: true,
+      value: {
+        raw,
+        type:
+          card.color === "RED"
+            ? "RED_CARD"
+            : card.color === "YELLOW_RED"
+              ? "YELLOW_RED_CARD"
+              : "YELLOW_CARD",
+        timeSeconds,
+        side: card.side,
+        capNumber: card.capNumber,
+        cardTarget: card.target,
+      },
+    };
+  }
 
   // Standard order: team then cap then action — (b|d|w|l)(\d+)(g|e|p)
   const standardRe = /^([bdwl])(\d+)([gep])$/;
@@ -1705,7 +1890,7 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
       return {
         ok: false,
         error:
-          "Invalid command. Examples: sq, eq, sb, c, r, r20, w13g, g13w, 6.07w13g, 5.53b2e, tw, 4.13tw or 4.13t3w.",
+          "Invalid command. Examples: sq, eq, sb, c, r, r20, w13g, g13w, 6.07w13g, 5.53b2e, b2yc, b2rc, ychb, yrchb, tw, 4.13tw or 4.13t3w.",
       };
     }
   }
@@ -1939,6 +2124,25 @@ function describeParsed(parsed: ParsedInput, aggregate: GameAggregate): string {
       return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} exclusion at ${formatParsedTime(parsed.timeSeconds)}`;
     case "PENALTY":
       return `${parsed.side === "HOME" ? "Dark" : "Light"} cap ${parsed.capNumber} penalty at ${formatParsedTime(parsed.timeSeconds)}`;
+    case "YELLOW_CARD":
+    case "RED_CARD":
+    case "YELLOW_RED_CARD": {
+      const color =
+        parsed.type === "RED_CARD"
+          ? "red"
+          : parsed.type === "YELLOW_RED_CARD"
+            ? "yellow/red"
+            : "yellow";
+      const who =
+        parsed.cardTarget === "HEAD_COACH"
+          ? "head coach"
+          : parsed.cardTarget === "ASSISTANT_COACH"
+            ? "assistant coach"
+            : parsed.cardTarget === "BENCH"
+              ? "bench"
+              : `cap ${parsed.capNumber}`;
+      return `${parsed.side === "HOME" ? "Dark" : "Light"} ${color} card, ${who} at ${formatParsedTime(parsed.timeSeconds)}`;
+    }
     default:
       return parsed.raw;
   }

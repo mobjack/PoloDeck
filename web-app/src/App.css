@@ -1339,6 +1339,47 @@
   }
 }
 
+.card-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.card-mark {
+  display: inline-block;
+  width: 8px;
+  height: 11px;
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.card-mark--yellow {
+  background: #f5d000;
+}
+
+.card-mark--red {
+  background: #e53935;
+}
+
+.roster-staff-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+
+.roster-staff-card {
+  display: inline-flex;
+  align-items: center;
+}
+
+.roster-staff-card--out .roster-staff-card-label {
+  text-decoration: line-through;
+}
+
 /* 3 personal fouls / ejected: red */
 .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-3,
 .game-sheet-roster-table tbody tr.roster-row--ejected {
@@ -1375,19 +1416,125 @@
   text-align: left;
 }
 
-.scoring-command-link {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+.scoring-label-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-.scoring-command-link:hover {
-  opacity: 0.85;
+.scoring-command-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  color: inherit;
+}
+
+.scoring-command-help:hover {
+  border-color: #69b8ff;
+  color: #69b8ff;
+}
+
+@media (prefers-color-scheme: light) {
+  .scoring-command-help {
+    border-color: rgba(0, 0, 0, 0.35);
+  }
+  .command-sheet-section {
+    border-top-color: rgba(0, 0, 0, 0.12);
+  }
+  .command-sheet code,
+  .command-sheet-examples code {
+    background: rgba(0, 0, 0, 0.08);
+  }
+}
+
+.command-sheet {
+  max-width: 52rem;
+}
+
+.command-sheet-lead {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.command-sheet-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.85rem;
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.command-sheet-section {
+  margin-top: 1.75rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.command-sheet-section h2 {
+  margin: 0 0 0.55rem;
+  font-size: 1.2rem;
+}
+
+.command-sheet-section p,
+.command-sheet-section li {
+  line-height: 1.5;
+}
+
+.command-sheet-table-wrap {
+  overflow-x: auto;
+}
+
+.command-sheet .table {
+  margin-top: 0.75rem;
+}
+
+.command-sheet .table td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.command-sheet code,
+.command-sheet-examples code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.command-sheet-also {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.command-sheet-also::before {
+  content: "also ";
+}
+
+.command-sheet-examples {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.command-sheet-examples li {
+  margin-bottom: 0.35rem;
+}
+
+.command-sheet .card-marks {
+  margin-left: 0.15rem;
+  margin-right: 0.15rem;
 }
 
 .scoring-command-help-overlay {

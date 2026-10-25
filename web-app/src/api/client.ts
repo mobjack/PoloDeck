@@ -304,10 +304,14 @@ export const api = {
           | "EXCLUSION"
           | "PENALTY"
           | "TIMEOUT"
-          | "TIMEOUT_30";
+          | "TIMEOUT_30"
+          | "YELLOW_CARD"
+          | "RED_CARD"
+          | "YELLOW_RED_CARD";
         timeSeconds?: number;
         side?: "HOME" | "AWAY";
         capNumber?: string;
+        cardTarget?: "PLAYER" | "HEAD_COACH" | "ASSISTANT_COACH" | "BENCH";
         overtime?: boolean;
         remainingMs?: number;
       }

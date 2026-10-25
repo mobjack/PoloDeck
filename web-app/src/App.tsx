@@ -8,6 +8,7 @@ import { AddGame } from "./pages/AddGame";
 import { EditGame } from "./pages/EditGame";
 import { GameRoster } from "./pages/GameRoster";
 import { GameSheet } from "./pages/GameSheet";
+import { CommandSheet } from "./pages/CommandSheet";
 import { Scoresheet } from "./pages/Scoresheet";
 import { ScoreboardControl } from "./pages/ScoreboardControl";
 import { TimerController } from "./pages/TimerController";
@@ -58,6 +59,7 @@ function App() {
           <Route path="/game-days/:id/games/new" element={<AddGame />} />
           <Route path="/game-days/:id/games/:gameId/edit" element={<EditGame />} />
           <Route path="/game-days/:id/games/:gameId/roster" element={<GameRoster />} />
+          <Route path="/commands" element={<CommandSheet />} />
           <Route path="/game-days/:id/games/:gameId/sheet" element={<GameSheet />} />
           <Route path="/game-days/:id/games/:gameId/scoresheet" element={<Scoresheet />} />
           <Route path="/game-days/:id/games/:gameId/scoreboard" element={<ScoreboardControl />} />

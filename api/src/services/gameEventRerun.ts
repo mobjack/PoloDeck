@@ -7,7 +7,8 @@ import {
   TeamSide,
 } from "../lib/prisma";
 import { startClock, stopClock, setClockRemaining } from "../lib/clock";
-import { playerIsRolled, ROLLED_PLAYER_MESSAGE } from "../lib/rolledPlayer";
+import { playerIsRolledByFoulsAndCards } from "../lib/cards";
+import { ROLLED_PLAYER_MESSAGE } from "../lib/rolledPlayer";
 import { remainingTimeouts, timeoutRulesFromGame } from "../lib/timeoutRules";
 
 export type RebuildEventInput = {
@@ -125,7 +126,18 @@ export async function rerunGameEventLog(
 
   const exclusionIdMap = new Map<string, string>();
   const foulStartsByCap = new Map<string, number>();
+  const yellowByCap = new Map<string, number>();
+  const redByCap = new Map<string, number>();
+  const yellowRedSides = new Set<TeamSide>();
   const capKey = (side: TeamSide, cap: string) => `${side}:${cap}`;
+  const rolledAt = (side: TeamSide, cap: string) => {
+    const key = capKey(side, cap);
+    return playerIsRolledByFoulsAndCards(
+      foulStartsByCap.get(key) ?? 0,
+      yellowByCap.get(key) ?? 0,
+      redByCap.get(key) ?? 0
+    );
+  };
 
   const outRows: {
     id?: string;
@@ -159,8 +171,7 @@ export async function rerunGameEventLog(
               `GOAL: no player with cap ${cap} on ${side === TeamSide.HOME ? "HOME" : "AWAY"}`
             );
           }
-          const n = foulStartsByCap.get(capKey(side, cap)) ?? 0;
-          if (playerIsRolled(n)) {
+          if (rolledAt(side, cap)) {
             throw new Error(ROLLED_PLAYER_MESSAGE);
           }
         }
@@ -545,11 +556,10 @@ export async function rerunGameEventLog(
           throw new Error("EXCLUSION_STARTED: player not found");
         }
         const key = capKey(player.teamSide, player.capNumber);
-        const foulsSoFar = foulStartsByCap.get(key) ?? 0;
-        if (playerIsRolled(foulsSoFar)) {
+        if (rolledAt(player.teamSide, player.capNumber)) {
           throw new Error(ROLLED_PLAYER_MESSAGE);
         }
-        foulStartsByCap.set(key, foulsSoFar + 1);
+        foulStartsByCap.set(key, (foulStartsByCap.get(key) ?? 0) + 1);
 
         const g = await tx.game.findUnique({
           where: { id: gameId },
@@ -649,6 +659,89 @@ export async function rerunGameEventLog(
 
       case GameEventType.HORN_TRIGGERED:
         break;
+
+      case GameEventType.CARD_ISSUED: {
+        const p = asPayload(ev.payload);
+        const color =
+          p.color === "RED" ? "RED" : p.color === "YELLOW" ? "YELLOW" : p.color === "YELLOW_RED" ? "YELLOW_RED" : null;
+        if (!color) throw new Error("CARD_ISSUED: missing color");
+        const teamSide = (p.teamSide ?? p.side) as TeamSide | undefined;
+        if (teamSide !== TeamSide.HOME && teamSide !== TeamSide.AWAY) {
+          throw new Error("CARD_ISSUED: missing teamSide");
+        }
+        const target = p.target;
+        const g = await tx.game.findUnique({
+          where: { id: gameId },
+          select: { currentPeriod: true },
+        });
+        const period = g?.currentPeriod ?? 1;
+        const timeSeconds =
+          typeof p.timeSeconds === "number" ? { timeSeconds: p.timeSeconds } : {};
+
+        if (color === "YELLOW_RED") {
+          if (target !== "HEAD_COACH") {
+            throw new Error("A yellow/red card is only for the head coach");
+          }
+          if (yellowRedSides.has(teamSide)) {
+            throw new Error("This team already has a yellow/red card");
+          }
+          yellowRedSides.add(teamSide);
+          payloadOut = {
+            color,
+            target: "HEAD_COACH",
+            teamSide,
+            period,
+            ...timeSeconds,
+          } as Prisma.InputJsonValue;
+          break;
+        }
+
+        if (target === "PLAYER") {
+          const cap = p.capNumber != null ? String(p.capNumber) : "";
+          const playerId = typeof p.playerId === "string" ? p.playerId : "";
+          const player = await tx.player.findFirst({
+            where: playerId
+              ? { id: playerId, gameId }
+              : { gameId, teamSide, capNumber: cap },
+          });
+          if (!player) throw new Error("CARD_ISSUED: player not found");
+          if (rolledAt(player.teamSide, player.capNumber)) {
+            throw new Error(ROLLED_PLAYER_MESSAGE);
+          }
+          const key = capKey(player.teamSide, player.capNumber);
+          if (color === "YELLOW") {
+            yellowByCap.set(key, (yellowByCap.get(key) ?? 0) + 1);
+          } else {
+            redByCap.set(key, (redByCap.get(key) ?? 0) + 1);
+          }
+          payloadOut = {
+            color,
+            target: "PLAYER",
+            teamSide: player.teamSide,
+            capNumber: player.capNumber,
+            playerId: player.id,
+            period,
+            ...timeSeconds,
+          } as Prisma.InputJsonValue;
+          break;
+        }
+
+        if (
+          target !== "HEAD_COACH" &&
+          target !== "ASSISTANT_COACH" &&
+          target !== "BENCH"
+        ) {
+          throw new Error("CARD_ISSUED: missing target");
+        }
+        payloadOut = {
+          color,
+          target,
+          teamSide,
+          period,
+          ...timeSeconds,
+        } as Prisma.InputJsonValue;
+        break;
+      }
 
       default:
         throw new Error(`Unsupported event type for rerun: ${ev.eventType}`);

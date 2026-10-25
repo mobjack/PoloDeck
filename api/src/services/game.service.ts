@@ -19,11 +19,8 @@ import {
   type DeviceSummary,
 } from "./deviceCapabilities";
 import { env } from "../config/env";
-import {
-  countPersonalFouls,
-  playerIsRolled,
-  ROLLED_PLAYER_MESSAGE,
-} from "../lib/rolledPlayer";
+import { countPlayerCards, playerIsRolledByFoulsAndCards } from "../lib/cards";
+import { countPersonalFouls, ROLLED_PLAYER_MESSAGE } from "../lib/rolledPlayer";
 import { resolveShotClockResetMs } from "../lib/shotClockReset";
 import {
   HIGH_SCHOOL_TIMEOUT_RULES,
@@ -122,15 +119,21 @@ export class GameService {
     capNumber: string
   ): Promise<void> {
     const events = await this.prisma.gameEvent.findMany({
-      where: { gameId, eventType: GameEventType.EXCLUSION_STARTED },
-      select: { payload: true },
+      where: {
+        gameId,
+        eventType: { in: [GameEventType.EXCLUSION_STARTED, GameEventType.CARD_ISSUED] },
+      },
+      select: { eventType: true, payload: true },
     });
-    const count = countPersonalFouls(
-      events.map((ev) => ev.payload),
-      teamSide,
-      capNumber
-    );
-    if (playerIsRolled(count)) {
+    const foulPayloads = events
+      .filter((ev) => ev.eventType === GameEventType.EXCLUSION_STARTED)
+      .map((ev) => ev.payload);
+    const cardPayloads = events
+      .filter((ev) => ev.eventType === GameEventType.CARD_ISSUED)
+      .map((ev) => ev.payload);
+    const fouls = countPersonalFouls(foulPayloads, teamSide, capNumber);
+    const cards = countPlayerCards(cardPayloads, teamSide, capNumber);
+    if (playerIsRolledByFoulsAndCards(fouls, cards.yellow, cards.red)) {
       throw this.badRequest(ROLLED_PLAYER_MESSAGE);
     }
   }
@@ -2032,6 +2035,75 @@ export class GameService {
     return this.emitState(gameId);
   }
 
+  async issueCard(
+    gameId: string,
+    body: {
+      color: "YELLOW" | "RED" | "YELLOW_RED";
+      teamSide: TeamSide;
+      target: "PLAYER" | "HEAD_COACH" | "ASSISTANT_COACH" | "BENCH";
+      capNumber?: string;
+      timeSeconds?: number;
+    }
+  ) {
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      select: { currentPeriod: true },
+    });
+    if (!game) throw this.notFound("Game not found");
+
+    const payload: Record<string, unknown> = {
+      color: body.color,
+      target: body.target,
+      teamSide: body.teamSide,
+      period: game.currentPeriod,
+    };
+    if (body.timeSeconds != null) payload.timeSeconds = body.timeSeconds;
+
+    if (body.color === "YELLOW_RED") {
+      if (body.target !== "HEAD_COACH") {
+        throw this.badRequest("A yellow/red card is only for the head coach");
+      }
+      const prior = await this.prisma.gameEvent.findMany({
+        where: { gameId, eventType: GameEventType.CARD_ISSUED },
+        select: { payload: true },
+      });
+      const already = prior.some((ev) => {
+        const record = ev.payload as Record<string, unknown> | null;
+        const side = record?.teamSide ?? record?.side;
+        return record?.color === "YELLOW_RED" && side === body.teamSide;
+      });
+      if (already) {
+        throw this.badRequest("This team already has a yellow/red card");
+      }
+    }
+
+    if (body.target === "PLAYER") {
+      if (body.capNumber == null || body.capNumber.trim() === "") {
+        throw this.badRequest("A player card requires a cap number");
+      }
+      const player = await this.prisma.player.findFirst({
+        where: { gameId, teamSide: body.teamSide, capNumber: body.capNumber },
+      });
+      if (!player) {
+        const teamName = body.teamSide === TeamSide.HOME ? "Dark" : "Light";
+        throw this.badRequest(
+          `No player with cap number ${body.capNumber} on the ${teamName} team for this game.`
+        );
+      }
+      await this.assertPlayerNotRolled(gameId, body.teamSide, player.capNumber);
+      payload.playerId = player.id;
+      payload.capNumber = player.capNumber;
+    }
+
+    await this.createEvent(
+      gameId,
+      GameEventType.CARD_ISSUED,
+      payload as Prisma.InputJsonValue,
+      "operator"
+    );
+    return this.emitState(gameId);
+  }
+
   /** Game-clock remaining as integer seconds (for scoring when time is omitted). */
   private async resolveGameClockTimeSeconds(gameId: string): Promise<number> {
     const clock = await this.prisma.gameClock.findUnique({ where: { gameId } });
@@ -2060,10 +2132,14 @@ export class GameService {
         | "EXCLUSION"
         | "PENALTY"
         | "TIMEOUT"
-        | "TIMEOUT_30";
+        | "TIMEOUT_30"
+        | "YELLOW_CARD"
+        | "RED_CARD"
+        | "YELLOW_RED_CARD";
       timeSeconds?: number;
       side?: "HOME" | "AWAY";
       capNumber?: string;
+      cardTarget?: "PLAYER" | "HEAD_COACH" | "ASSISTANT_COACH" | "BENCH";
       overtime?: boolean;
       remainingMs?: number;
     }
@@ -2208,6 +2284,29 @@ export class GameService {
             ? explicitTimeSeconds
             : await this.resolveGameClockTimeSeconds(gameId);
         return this.useTimeout(gameId, side, "short", timeout30TimeSeconds);
+      }
+      case "YELLOW_CARD":
+      case "RED_CARD":
+      case "YELLOW_RED_CARD": {
+        if (side == null) throw this.badRequest("A card requires a team");
+        if (body.cardTarget == null) throw this.badRequest("A card requires a target");
+        const cardTimeSeconds =
+          explicitTimeSeconds != null
+            ? explicitTimeSeconds
+            : await this.resolveGameClockTimeSeconds(gameId);
+        const color =
+          body.type === "RED_CARD"
+            ? "RED"
+            : body.type === "YELLOW_RED_CARD"
+              ? "YELLOW_RED"
+              : "YELLOW";
+        return this.issueCard(gameId, {
+          color,
+          teamSide: side,
+          target: body.cardTarget,
+          capNumber: body.capNumber,
+          timeSeconds: cardTimeSeconds,
+        });
       }
       default:
         throw this.badRequest(`Unknown score command type: ${(body as { type: string }).type}`);

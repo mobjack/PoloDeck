@@ -1,3 +1,4 @@
+import { staffCapCode, staffCardLabel } from "./cards";
 import {
   eventsForGameProgressDisplay,
   formatQuarterEndedRemark,
@@ -124,7 +125,7 @@ export function computeGoalsByPlayerAndPeriod(rawEvents: ScoresheetEvent[]): Goa
 
 export type FoulsByPlayer = Record<TeamSide, Record<string, string[]>>;
 
-/** Up to 3 personal fouls per cap, each as `E<period>` (exclusion) or `P<period>` (penalty). */
+/** Up to 3 personal fouls per cap: `E` exclusion, `P` penalty, `M` misconduct from a red card. */
 export function computeFoulsByPlayer(rawEvents: ScoresheetEvent[]): FoulsByPlayer {
   const events = sortedCopy(rawEvents);
   const bySideCap: FoulsByPlayer = {
@@ -139,14 +140,16 @@ export function computeFoulsByPlayer(rawEvents: ScoresheetEvent[]): FoulsByPlaye
       currentPeriod = to;
       continue;
     }
-    if (ev.eventType !== "EXCLUSION_STARTED") continue;
+    const misconduct =
+      ev.eventType === "CARD_ISSUED" && p?.color === "RED" && p?.target === "PLAYER";
+    if (ev.eventType !== "EXCLUSION_STARTED" && !misconduct) continue;
     const side = (p?.teamSide as TeamSide) ?? (p?.side as TeamSide);
     const cap = p?.capNumber as string;
     if (!side || !cap) continue;
     if (!bySideCap[side][cap]) bySideCap[side][cap] = [];
     if (bySideCap[side][cap].length >= 3) continue;
     const period = (typeof p?.period === "number" ? p.period : currentPeriod) as number;
-    const letter = p?.isPenalty === true ? "P" : "E";
+    const letter = misconduct ? "M" : p?.isPenalty === true ? "P" : "E";
     bySideCap[side][cap].push(`${letter}${period}`);
   }
   return bySideCap;
@@ -154,7 +157,7 @@ export function computeFoulsByPlayer(rawEvents: ScoresheetEvent[]): FoulsByPlaye
 
 /** Render a stored foul slot (`E1`) in the traditional slash form (`E/1`). */
 export function formatFoulSlot(slot: string): string {
-  const match = /^([EP])(\d+)$/.exec(slot);
+  const match = /^([EPM])(\d+)$/.exec(slot);
   if (!match) return slot;
   return `${match[1]}/${match[2]}`;
 }
@@ -303,6 +306,39 @@ export function computeEventPeriods(rawEvents: ScoresheetEvent[]): Map<string, n
 }
 
 /**
+ * Player-card events that take the cap from eligible to rolled: the red card, or the
+ * second yellow. Earlier yellows stay unmarked.
+ */
+function cardsThatRoll(rawEvents: ScoresheetEvent[]): Set<string> {
+  const yellow = new Map<string, number>();
+  const red = new Map<string, number>();
+  const fouls = new Map<string, number>();
+  const rolling = new Set<string>();
+  for (const ev of sortedCopy(rawEvents)) {
+    const p = ev.payload as Record<string, unknown> | undefined;
+    const side = (p?.teamSide ?? p?.side) as string | undefined;
+    const cap = p?.capNumber != null ? String(p.capNumber) : "";
+    if (!side || !cap) continue;
+    const key = `${side}:${cap}`;
+    if (ev.eventType === "EXCLUSION_STARTED") {
+      fouls.set(key, (fouls.get(key) ?? 0) + 1);
+      continue;
+    }
+    if (ev.eventType !== "CARD_ISSUED" || p?.target !== "PLAYER") continue;
+    const beforeFouls = fouls.get(key) ?? 0;
+    const beforeYellow = yellow.get(key) ?? 0;
+    const beforeRed = red.get(key) ?? 0;
+    const alreadyRolled = beforeFouls >= 3 || beforeYellow >= 2 || beforeRed >= 1;
+    if (p.color === "YELLOW") yellow.set(key, beforeYellow + 1);
+    else if (p.color === "RED") red.set(key, beforeRed + 1);
+    const rolledNow =
+      beforeFouls >= 3 || (yellow.get(key) ?? 0) >= 2 || (red.get(key) ?? 0) >= 1;
+    if (!alreadyRolled && rolledNow) rolling.add(ev.id);
+  }
+  return rolling;
+}
+
+/**
  * Chronological "progress of game" rows shared by the on-screen game sheet and the
  * printable scoresheet. Mirrors the legacy GameSheet mapping and additionally tracks
  * the period each row belongs to (for per-quarter scoresheet columns).
@@ -314,13 +350,15 @@ export function buildProgressRows(
 ): ProgressRow[] {
   const events = Array.isArray(rawEvents) ? rawEvents : [];
   const periodById = computeEventPeriods(events);
+  const rollingCardIds = cardsThatRoll(events);
   const shortTimeoutDurationSec = options?.shortTimeoutDurationSec ?? 30;
 
   return eventsForGameProgressDisplay(events).map((ev) => {
     const p = ev.payload as Record<string, unknown> | undefined;
     const side = (p?.side ?? p?.teamSide) as TeamSide | undefined;
     const team = side === "HOME" ? "Dark" : side === "AWAY" ? "Light" : "—";
-    const cap = (p?.capNumber as string) ?? "—";
+    const staffCap = ev.eventType === "CARD_ISSUED" ? staffCapCode(p?.target) : null;
+    const cap = staffCap ?? ((p?.capNumber as string) ?? "—");
     const timeStr =
       typeof p?.timeSeconds === "number"
         ? `${Math.floor(p.timeSeconds / 60)}:${String(p.timeSeconds % 60).padStart(2, "0")}`
@@ -356,6 +394,17 @@ export function buildProgressRows(
             ? `Timeout (${shortTimeoutDurationSec}s)`
             : "Timeout (full)";
         break;
+      case "CARD_ISSUED": {
+        const colorName =
+          p?.color === "RED"
+            ? "Red card"
+            : p?.color === "YELLOW_RED"
+              ? "Yellow/red card"
+              : "Yellow card";
+        const who = staffCardLabel(p?.target);
+        remark = who ? `${colorName} · ${who}` : colorName;
+        break;
+      }
       case "PERIOD_ADVANCED":
         remark = `End Q${(p?.from as number) ?? "?"} → Q${(p?.to as number) ?? "?"}`;
         if (typeof p?.homeScore === "number" && typeof p?.awayScore === "number") {
@@ -384,7 +433,9 @@ export function buildProgressRows(
     const foulCount =
       ev.eventType === "EXCLUSION_STARTED" && side && cap
         ? (foulsByPlayer[side]?.[cap]?.length ?? 0)
-        : undefined;
+        : ev.eventType === "CARD_ISSUED" && rollingCardIds.has(ev.id)
+          ? 3
+          : undefined;
 
     return {
       id: ev.id,
@@ -427,6 +478,10 @@ export function chronologyEventCode(
       return "G";
     case "EXCLUSION_STARTED":
       return payload?.isPenalty === true ? "P" : "E";
+    case "CARD_ISSUED":
+      if (payload?.color === "RED") return "R";
+      if (payload?.color === "YELLOW_RED") return "YR";
+      return "Y";
     case "TIMEOUT_USED":
       if (payload?.type === "short") {
         const seconds = options?.shortTimeoutDurationSec ?? 30;

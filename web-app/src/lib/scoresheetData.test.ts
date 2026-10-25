@@ -163,6 +163,65 @@ describe("buildProgressRows", () => {
     assert.equal(custom[0]?.chronologyCode, "T/O 45");
   });
 
+  it("records a yellow or red card in the chronology", () => {
+    seq = 0;
+    const events: ScoresheetEvent[] = [
+      ev("CARD_ISSUED", {
+        color: "YELLOW",
+        target: "PLAYER",
+        teamSide: "HOME",
+        capNumber: "2",
+        timeSeconds: 305,
+      }),
+      ev("CARD_ISSUED", {
+        color: "YELLOW",
+        target: "PLAYER",
+        teamSide: "HOME",
+        capNumber: "2",
+        timeSeconds: 200,
+      }),
+      ev("CARD_ISSUED", {
+        color: "RED",
+        target: "HEAD_COACH",
+        teamSide: "AWAY",
+        timeSeconds: 90,
+      }),
+    ];
+    const rows = buildProgressRows(events, computeFoulsByPlayer(events));
+    assert.equal(rows[0]?.chronologyCode, "Y");
+    assert.equal(rows[0]?.cap, "2");
+    assert.equal(rows[0]?.remark, "Yellow card");
+    assert.equal(rows[0]?.foulCount, undefined);
+    assert.equal(rows[1]?.chronologyCode, "Y");
+    assert.equal(rows[1]?.foulCount, 3);
+    assert.equal(rows[2]?.chronologyCode, "R");
+    assert.equal(rows[2]?.cap, "H");
+    assert.equal(rows[2]?.remark, "Red card · head coach");
+  });
+
+  it("records a player red card as misconduct in the foul columns", () => {
+    seq = 0;
+    const events: ScoresheetEvent[] = [
+      ev("EXCLUSION_STARTED", { teamSide: "HOME", capNumber: "4", period: 1 }),
+      ev("CARD_ISSUED", {
+        color: "RED",
+        target: "PLAYER",
+        teamSide: "HOME",
+        capNumber: "4",
+        period: 2,
+      }),
+      ev("CARD_ISSUED", {
+        color: "YELLOW",
+        target: "PLAYER",
+        teamSide: "HOME",
+        capNumber: "4",
+        period: 2,
+      }),
+    ];
+    assert.deepEqual(computeFoulsByPlayer(events).HOME["4"], ["E1", "M2"]);
+    assert.equal(formatFoulSlot("M2"), "M/2");
+  });
+
   it("marks quarter-end rows for blacking out", () => {
     const events = sampleLog();
     const rows = buildProgressRows(events, computeFoulsByPlayer(events));
