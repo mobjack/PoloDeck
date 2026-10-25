@@ -248,26 +248,27 @@ export function GameSheet() {
   const getGoalsForPlayer = (
     side: "HOME" | "AWAY",
     capNumber: string
-  ): { q1: number | "—"; q2: number | "—"; q3: number | "—"; q4: number | "—"; ot: number; tot: number } => {
+  ): { q1: number | "—"; q2: number | "—"; q3: number | "—"; q4: number | "—"; ot: number | "—"; tot: number } => {
     const byPeriod = goalsByPlayerAndPeriod[side]?.[capNumber];
+    const otPlayed = [...closedPeriods].some((period) => period >= 5);
     if (!byPeriod) {
-      return { q1: "—", q2: "—", q3: "—", q4: "—", ot: 0, tot: 0 };
+      return { q1: "—", q2: "—", q3: "—", q4: "—", ot: otPlayed ? 0 : "—", tot: 0 };
     }
     const q1 = closedPeriods.has(1) ? (byPeriod[1] ?? 0) : "—";
     const q2 = closedPeriods.has(2) ? (byPeriod[2] ?? 0) : "—";
     const q3 = closedPeriods.has(3) ? (byPeriod[3] ?? 0) : "—";
     const q4 = closedPeriods.has(4) ? (byPeriod[4] ?? 0) : "—";
-    let ot = 0;
+    let otTotal = 0;
     let tot = 0;
     for (const [periodStr, count] of Object.entries(byPeriod)) {
       const period = Number(periodStr);
       if (!Number.isInteger(period) || count === undefined) continue;
       if (closedPeriods.has(period)) {
         tot += count;
-        if (period >= 5) ot += count;
+        if (period >= 5) otTotal += count;
       }
     }
-    return { q1, q2, q3, q4, ot, tot };
+    return { q1, q2, q3, q4, ot: otPlayed ? otTotal : "—", tot };
   };
 
   const sumRosterGoals = (
@@ -281,7 +282,7 @@ export function GameSheet() {
       totals.q2 += typeof g.q2 === "number" ? g.q2 : 0;
       totals.q3 += typeof g.q3 === "number" ? g.q3 : 0;
       totals.q4 += typeof g.q4 === "number" ? g.q4 : 0;
-      totals.ot += g.ot;
+      totals.ot += typeof g.ot === "number" ? g.ot : 0;
       totals.tot += g.tot;
     }
     return totals;
@@ -291,8 +292,107 @@ export function GameSheet() {
 
   const getFoulSlots = (side: "HOME" | "AWAY", capNumber: string): [string, string, string] => {
     const arr = foulsByPlayer[side]?.[capNumber] ?? [];
-    return [arr[0] ?? "—", arr[1] ?? "—", arr[2] ?? "—"];
+    // Stored as E1 / P2. Show e1 / p2: the letter is the call, the digit is the period.
+    const show = (slot: string | undefined) => (slot ? slot.toLowerCase() : "—");
+    return [show(arr[0]), show(arr[1]), show(arr[2])];
   };
+
+  const renderTeamMatrix = (
+    side: "HOME" | "AWAY",
+    players: typeof homePlayers,
+    totals: { q1: number; q2: number; q3: number; q4: number; ot: number; tot: number }
+  ) => (
+    <table className="table game-sheet-roster-table">
+      <thead>
+        <tr>
+          <th className="roster-col-cap">Cap#</th>
+          <th className="roster-col-name">Name</th>
+          <th className="roster-col-foul" title="First exclusion or penalty">
+            1
+          </th>
+          <th className="roster-col-foul" title="Second exclusion or penalty">
+            2
+          </th>
+          <th className="roster-col-foul" title="Third exclusion or penalty rolls the player">
+            3
+          </th>
+          <th className="roster-col-score roster-col-q1">Q1</th>
+          <th className="roster-col-score">Q2</th>
+          <th className="roster-col-score">Q3</th>
+          <th className="roster-col-score">Q4</th>
+          <th className="roster-col-score">OT</th>
+          <th className="roster-col-score">TOT</th>
+        </tr>
+      </thead>
+      <tbody>
+        {maxRosterRows === 0 ? (
+          <tr>
+            <td colSpan={11}>No roster yet.</td>
+          </tr>
+        ) : (
+          <>
+            {Array.from({ length: maxRosterRows }, (_, index) => {
+              const p = players[index];
+              if (!p) {
+                return (
+                  <tr key={`${side}-empty-${index}`}>
+                    <td className="roster-col-cap">&nbsp;</td>
+                    <td className="roster-col-name">&nbsp;</td>
+                    <td className="roster-col-foul">&nbsp;</td>
+                    <td className="roster-col-foul">&nbsp;</td>
+                    <td className="roster-col-foul">&nbsp;</td>
+                    <td className="roster-col-score roster-col-q1">&nbsp;</td>
+                    <td className="roster-col-score">&nbsp;</td>
+                    <td className="roster-col-score">&nbsp;</td>
+                    <td className="roster-col-score">&nbsp;</td>
+                    <td className="roster-col-score">&nbsp;</td>
+                    <td className="roster-col-score">&nbsp;</td>
+                  </tr>
+                );
+              }
+              const g = getGoalsForPlayer(side, p.capNumber);
+              const [s1, s2, s3] = getFoulSlots(side, p.capNumber);
+              const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
+              return (
+                <tr
+                  key={p.id}
+                  className={
+                    [
+                      foulCount === 2 && "fouls-row--2",
+                      foulCount >= 3 && "roster-row--ejected",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
+                >
+                  <td className="roster-col-cap">{p.capNumber}</td>
+                  <td className="roster-col-name">{p.playerName}</td>
+                  <td className="roster-col-foul">{s1}</td>
+                  <td className="roster-col-foul">{s2}</td>
+                  <td className="roster-col-foul">{s3}</td>
+                  <td className="roster-col-score roster-col-q1">{g.q1}</td>
+                  <td className="roster-col-score">{g.q2}</td>
+                  <td className="roster-col-score">{g.q3}</td>
+                  <td className="roster-col-score">{g.q4}</td>
+                  <td className="roster-col-score">{g.ot}</td>
+                  <td className="roster-col-score">{g.tot}</td>
+                </tr>
+              );
+            })}
+            <tr className="roster-totals-row">
+              <td colSpan={5}>Totals</td>
+              <td className="roster-col-score roster-col-q1">{totals.q1}</td>
+              <td className="roster-col-score">{totals.q2}</td>
+              <td className="roster-col-score">{totals.q3}</td>
+              <td className="roster-col-score">{totals.q4}</td>
+              <td className="roster-col-score">{totals.ot}</td>
+              <td className="roster-col-score">{totals.tot}</td>
+            </tr>
+          </>
+        )}
+      </tbody>
+    </table>
+  );
 
   const progressRows = buildProgressRows(
     Array.isArray(aggregate.events) ? aggregate.events : [],
@@ -1486,256 +1586,22 @@ export function GameSheet() {
           </section>
         </div>
 
-        {/* Column 2: home roster + goals + fouls */}
+        {/* Column 2: home cap, fouls, and quarter scoring on one row */}
         <div className="game-sheet-col">
           <section className="game-sheet-roster-column game-sheet-roster-column-home">
             <div className="game-sheet-roster-card">
-            <h3>Home - {aggregate.homeTeamName} (dark)</h3>
-            <table className="table game-sheet-roster-table">
-              <thead>
-                <tr>
-                  <th>Cap#</th>
-                  <th>Name</th>
-                  <th>Q1</th>
-                  <th>Q2</th>
-                  <th>Q3</th>
-                  <th>Q4</th>
-                  <th>OT</th>
-                  <th>TOT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {maxRosterRows === 0 ? (
-                  <tr>
-                    <td colSpan={8}>No roster yet.</td>
-                  </tr>
-                ) : (
-                  <>
-                    {Array.from({ length: maxRosterRows }, (_, index) => {
-                      const p = homePlayers[index];
-                      if (!p) {
-                        return (
-                          <tr key={`home-empty-${index}`}>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                          </tr>
-                        );
-                      }
-                      const g = getGoalsForPlayer("HOME", p.capNumber);
-                      const isEjected = (foulsByPlayer.HOME?.[p.capNumber]?.length ?? 0) === 3;
-                      return (
-                        <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
-                          <td>{p.capNumber}</td>
-                          <td>{p.playerName}</td>
-                          <td>{g.q1}</td>
-                          <td>{g.q2}</td>
-                          <td>{g.q3}</td>
-                          <td>{g.q4}</td>
-                          <td>{g.ot}</td>
-                          <td>{g.tot}</td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="roster-totals-row">
-                      <td colSpan={2}>Totals</td>
-                      <td>{homeRosterTotals.q1}</td>
-                      <td>{homeRosterTotals.q2}</td>
-                      <td>{homeRosterTotals.q3}</td>
-                      <td>{homeRosterTotals.q4}</td>
-                      <td>{homeRosterTotals.ot}</td>
-                      <td>{homeRosterTotals.tot}</td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
-
-            <h4 className="game-sheet-fouls-heading">Personal fouls (3 per player)</h4>
-            <table className="table game-sheet-fouls-table">
-              <thead>
-                <tr>
-                  <th>Cap#</th>
-                  <th>Name</th>
-                  <th>1</th>
-                  <th>2</th>
-                  <th>3</th>
-                </tr>
-              </thead>
-              <tbody>
-                {maxRosterRows === 0 ? (
-                  <tr>
-                    <td colSpan={5}>No roster yet.</td>
-                  </tr>
-                ) : (
-                  Array.from({ length: maxRosterRows }, (_, index) => {
-                    const p = homePlayers[index];
-                    if (!p) {
-                      return (
-                        <tr key={`home-foul-empty-${index}`}>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td className="foul-slot">&nbsp;</td>
-                          <td className="foul-slot">&nbsp;</td>
-                          <td className="foul-slot">&nbsp;</td>
-                        </tr>
-                      );
-                    }
-                    const [s1, s2, s3] = getFoulSlots("HOME", p.capNumber);
-                    const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
-                    return (
-                      <tr
-                        key={`foul-${p.id}`}
-                        className={[
-                          foulCount === 2 && "fouls-row--2",
-                          foulCount === 3 && "fouls-row--3",
-                        ]
-                          .filter(Boolean)
-                          .join(" ") || undefined}
-                      >
-                        <td>{p.capNumber}</td>
-                        <td>{p.playerName}</td>
-                        <td className="foul-slot">{s1}</td>
-                        <td className="foul-slot">{s2}</td>
-                        <td className="foul-slot">{s3}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+              <h3>Home - {aggregate.homeTeamName} (dark)</h3>
+              {renderTeamMatrix("HOME", homePlayers, homeRosterTotals)}
             </div>
           </section>
         </div>
 
-        {/* Column 3: away roster + goals + fouls */}
+        {/* Column 3: away cap, fouls, and quarter scoring on one row */}
         <div className="game-sheet-col">
           <section className="game-sheet-roster-column game-sheet-roster-column-away">
             <div className="game-sheet-roster-card">
-            <h3>Away - {aggregate.awayTeamName} (light)</h3>
-            <table className="table game-sheet-roster-table">
-              <thead>
-                <tr>
-                  <th>Cap#</th>
-                  <th>Name</th>
-                  <th>Q1</th>
-                  <th>Q2</th>
-                  <th>Q3</th>
-                  <th>Q4</th>
-                  <th>OT</th>
-                  <th>TOT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {maxRosterRows === 0 ? (
-                  <tr>
-                    <td colSpan={8}>No roster yet.</td>
-                  </tr>
-                ) : (
-                  <>
-                    {Array.from({ length: maxRosterRows }, (_, index) => {
-                      const p = awayPlayers[index];
-                      if (!p) {
-                        return (
-                          <tr key={`away-empty-${index}`}>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
-                          </tr>
-                        );
-                      }
-                      const g = getGoalsForPlayer("AWAY", p.capNumber);
-                      const isEjected = (foulsByPlayer.AWAY?.[p.capNumber]?.length ?? 0) === 3;
-                      return (
-                        <tr key={p.id} className={isEjected ? "roster-row--ejected" : undefined}>
-                          <td>{p.capNumber}</td>
-                          <td>{p.playerName}</td>
-                          <td>{g.q1}</td>
-                          <td>{g.q2}</td>
-                          <td>{g.q3}</td>
-                          <td>{g.q4}</td>
-                          <td>{g.ot}</td>
-                          <td>{g.tot}</td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="roster-totals-row">
-                      <td colSpan={2}>Totals</td>
-                      <td>{awayRosterTotals.q1}</td>
-                      <td>{awayRosterTotals.q2}</td>
-                      <td>{awayRosterTotals.q3}</td>
-                      <td>{awayRosterTotals.q4}</td>
-                      <td>{awayRosterTotals.ot}</td>
-                      <td>{awayRosterTotals.tot}</td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
-
-            <h4 className="game-sheet-fouls-heading">Personal fouls (3 per player)</h4>
-            <table className="table game-sheet-fouls-table">
-              <thead>
-                <tr>
-                  <th>Cap#</th>
-                  <th>Name</th>
-                  <th>1</th>
-                  <th>2</th>
-                  <th>3</th>
-                </tr>
-              </thead>
-              <tbody>
-                {maxRosterRows === 0 ? (
-                  <tr>
-                    <td colSpan={5}>No roster yet.</td>
-                  </tr>
-                ) : (
-                  Array.from({ length: maxRosterRows }, (_, index) => {
-                    const p = awayPlayers[index];
-                    if (!p) {
-                      return (
-                        <tr key={`away-foul-empty-${index}`}>
-                          <td>&nbsp;</td>
-                          <td>&nbsp;</td>
-                          <td className="foul-slot">&nbsp;</td>
-                          <td className="foul-slot">&nbsp;</td>
-                          <td className="foul-slot">&nbsp;</td>
-                        </tr>
-                      );
-                    }
-                    const [s1, s2, s3] = getFoulSlots("AWAY", p.capNumber);
-                    const foulCount = [s1, s2, s3].filter((s) => s !== "—").length;
-                    return (
-                      <tr
-                        key={`foul-${p.id}`}
-                        className={[
-                          foulCount === 2 && "fouls-row--2",
-                          foulCount === 3 && "fouls-row--3",
-                        ]
-                          .filter(Boolean)
-                          .join(" ") || undefined}
-                      >
-                        <td>{p.capNumber}</td>
-                        <td>{p.playerName}</td>
-                        <td className="foul-slot">{s1}</td>
-                        <td className="foul-slot">{s2}</td>
-                        <td className="foul-slot">{s3}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+              <h3>Away - {aggregate.awayTeamName} (light)</h3>
+              {renderTeamMatrix("AWAY", awayPlayers, awayRosterTotals)}
             </div>
           </section>
         </div>

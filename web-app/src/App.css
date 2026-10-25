@@ -660,7 +660,7 @@
 }
 
 .game-sheet-page {
-  max-width: 1200px;
+  max-width: none;
   margin-left: 0;
   margin-right: auto;
   padding-left: 0.75rem;
@@ -708,7 +708,7 @@
 
 .game-sheet-main {
   display: flex;
-  gap: 3rem;
+  gap: 1.25rem;
   align-items: flex-start;
   flex: 1;
   min-height: 0;
@@ -921,36 +921,69 @@
   font-size: 0.9rem;
 }
 
-/* Match Game clock size (0.85rem) for scoring and roster/foul tables */
-.game-sheet-roster-table,
-.game-sheet-fouls-table {
-  font-size: 0.85rem;
+/* One matrix per team. Type matches the rest of the sheet; the page uses the laptop width. */
+.game-sheet-page .game-sheet-roster-table {
+  font-size: 0.9rem;
+  margin-bottom: 0;
 }
 
-/* Keep long names on one line: smaller font in Name column */
-.game-sheet-roster-table th:nth-child(2),
-.game-sheet-roster-table td:nth-child(2),
-.game-sheet-fouls-table th:nth-child(2),
-.game-sheet-fouls-table td:nth-child(2) {
-  font-size: 0.75rem;
+.game-sheet-page .game-sheet-roster-table th,
+.game-sheet-page .game-sheet-roster-table td {
+  padding: 0.28rem 0.4rem;
+}
+
+.game-sheet-page .game-sheet-roster-table .roster-col-cap,
+.game-sheet-page .game-sheet-roster-table .roster-col-foul,
+.game-sheet-page .game-sheet-roster-table .roster-col-score {
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-sheet-page .game-sheet-roster-table .roster-col-name {
+  font-size: 0.85rem;
   white-space: nowrap;
 }
 
-.game-sheet-fouls-table .foul-slot {
-  min-width: 1.5rem;
-  text-align: center;
+/* Narrower windows keep the three columns on screen with slightly smaller type. */
+@media (max-width: 1360px) {
+  .game-sheet-page .game-sheet-roster-table {
+    font-size: 0.8rem;
+  }
+  .game-sheet-page .game-sheet-roster-table th,
+  .game-sheet-page .game-sheet-roster-table td {
+    padding: 0.24rem 0.3rem;
+  }
+  .game-sheet-page .game-sheet-roster-table .roster-col-name {
+    font-size: 0.76rem;
+  }
 }
 
-/* Subtle row background on game sheet rosters/fouls to aid horizontal tracking.
+.game-sheet-page .game-sheet-roster-table .roster-col-foul {
+  min-width: 1.7rem;
+  font-weight: 650;
+}
+
+/* Bar between the three foul boxes and the quarter scoring columns. */
+.game-sheet-page .game-sheet-roster-table .roster-col-q1 {
+  border-left: 3px solid rgba(236, 242, 250, 0.78);
+  padding-left: 0.45rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .game-sheet-page .game-sheet-roster-table .roster-col-q1 {
+    border-left-color: rgba(18, 28, 44, 0.55);
+  }
+}
+
+/* Subtle row background on game sheet rosters to aid horizontal tracking.
    Only apply to odd rows so the existing even-row shading remains. */
-.game-sheet-roster-table tbody tr:nth-child(odd),
-.game-sheet-fouls-table tbody tr:nth-child(odd) {
+.game-sheet-roster-table tbody tr:nth-child(odd) {
   background: rgba(255, 255, 255, 0.03);
 }
 
 @media (prefers-color-scheme: light) {
-  .game-sheet-roster-table tbody tr:nth-child(odd),
-  .game-sheet-fouls-table tbody tr:nth-child(odd) {
+  .game-sheet-roster-table tbody tr:nth-child(odd) {
     background: rgba(0, 0, 0, 0.02);
   }
 }
@@ -963,10 +996,13 @@
 .game-sheet-roster-column {
   display: flex;
   justify-content: flex-start;
+  width: 100%;
 }
 
 .game-sheet-roster-card {
-  padding: 0.9rem 1rem 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 0.65rem 0.6rem;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(0, 0, 0, 0.25);
@@ -1016,12 +1052,6 @@
   .game-sheet-roster-column-away .game-sheet-roster-card > h3 {
     color: #f3f7fc;
   }
-}
-
-.game-sheet-fouls-heading {
-  margin-top: 0.75rem;
-  margin-bottom: 0.3rem;
-  font-size: 0.85rem;
 }
 
 .goals-columns {
@@ -1298,27 +1328,25 @@
 
 /* 2 personal fouls: bright yellow */
 .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-2,
-.game-sheet-fouls-table tbody tr.fouls-row--2 {
+.game-sheet-roster-table tbody tr.fouls-row--2 {
   background: rgba(255, 235, 0, 0.5);
 }
 
 @media (prefers-color-scheme: light) {
   .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-2,
-  .game-sheet-fouls-table tbody tr.fouls-row--2 {
+  .game-sheet-roster-table tbody tr.fouls-row--2 {
     background: rgba(255, 235, 0, 0.55);
   }
 }
 
 /* 3 personal fouls / ejected: red */
 .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-3,
-.game-sheet-fouls-table tbody tr.fouls-row--3,
 .game-sheet-roster-table tbody tr.roster-row--ejected {
   background: rgba(244, 67, 54, 0.4);
 }
 
 @media (prefers-color-scheme: light) {
   .game-sheet-progress-table-wrapper .table tbody tr.game-progress-row--fouls-3,
-  .game-sheet-fouls-table tbody tr.fouls-row--3,
   .game-sheet-roster-table tbody tr.roster-row--ejected {
     background: rgba(244, 67, 54, 0.35);
   }
@@ -1330,7 +1358,7 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
-.game-sheet-roster-table tbody tr.roster-totals-row td:nth-child(n + 3) {
+.game-sheet-roster-table tbody tr.roster-totals-row .roster-col-score {
   text-align: center;
 }
 
