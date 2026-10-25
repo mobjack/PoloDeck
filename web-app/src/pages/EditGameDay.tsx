@@ -39,6 +39,7 @@ export function EditGameDay() {
             gd.fullTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutDurationSec,
           shortTimeoutDurationSec:
             gd.shortTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.shortTimeoutDurationSec,
+          shotClockTwentyReset: gd.shotClockTwentyReset ?? false,
         });
       })
       .catch((e) => setError(e))
@@ -64,34 +65,36 @@ export function EditGameDay() {
   }
 
   return (
-    <div className="page page--left">
+    <div className="page page--left page--game-day-edit">
       <header className="page-header page-header--stacked">
         <Link to={`/game-days/${id}`}>← Back to game day</Link>
         <h1>Edit game day</h1>
       </header>
 
-      <form onSubmit={handleSubmit} className="form">
+      <form onSubmit={handleSubmit} className="form form--landscape">
         {error != null ? (
           <p className="error">{formatApiErrorMessage(error)}</p>
         ) : null}
-        <label>
-          Date
-          <input
-            type="date"
-            value={form.date ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-            required
-          />
-        </label>
-        <label>
-          Location
-          <input
-            type="text"
-            value={form.location ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-            required
-          />
-        </label>
+        <div className="game-day-edit-identity">
+          <label>
+            Date
+            <input
+              type="date"
+              value={form.date ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+              required
+            />
+          </label>
+          <label>
+            Location
+            <input
+              type="text"
+              value={form.location ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              required
+            />
+          </label>
+        </div>
         <TimeoutRulesFields
           value={{
             timeoutPreset: form.timeoutPreset ?? HIGH_SCHOOL_TIMEOUT_RULES.timeoutPreset,
@@ -108,6 +111,10 @@ export function EditGameDay() {
               form.shortTimeoutDurationSec ?? HIGH_SCHOOL_TIMEOUT_RULES.shortTimeoutDurationSec,
           }}
           onChange={(rules) => setForm((current) => ({ ...current, ...rules }))}
+          shotClockTwentyReset={form.shotClockTwentyReset ?? false}
+          onShotClockTwentyResetChange={(shotClockTwentyReset) =>
+            setForm((current) => ({ ...current, shotClockTwentyReset }))
+          }
         />
         <div className="form-actions">
           <button type="submit" className="btn primary">

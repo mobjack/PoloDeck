@@ -132,6 +132,8 @@ export interface GameAggregate {
   separateOvertimeTimeouts: boolean;
   fullTimeoutDurationSec: number;
   shortTimeoutDurationSec: number;
+  /** When true, the timer offers a 20-second reset and a full reset. */
+  shotClockTwentyReset?: boolean;
   score: {
     homeScore: number;
     awayScore: number;
@@ -307,6 +309,7 @@ export const api = {
         side?: "HOME" | "AWAY";
         capNumber?: string;
         overtime?: boolean;
+        remainingMs?: number;
       }
     ) =>
       request<GameAggregate>(`/games/${id}/score-command`, {
@@ -354,8 +357,11 @@ export const api = {
       request<GameAggregate>(`/games/${id}/game-clock/start`, { method: "POST" }),
     gameClockStop: (id: string) =>
       request<GameAggregate>(`/games/${id}/game-clock/stop`, { method: "POST" }),
-    shotClockReset: (id: string) =>
-      request<GameAggregate>(`/games/${id}/shot-clock/reset`, { method: "POST" }),
+    shotClockReset: (id: string, remainingMs?: number) =>
+      request<GameAggregate>(`/games/${id}/shot-clock/reset`, {
+        method: "POST",
+        ...(remainingMs != null ? { json: { remainingMs } } : {}),
+      }),
     shotClockUndoReset: (id: string) =>
       request<GameAggregate>(`/games/${id}/shot-clock/undo-reset`, { method: "POST" }),
     setGameClockRemaining: (id: string, remainingMs: number) =>

@@ -23,6 +23,7 @@ export function NewGameDay() {
     defaultBreakBetweenQuartersMs: DEFAULT_BREAK_MS,
     defaultHalftimeDurationMs: DEFAULT_HALFTIME_MS,
     ...HIGH_SCHOOL_TIMEOUT_RULES,
+    shotClockTwentyReset: false,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -107,6 +108,10 @@ export function NewGameDay() {
         <TimeoutRulesFields
           value={form}
           onChange={(rules) => setForm((current) => ({ ...current, ...rules }))}
+          shotClockTwentyReset={form.shotClockTwentyReset}
+          onShotClockTwentyResetChange={(shotClockTwentyReset) =>
+            setForm((current) => ({ ...current, shotClockTwentyReset }))
+          }
         />
         <div className="form-actions">
           <button type="submit" className="btn primary">

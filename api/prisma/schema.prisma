@@ -82,6 +82,8 @@ model GameDay {
   separateOvertimeTimeouts    Boolean  @default(false)
   fullTimeoutDurationSec      Int      @default(60)
   shortTimeoutDurationSec     Int      @default(30)
+  /// Offense keeps the ball after a shot: timer may reset the shot clock to 20s as well as the full possession time.
+  shotClockTwentyReset        Boolean  @default(false)
   activeGameId                String?  @unique
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
@@ -107,6 +109,8 @@ model Game {
   breakBetweenQuartersDurationMs Int       @default(120000)  // 2 min
   halftimeDurationMs            Int       @default(300000)   // 5 min
   shotClockDurationMs           Int       @default(30000)    // regulation shot length
+  /// Copied from the game day. When true, the timer offers a 20-second reset and a full reset.
+  shotClockTwentyReset          Boolean   @default(false)
   fullTimeoutsRegulation        Int       @default(2)
   shortTimeouts                 Int       @default(1)
   fullTimeoutsOvertime          Int       @default(0)

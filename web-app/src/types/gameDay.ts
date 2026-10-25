@@ -14,6 +14,7 @@ export interface GameDay {
   separateOvertimeTimeouts: boolean;
   fullTimeoutDurationSec: number;
   shortTimeoutDurationSec: number;
+  shotClockTwentyReset: boolean;
   activeGameId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +58,7 @@ export interface CreateGameDayInput {
   separateOvertimeTimeouts: boolean;
   fullTimeoutDurationSec: number;
   shortTimeoutDurationSec: number;
+  shotClockTwentyReset: boolean;
 }
 
 export interface UpdateGameDayInput {
@@ -72,6 +74,7 @@ export interface UpdateGameDayInput {
   separateOvertimeTimeouts?: boolean;
   fullTimeoutDurationSec?: number;
   shortTimeoutDurationSec?: number;
+  shotClockTwentyReset?: boolean;
   activeGameId?: string | null;
 }
 

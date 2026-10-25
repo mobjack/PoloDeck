@@ -315,6 +315,8 @@ export async function rerunGameEventLog(
         if (!clock) throw new Error("Shot clock missing");
         const gameTimeRunning = g?.gameClock?.running ?? false;
         const p = asPayload(ev.payload);
+        const resetToMs =
+          typeof p.resetToMs === "number" ? p.resetToMs : clock.durationMs;
         if (
           typeof p.priorRemainingMs === "number" &&
           typeof p.priorRunning === "boolean"
@@ -323,20 +325,21 @@ export async function rerunGameEventLog(
           payloadOut = {
             ...p,
             durationMs: clock.durationMs,
+            resetToMs,
             priorRemainingMs: p.priorRemainingMs,
             priorRunning: p.priorRunning,
           } as Prisma.InputJsonValue;
         } else {
-          payloadOut = { durationMs: clock.durationMs } as Prisma.InputJsonValue;
+          payloadOut = { durationMs: clock.durationMs, resetToMs } as Prisma.InputJsonValue;
         }
         const newData = gameTimeRunning
           ? {
-              remainingMs: clock.durationMs,
+              remainingMs: resetToMs,
               running: true,
               lastStartedAt: createdAt,
             }
           : {
-              remainingMs: clock.durationMs,
+              remainingMs: resetToMs,
               running: false,
               lastStartedAt: null,
             };

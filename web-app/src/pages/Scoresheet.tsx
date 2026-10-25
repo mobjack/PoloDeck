@@ -15,7 +15,7 @@ import {
   sortGameEventsAsc,
   type ProgressRow,
 } from "../lib/scoresheetData";
-import { fullTimeoutColumnCount, shortTimeoutLabel } from "../lib/timeoutRules";
+import { buildTimeoutMatrix, shortTimeoutLabel } from "../lib/timeoutRules";
 import "../scoresheet.css";
 
 type TeamSide = "HOME" | "AWAY";
@@ -88,19 +88,20 @@ export function Scoresheet() {
   );
   const foulsByPlayer = useMemo(() => computeFoulsByPlayer(events), [events]);
   const timeoutCalls = useMemo(() => computeTimeoutCalls(events), [events]);
-  const fullColumns = fullTimeoutColumnCount(
+  const timeoutSource = gameDay ?? aggregate;
+  const timeoutMatrix = buildTimeoutMatrix(
     {
-      fullTimeoutsRegulation: aggregate?.fullTimeoutsRegulation ?? 2,
-      fullTimeoutsOvertime: aggregate?.fullTimeoutsOvertime ?? 0,
-      separateOvertimeTimeouts: aggregate?.separateOvertimeTimeouts ?? false,
+      fullTimeoutsRegulation: timeoutSource?.fullTimeoutsRegulation ?? 2,
+      fullTimeoutsOvertime: timeoutSource?.fullTimeoutsOvertime ?? 0,
+      separateOvertimeTimeouts: timeoutSource?.separateOvertimeTimeouts ?? false,
+      shortTimeouts: timeoutSource?.shortTimeouts ?? 1,
+      fullTimeoutDurationSec: timeoutSource?.fullTimeoutDurationSec ?? 60,
+      shortTimeoutDurationSec: timeoutSource?.shortTimeoutDurationSec ?? 30,
     },
-    Math.max(timeoutCalls.HOME.full.length, timeoutCalls.AWAY.full.length)
+    timeoutCalls
   );
-  const showShortTimeout =
-    (aggregate?.shortTimeouts ?? 1) > 0 ||
-    timeoutCalls.HOME.short.length > 0 ||
-    timeoutCalls.AWAY.short.length > 0;
-  const shortLabel = shortTimeoutLabel(aggregate?.shortTimeoutDurationSec ?? 30);
+  const showShortTimeout = timeoutMatrix.some((column) => column.key.startsWith("short-"));
+  const shortLabel = shortTimeoutLabel(timeoutSource?.shortTimeoutDurationSec ?? 30);
   const scoreByQuarter = useMemo(
     () =>
       computeScoreByQuarter(
@@ -342,13 +343,12 @@ export function Scoresheet() {
     );
   };
 
-  const renderTimeoutRow = (label: string, calls: { full: string[]; short: string[] }) => (
+  const renderTimeoutRow = (label: string, side: "home" | "away") => (
     <tr>
       <td className="ss-to-team">{label}</td>
-      {Array.from({ length: fullColumns }, (_, index) => (
-        <td key={index}>{calls.full[index] ?? ""}</td>
+      {timeoutMatrix.map((column) => (
+        <td key={column.key}>{column[side] ?? ""}</td>
       ))}
-      {showShortTimeout ? <td>{calls.short[0] ?? ""}</td> : null}
     </tr>
   );
 
@@ -471,15 +471,14 @@ export function Scoresheet() {
               <thead>
                 <tr>
                   <th>Team</th>
-                  {Array.from({ length: fullColumns }, (_, index) => (
-                    <th key={index}>T{index + 1}</th>
+                  {timeoutMatrix.map((column) => (
+                    <th key={column.key}>{column.label}</th>
                   ))}
-                  {showShortTimeout ? <th>{shortLabel}</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {renderTimeoutRow("Dark", timeoutCalls.HOME)}
-                {renderTimeoutRow("White", timeoutCalls.AWAY)}
+                {renderTimeoutRow("Dark", "home")}
+                {renderTimeoutRow("White", "away")}
               </tbody>
             </table>
             <p className="ss-timeouts-remaining">

@@ -15,6 +15,7 @@ import {
   gameIdParamSchema,
   patchDeviceBodySchema,
   setActiveGameBodySchema,
+  resetShotClockBodySchema,
   setClockBodySchema,
   setGamePeriodBodySchema,
   triggerHornBodySchema,
@@ -207,7 +208,8 @@ export async function registerGameRoutes(app: FastifyInstance) {
 
   app.post("/games/:id/shot-clock/reset", async (request) => {
     const params = gameIdParamSchema.parse(request.params);
-    return service.resetShotClock(params.id);
+    const body = resetShotClockBodySchema.parse(request.body ?? {});
+    return service.resetShotClock(params.id, body.remainingMs);
   });
 
   app.post("/games/:id/shot-clock/undo-reset", async (request) => {
