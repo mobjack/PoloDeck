@@ -66,6 +66,7 @@ enum GameEventType {
   EXCLUSION_CLEARED
   TIMEOUT_USED
   HORN_TRIGGERED
+  CARD_ISSUED
 }
 
 model GameDay {

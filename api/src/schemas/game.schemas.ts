@@ -141,10 +141,15 @@ export const scoreCommandBodySchema = z.object({
     "PENALTY",
     "TIMEOUT",
     "TIMEOUT_30",
+    "YELLOW_CARD",
+    "RED_CARD",
+    "YELLOW_RED_CARD",
   ]),
   timeSeconds: z.number().int().nonnegative().optional(),
   side: z.enum(["HOME", "AWAY"]).optional(),
   capNumber: z.string().min(1).optional(),
+  /** Player cap, or a coach / bench card with no cap. */
+  cardTarget: z.enum(["PLAYER", "HEAD_COACH", "ASSISTANT_COACH", "BENCH"]).optional(),
   overtime: z.boolean().optional(),
   /** Full possession reset omits this. 20000 requests the 20-second reset. */
   remainingMs: z.number().int().positive().optional(),

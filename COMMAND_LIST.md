@@ -1,6 +1,6 @@
 # PoloDeck command list
 
-Quick reference for **game sheet scoring commands**: enter text in the **Scoring command** field on a game’s sheet and press **Apply**. The same content is available in the web app via the **?** (command help) button on that page.
+Quick reference for **game sheet scoring commands**: enter text in the **Scoring command** field on a game’s sheet and press **Apply**. The same content is the cheat sheet at **/commands**, opened in a new tab from the **?** beside Scoring command.
 
 Commands are parsed case-insensitively unless noted.
 
@@ -22,6 +22,7 @@ Commands are parsed case-insensitively unless noted.
 | --- | --- | --- |
 | `c` | `clock` | **Toggle game clock** — Start if stopped, stop if running. |
 | `r` | `reset` | **Reset shot clock** — Full shot time from game settings (same behavior as a shot reset elsewhere: if the game clock is running, the shot may resume running after reset). |
+| `r20` | `reset20` | **20-second shot reset** — When the game day uses a 20-second reset (USA Water Polo, Olympics, Junior Olympics). |
 
 ### After `eq`, before `sb` (break pending)
 
@@ -70,6 +71,20 @@ Examples: `g13w`, `6.07g13w`
 | `g` | Goal |
 | `e` | Exclusion |
 | `p` | Penalty |
+| `yc` | Yellow card. A second yellow on the same player rolls them. |
+| `rc` | Red card. Rolls the player and records misconduct (`M`) in the foul columns. |
+| `yrc` | Yellow and red shown together. Head coach only. The coach stays. |
+
+Coach and bench cards have no cap number. Role letter: **h** head coach, **a** assistant, **n** bench.
+
+| Example | Meaning |
+| --- | --- |
+| `b2yc` or `yc2b` | Dark cap 2 yellow card |
+| `w5rc` or `rc5w` | Light cap 5 red card |
+| `ychb` or `bych` | Yellow card, dark head coach |
+| `rcaw` or `wrca` | Red card, light assistant coach |
+| `ycnb` | Yellow card, dark bench |
+| `yrchb` or `byrch` | Yellow/red card, dark head coach |
 
 ---
 

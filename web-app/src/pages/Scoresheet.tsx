@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
+import { CardMarks, StaffCardLine } from "../components/CardMarks";
 import type { GameDay } from "../types/gameDay";
 import {
   buildProgressRows,
@@ -15,6 +16,7 @@ import {
   sortGameEventsAsc,
   type ProgressRow,
 } from "../lib/scoresheetData";
+import { computeCards, isPlayerRolled } from "../lib/cards";
 import { buildTimeoutMatrix, shortTimeoutLabel } from "../lib/timeoutRules";
 import "../scoresheet.css";
 
@@ -87,6 +89,7 @@ export function Scoresheet() {
     [events]
   );
   const foulsByPlayer = useMemo(() => computeFoulsByPlayer(events), [events]);
+  const cardsBySide = useMemo(() => computeCards(events), [events]);
   const timeoutCalls = useMemo(() => computeTimeoutCalls(events), [events]);
   const timeoutSource = gameDay ?? aggregate;
   const timeoutMatrix = buildTimeoutMatrix(
@@ -288,6 +291,7 @@ export function Scoresheet() {
           <span className="ss-team-name">{teamName}</span>
           <span className="ss-team-color">Cap color: {colorLabel}</span>
         </div>
+        <StaffCardLine cards={cardsBySide} side={side} />
         <table className="ss-table ss-matrix">
           <thead>
             <tr>
@@ -320,11 +324,16 @@ export function Scoresheet() {
               }
               const g = getMatrixGoals(side, p.capNumber);
               const [f1, f2, f3] = getFoulSlots(side, p.capNumber);
-              const fouledOut = (foulsByPlayer[side]?.[p.capNumber]?.length ?? 0) >= 3;
+              const foulCount = (foulsByPlayer[side]?.[p.capNumber]?.length ?? 0);
+              const tally = cardsBySide.players[side]?.[p.capNumber];
+              const fouledOut = isPlayerRolled(foulCount, tally);
               return (
                 <tr key={p.id} className={fouledOut ? "ss-row-fouled-out" : undefined}>
                   <td className="ss-col-cap">{p.capNumber}</td>
-                  <td className="ss-col-name">{p.playerName}</td>
+                  <td className="ss-col-name">
+                    <span className={fouledOut ? "ss-rolled-name" : undefined}>{p.playerName}</span>
+                    <CardMarks yellows={tally?.yellow ?? 0} reds={tally?.red ?? 0} />
+                  </td>
                   <td>{g.q1}</td>
                   <td>{g.q2}</td>
                   <td>{g.q3}</td>
