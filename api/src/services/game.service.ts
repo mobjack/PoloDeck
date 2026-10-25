@@ -24,6 +24,7 @@ import {
   playerIsRolled,
   ROLLED_PLAYER_MESSAGE,
 } from "../lib/rolledPlayer";
+import { resolveShotClockResetMs } from "../lib/shotClockReset";
 import {
   HIGH_SCHOOL_TIMEOUT_RULES,
   remainingTimeouts,
@@ -379,6 +380,7 @@ export class GameService {
     defaultQuarterDurationMs: number;
     defaultBreakBetweenQuartersMs: number;
     defaultHalftimeDurationMs: number;
+    shotClockTwentyReset: boolean;
     activeGameId: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -433,6 +435,7 @@ export class GameService {
     separateOvertimeTimeouts: boolean;
     fullTimeoutDurationSec: number;
     shortTimeoutDurationSec: number;
+    shotClockTwentyReset: boolean;
   }) {
     const gameDay = await this.prisma.gameDay.create({
       data: {
@@ -448,6 +451,7 @@ export class GameService {
         separateOvertimeTimeouts: input.separateOvertimeTimeouts,
         fullTimeoutDurationSec: input.fullTimeoutDurationSec,
         shortTimeoutDurationSec: input.shortTimeoutDurationSec,
+        shotClockTwentyReset: input.shotClockTwentyReset,
       },
     });
     return gameDay;
@@ -510,6 +514,7 @@ export class GameService {
       separateOvertimeTimeouts?: boolean;
       fullTimeoutDurationSec?: number;
       shortTimeoutDurationSec?: number;
+      shotClockTwentyReset?: boolean;
       activeGameId?: string | null;
     }
   ) {
@@ -533,6 +538,7 @@ export class GameService {
       separateOvertimeTimeouts?: boolean;
       fullTimeoutDurationSec?: number;
       shortTimeoutDurationSec?: number;
+      shotClockTwentyReset?: boolean;
       activeGameId?: string | null;
     } = {};
     if (input.date != null) data.date = new Date(input.date);
@@ -547,6 +553,7 @@ export class GameService {
     if (input.separateOvertimeTimeouts != null) data.separateOvertimeTimeouts = input.separateOvertimeTimeouts;
     if (input.fullTimeoutDurationSec != null) data.fullTimeoutDurationSec = input.fullTimeoutDurationSec;
     if (input.shortTimeoutDurationSec != null) data.shortTimeoutDurationSec = input.shortTimeoutDurationSec;
+    if (input.shotClockTwentyReset !== undefined) data.shotClockTwentyReset = input.shotClockTwentyReset;
     const timeoutRulesChanged =
       input.timeoutPreset !== undefined ||
       input.fullTimeoutsRegulation !== undefined ||
@@ -559,6 +566,9 @@ export class GameService {
       data.activeGameId = null;
       await this.prisma.gameDay.update({ where: { id: gameDayId }, data });
       if (timeoutRulesChanged) await this.applyTimeoutRulesToGames(gameDayId);
+      if (input.shotClockTwentyReset !== undefined) {
+        await this.applyShotClockTwentyResetToGames(gameDayId, input.shotClockTwentyReset);
+      }
       await this.syncAssignedDevicesToActiveGame(null);
       await this.emitActiveGameChanged();
       return this.getGameDay(gameDayId);
@@ -569,7 +579,25 @@ export class GameService {
       data,
     });
     if (timeoutRulesChanged) await this.applyTimeoutRulesToGames(gameDayId);
+    if (input.shotClockTwentyReset !== undefined) {
+      await this.applyShotClockTwentyResetToGames(gameDayId, input.shotClockTwentyReset);
+    }
     return this.getGameDay(gameDayId);
+  }
+
+  private async applyShotClockTwentyResetToGames(gameDayId: string, enabled: boolean) {
+    const games = await this.prisma.game.findMany({
+      where: { gameDayId },
+      select: { id: true },
+    });
+    if (games.length === 0) return;
+    await this.prisma.game.updateMany({
+      where: { gameDayId },
+      data: { shotClockTwentyReset: enabled },
+    });
+    for (const game of games) {
+      await this.emitState(game.id);
+    }
   }
 
   private timeoutRulesData(rules: TimeoutRules) {
@@ -651,6 +679,7 @@ export class GameService {
     let breakBetweenQuartersDurationMs = input.breakBetweenQuartersDurationMs;
     let halftimeDurationMs = input.halftimeDurationMs;
 
+    let shotClockTwentyReset = false;
     let timeoutRules: TimeoutRules = {
       fullTimeoutsRegulation: HIGH_SCHOOL_TIMEOUT_RULES.fullTimeoutsRegulation,
       shortTimeouts: HIGH_SCHOOL_TIMEOUT_RULES.shortTimeouts,
@@ -670,6 +699,7 @@ export class GameService {
         if (breakBetweenQuartersDurationMs == null) breakBetweenQuartersDurationMs = gameDay.defaultBreakBetweenQuartersMs;
         if (halftimeDurationMs == null) halftimeDurationMs = gameDay.defaultHalftimeDurationMs;
         if (shotClockDurationMs == null) shotClockDurationMs = 30 * 1000;
+        shotClockTwentyReset = gameDay.shotClockTwentyReset;
         timeoutRules = timeoutRulesFromGame(gameDay);
       }
     }
@@ -704,6 +734,7 @@ export class GameService {
         breakBetweenQuartersDurationMs,
         halftimeDurationMs,
         shotClockDurationMs,
+        shotClockTwentyReset,
         ...this.timeoutRulesData(timeoutRules),
         score: { create: {} },
         gameClock: {
@@ -1175,7 +1206,7 @@ export class GameService {
     return this.emitState(gameId);
   }
 
-  async resetShotClock(gameId: string) {
+  async resetShotClock(gameId: string, requestedMs?: number) {
     const game = await this.prisma.game.findUnique({
       where: { id: gameId },
       include: { gameClock: true, shotClock: true },
@@ -1184,6 +1215,15 @@ export class GameService {
     if (!game || !clock) {
       throw this.notFound("Game or shot clock not found");
     }
+
+    const resolved = resolveShotClockResetMs({
+      requestedMs,
+      clockDurationMs: clock.durationMs,
+      regulationMs: game.shotClockDurationMs,
+      twentyResetEnabled: game.shotClockTwentyReset,
+    });
+    if (!resolved.ok) throw this.badRequest(resolved.error);
+    const targetMs = resolved.remainingMs;
 
     const now = Date.now();
     // Frozen "time at this instant" for undo (not a live/background running process in the log).
@@ -1201,12 +1241,12 @@ export class GameService {
     const gameTimeRunning = game.gameClock?.running ?? false;
     const newData = gameTimeRunning
       ? {
-          remainingMs: clock.durationMs,
+          remainingMs: targetMs,
           running: true,
           lastStartedAt: new Date(now),
         }
       : {
-          remainingMs: clock.durationMs,
+          remainingMs: targetMs,
           running: false,
           lastStartedAt: null,
         };
@@ -1221,6 +1261,7 @@ export class GameService {
     // event; undo re-anchors with lastStartedAt = now if game + priorRunning warrant it).
     const resetPayload: Prisma.InputJsonValue = {
       durationMs: clock.durationMs,
+      resetToMs: targetMs,
       priorRemainingMs,
       priorRunning,
     };
@@ -2024,6 +2065,7 @@ export class GameService {
       side?: "HOME" | "AWAY";
       capNumber?: string;
       overtime?: boolean;
+      remainingMs?: number;
     }
   ) {
     const side = body.side != null ? (body.side as TeamSide) : undefined;
@@ -2108,7 +2150,7 @@ export class GameService {
         const game = await this.prisma.game.findUnique({ where: { id: gameId } });
         if (!game) throw this.notFound("Game not found");
         this.assertClockCommandsAllowed(game);
-        return this.resetShotClock(gameId);
+        return this.resetShotClock(gameId, body.remainingMs);
       }
       case "GOAL": {
         if (side == null || body.capNumber == null) {

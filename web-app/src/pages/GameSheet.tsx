@@ -25,7 +25,7 @@ import {
   sortGameEventsAsc,
 } from "../lib/scoresheetData";
 import { createGameSocket } from "../lib/socketUrl";
-import { fullTimeoutColumnCount, shortTimeoutLabel } from "../lib/timeoutRules";
+import { buildTimeoutMatrix, shortTimeoutLabel } from "../lib/timeoutRules";
 import { api, type GameAggregate } from "../api/client";
 import { ApiErrorDisplay } from "../components/DatabaseUnavailable";
 import type { GameDay } from "../types/gameDay";
@@ -48,6 +48,8 @@ interface ParsedInput {
   timeSeconds?: number;
   side?: TeamSide;
   capNumber?: string;
+  /** Set for a 20-second shot clock reset. Omitted for a full reset. */
+  resetRemainingMs?: number;
 }
 
 export function GameSheet() {
@@ -195,17 +197,16 @@ export function GameSheet() {
     () => computeTimeoutCalls(aggregate?.events ?? []),
     [aggregate?.events]
   );
+  const timeoutSource = gameDay ?? aggregate;
   const timeoutRules = {
-    fullTimeoutsRegulation: aggregate?.fullTimeoutsRegulation ?? 2,
-    fullTimeoutsOvertime: aggregate?.fullTimeoutsOvertime ?? 0,
-    separateOvertimeTimeouts: aggregate?.separateOvertimeTimeouts ?? false,
-    shortTimeouts: aggregate?.shortTimeouts ?? 1,
-    shortTimeoutDurationSec: aggregate?.shortTimeoutDurationSec ?? 30,
+    fullTimeoutsRegulation: timeoutSource?.fullTimeoutsRegulation ?? 2,
+    fullTimeoutsOvertime: timeoutSource?.fullTimeoutsOvertime ?? 0,
+    separateOvertimeTimeouts: timeoutSource?.separateOvertimeTimeouts ?? false,
+    shortTimeouts: timeoutSource?.shortTimeouts ?? 1,
+    fullTimeoutDurationSec: timeoutSource?.fullTimeoutDurationSec ?? 60,
+    shortTimeoutDurationSec: timeoutSource?.shortTimeoutDurationSec ?? 30,
   };
-  const fullColumns = fullTimeoutColumnCount(
-    timeoutRules,
-    Math.max(timeoutCalls.HOME.full.length, timeoutCalls.AWAY.full.length)
-  );
+  const timeoutMatrix = buildTimeoutMatrix(timeoutRules, timeoutCalls);
   const showShortTimeout =
     timeoutRules.shortTimeouts > 0 ||
     timeoutCalls.HOME.short.length > 0 ||
@@ -645,6 +646,10 @@ export function GameSheet() {
     setLastParsed(parsed.value);
     if (!gameId) return;
     if (isGameOver) return;
+    if (parsed.value.resetRemainingMs === 20_000 && !aggregate.shotClockTwentyReset) {
+      setInputError("This game does not use a 20-second shot clock reset.");
+      return;
+    }
 
     const isEqInQ4 =
       parsed.value.type === "END_QUARTER" &&
@@ -667,6 +672,7 @@ export function GameSheet() {
       ...(parsed.value.timeSeconds != null && { timeSeconds: parsed.value.timeSeconds }),
       ...(parsed.value.side != null && { side: parsed.value.side }),
       ...(parsed.value.capNumber != null && { capNumber: parsed.value.capNumber }),
+      ...(parsed.value.resetRemainingMs != null && { remainingMs: parsed.value.resetRemainingMs }),
     };
     try {
       const next = await api.games.applyScoreCommand(gameId, payload);
@@ -926,6 +932,9 @@ export function GameSheet() {
                   <ul>
                     <li><strong>c</strong> or <strong>clock</strong> — Start or stop the game clock</li>
                     <li><strong>r</strong> or <strong>reset</strong> — Reset shot clock to full shot time (from game settings)</li>
+                    {aggregate.shotClockTwentyReset ? (
+                      <li><strong>r20</strong> or <strong>reset20</strong> — Reset shot clock to 20 seconds when the offense keeps the ball after a shot</li>
+                    ) : null}
                   </ul>
                   <p>
                     After <strong>eq</strong>, use <strong>sb</strong> before <strong>c</strong> or <strong>r</strong> while break is pending.
@@ -1459,20 +1468,18 @@ export function GameSheet() {
                     <thead>
                       <tr>
                         <th>Team</th>
-                        {Array.from({ length: fullColumns }, (_, index) => (
-                          <th key={index}>T{index + 1}</th>
+                        {timeoutMatrix.map((column) => (
+                          <th key={column.key}>{column.label}</th>
                         ))}
-                        {showShortTimeout ? <th>{shortLabel}</th> : null}
                       </tr>
                     </thead>
                     <tbody>
                       {(["HOME", "AWAY"] as const).map((side) => (
                         <tr key={side}>
                           <td><strong>{side === "HOME" ? "DARK" : "WHITE"}</strong></td>
-                          {Array.from({ length: fullColumns }, (_, index) => (
-                            <td key={index}>{timeoutCalls[side].full[index] ?? "—"}</td>
+                          {timeoutMatrix.map((column) => (
+                            <td key={column.key}>{(side === "HOME" ? column.home : column.away) ?? "—"}</td>
                           ))}
-                          {showShortTimeout ? <td>{timeoutCalls[side].short[0] ?? "—"}</td> : null}
                         </tr>
                       ))}
                     </tbody>
@@ -1650,6 +1657,9 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
   if (lower === "r" || lower === "reset") {
     return { ok: true, value: { raw, type: "RESET_SHOT_CLOCK" } };
   }
+  if (lower === "r20" || lower === "reset20") {
+    return { ok: true, value: { raw, type: "RESET_SHOT_CLOCK", resetRemainingMs: 20_000 } };
+  }
 
   // b and d both mean dark; w and l both mean light
   const darkChars = "bd";
@@ -1695,7 +1705,7 @@ function parseScoreInput(raw: string): { ok: true; value: ParsedInput } | { ok: 
       return {
         ok: false,
         error:
-          "Invalid command. Examples: sq, eq, sb, c, r, w13g, g13w, 6.07w13g, 5.53b2e, tw, 4.13tw or 4.13t3w.",
+          "Invalid command. Examples: sq, eq, sb, c, r, r20, w13g, g13w, 6.07w13g, 5.53b2e, tw, 4.13tw or 4.13t3w.",
       };
     }
   }
@@ -1916,7 +1926,9 @@ function describeParsed(parsed: ParsedInput, aggregate: GameAggregate): string {
     case "TOGGLE_GAME_CLOCK":
       return aggregate.gameClock?.running ? "Stop game clock" : "Start game clock";
     case "RESET_SHOT_CLOCK":
-      return "Reset shot clock to full shot time";
+      return parsed.resetRemainingMs === 20_000
+        ? "Reset shot clock to 20 seconds"
+        : "Reset shot clock to full shot time";
     case "TIMEOUT":
       return `${parsed.side === "HOME" ? "Dark" : "Light"} timeout at ${formatParsedTime(parsed.timeSeconds)}`;
     case "TIMEOUT_30":

@@ -101,6 +101,11 @@ export function GameDayDetail() {
             {gameDay.date} @ {gameDay.location}
           </h1>
           <p className="form-hint">{describeTimeoutRules(gameDay)}</p>
+          <p className="form-hint">
+            {gameDay.shotClockTwentyReset
+              ? "Shot clock: Reset 30 or Reset 20. This day uses the 20-second reset when the offense keeps the ball after a shot."
+              : "Shot clock: the timer resets to the full possession time."}
+          </p>
         </div>
         <div className="game-day-detail-header-actions">
           <Link to="/kiosks" className="btn secondary">

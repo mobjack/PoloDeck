@@ -143,16 +143,42 @@ export function TimerController() {
     }
   }, [gameId, gameRunning, runCommand]);
 
-  const resetShot = useCallback(() => {
+  const fullShotSeconds = Math.max(
+    1,
+    Math.round((aggregate?.shotClockDurationMs ?? 30_000) / 1000)
+  );
+  const twentyReset = aggregate?.shotClockTwentyReset === true;
+
+  const resetShot = useCallback(
+    (remainingMs?: number) => {
+      if (!gameId) return;
+      const label = remainingMs === 20_000 ? "Reset shot clock to 20" : "Reset shot clock";
+      void runCommand(label, () => api.games.shotClockReset(gameId, remainingMs), VIBRATE_PRIMARY);
+    },
+    [gameId, runCommand]
+  );
+
+  const stage = aggregate ? getStageAction(aggregate) : null;
+
+  const undoDisabled = !aggregate || connectionDown || busy || onBreak || breakPending;
+  const hornDisabled = !aggregate || connectionDown || busy;
+
+  const soundHorn = useCallback(() => {
     if (!gameId) return;
-    void runCommand("Reset shot clock", () => api.games.shotClockReset(gameId), VIBRATE_PRIMARY);
+    void runCommand("Horn", () => api.games.hornTrigger(gameId), VIBRATE_PROTECTED);
   }, [gameId, runCommand]);
 
-  // Keyboard shortcuts: Space = Start/Stop clock, R = Reset shot clock.
-  // Dangerous actions (horn, undo, quarter/break) are intentionally NOT mapped.
+  const horn = useHoldToConfirm({
+    durationMs: 1000,
+    disabled: hornDisabled,
+    onComplete: soundHorn,
+  });
+
+  // Space = start/stop, R = full reset, 2 = 20 reset, H = horn, U = undo confirm.
+  // Quarter and break stay on the confirm button only.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat || isTypingTarget(e.target)) return;
+      if (e.repeat || isTypingTarget(e.target) || confirm) return;
       if (e.code === "Space" || e.key === " ") {
         if (!canToggleClock) return;
         e.preventDefault();
@@ -161,24 +187,33 @@ export function TimerController() {
         if (!canResetShot) return;
         e.preventDefault();
         resetShot();
+      } else if (e.key === "2") {
+        if (!twentyReset || !canResetShot) return;
+        e.preventDefault();
+        resetShot(20_000);
+      } else if (e.key === "h" || e.key === "H") {
+        if (hornDisabled) return;
+        e.preventDefault();
+        soundHorn();
+      } else if (e.key === "u" || e.key === "U") {
+        if (undoDisabled) return;
+        e.preventDefault();
+        setConfirm("undo");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canToggleClock, canResetShot, toggleClock, resetShot]);
-
-  const stage = aggregate ? getStageAction(aggregate) : null;
-
-  const undoDisabled = !aggregate || connectionDown || busy || onBreak || breakPending;
-
-  const horn = useHoldToConfirm({
-    durationMs: 1000,
-    disabled: !aggregate || connectionDown || busy,
-    onComplete: () => {
-      if (!gameId) return;
-      void runCommand("Horn", () => api.games.hornTrigger(gameId), VIBRATE_PROTECTED);
-    },
-  });
+  }, [
+    confirm,
+    canToggleClock,
+    canResetShot,
+    twentyReset,
+    hornDisabled,
+    undoDisabled,
+    toggleClock,
+    resetShot,
+    soundHorn,
+  ]);
 
   // --- Loading / waiting / error states ---
   if (activeLoading && !activeGame) {
@@ -252,6 +287,7 @@ export function TimerController() {
 
   return (
     <div className="page timer-ctrl-page">
+      <div className="timer-ctrl-main">
       <header className="timer-ctrl-header">
         <div className="timer-ctrl-header-top">
           <span className="timer-ctrl-brand">PoloDeck Timer</span>
@@ -319,7 +355,7 @@ export function TimerController() {
         </section>
       </div>
 
-      <div className="timer-ctrl-primary">
+      <div className={"timer-ctrl-primary" + (twentyReset ? " timer-ctrl-primary--twenty" : "")}>
         <button
           type="button"
           className={
@@ -331,21 +367,36 @@ export function TimerController() {
         >
           {gameRunning ? "Stop Clock" : "Start Clock"}
         </button>
-        <button
-          type="button"
-          className="btn timer-ctrl-reset"
-          disabled={!canResetShot}
-          onClick={resetShot}
-        >
-          Reset Shot Clock
-        </button>
+        <div className={"timer-ctrl-resets" + (twentyReset ? " timer-ctrl-resets--twenty" : "")}>
+          <button
+            type="button"
+            className="btn timer-ctrl-reset"
+            disabled={!canResetShot}
+            title={`Shortcut: R. Resets to ${fullShotSeconds} seconds.`}
+            onClick={() => resetShot()}
+          >
+            Reset {fullShotSeconds}
+          </button>
+          {twentyReset ? (
+            <button
+              type="button"
+              className="btn timer-ctrl-reset timer-ctrl-reset--twenty"
+              disabled={!canResetShot}
+              title="Shortcut: 2. Use when the offense keeps the ball after a shot."
+              onClick={() => resetShot(20_000)}
+            >
+              Reset 20
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="timer-ctrl-protected" aria-label="Protected actions">
         <button
           type="button"
           className={"btn timer-ctrl-horn" + (horn.holding ? " timer-ctrl-horn--holding" : "")}
-          disabled={!aggregate || connectionDown || busy}
+          disabled={hornDisabled}
+          title="Shortcut: H"
           aria-label="Hold one second to sound horn"
           {...horn.handlers}
         >
@@ -374,6 +425,7 @@ export function TimerController() {
             type="button"
             className="btn timer-ctrl-undo"
             disabled={undoDisabled}
+            title="Shortcut: U"
             onClick={() => setConfirm("undo")}
           >
             Undo
@@ -402,11 +454,41 @@ export function TimerController() {
         )}
       </div>
 
+      <div className="timer-ctrl-bottom">
       <footer className="timer-ctrl-footer">
         <Link to="/" className="timer-ctrl-footer-link">
           Game day
         </Link>
       </footer>
+
+      <aside className="timer-ctrl-keys" aria-label="Keyboard shortcuts">
+        <ul>
+          <li>
+            <kbd>Space</kbd>
+            <span>Start / Stop</span>
+          </li>
+          <li>
+            <kbd>R</kbd>
+            <span>Reset {fullShotSeconds}</span>
+          </li>
+          {twentyReset ? (
+            <li>
+              <kbd>2</kbd>
+              <span>Reset 20</span>
+            </li>
+          ) : null}
+          <li>
+            <kbd>H</kbd>
+            <span>Horn</span>
+          </li>
+          <li>
+            <kbd>U</kbd>
+            <span>Undo</span>
+          </li>
+        </ul>
+      </aside>
+      </div>
+      </div>
 
       <ConfirmDialog
         open={confirm === "stage" && stage != null && stage.kind !== "complete"}

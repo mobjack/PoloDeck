@@ -29,6 +29,7 @@ export const createGameDayBodySchema = z.object({
   separateOvertimeTimeouts: timeoutRulesFields.separateOvertimeTimeouts.default(true),
   fullTimeoutDurationSec: timeoutRulesFields.fullTimeoutDurationSec.default(120),
   shortTimeoutDurationSec: timeoutRulesFields.shortTimeoutDurationSec.default(30),
+  shotClockTwentyReset: z.boolean().default(false),
 });
 
 export const updateGameDayBodySchema = z.object({
@@ -44,6 +45,7 @@ export const updateGameDayBodySchema = z.object({
   separateOvertimeTimeouts: timeoutRulesFields.separateOvertimeTimeouts.optional(),
   fullTimeoutDurationSec: timeoutRulesFields.fullTimeoutDurationSec.optional(),
   shortTimeoutDurationSec: timeoutRulesFields.shortTimeoutDurationSec.optional(),
+  shotClockTwentyReset: z.boolean().optional(),
   activeGameId: z.string().cuid().nullable().optional(),
 });
 
@@ -98,6 +100,10 @@ export const setClockBodySchema = z.object({
   remainingMs: z.number().int().nonnegative(),
 });
 
+export const resetShotClockBodySchema = z.object({
+  remainingMs: z.number().int().positive().optional(),
+});
+
 export const setGamePeriodBodySchema = z.object({
   period: z.number().int().min(1),
   /** Scoreboard "Half time" — enter halftime break after Q2 (period stays 2 until sq). */
@@ -140,6 +146,8 @@ export const scoreCommandBodySchema = z.object({
   side: z.enum(["HOME", "AWAY"]).optional(),
   capNumber: z.string().min(1).optional(),
   overtime: z.boolean().optional(),
+  /** Full possession reset omits this. 20000 requests the 20-second reset. */
+  remainingMs: z.number().int().positive().optional(),
 });
 
 export const eventLogRebuildRowSchema = z.object({
